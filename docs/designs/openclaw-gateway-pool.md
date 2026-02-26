@@ -1,3 +1,13 @@
+---
+title: OpenClaw Gateway Pool 实施设计
+doc_type: design
+author: mrc
+created_at: 2026-02-26
+updated_at: 2026-02-26
+status: draft
+version: v0.1
+---
+
 # OpenClaw Gateway Pool 实施设计
 
 ## Context
