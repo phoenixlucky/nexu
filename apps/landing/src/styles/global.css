@@ -28,7 +28,7 @@
   --color-accent-fg: #ffffff;
 }
 
-html, body, #root {
+html, body {
   height: 100%;
   margin: 0;
   background-color: var(--color-surface-0);

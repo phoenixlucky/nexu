@@ -565,6 +565,7 @@ export type PostV1ChannelsSlackConnectData = {
         signingSecret: string;
         teamId: string;
         teamName?: string;
+        appId: string;
     };
     path?: never;
     query?: never;
