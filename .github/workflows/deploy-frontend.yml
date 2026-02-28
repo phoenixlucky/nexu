@@ -16,6 +16,8 @@ permissions:
 jobs:
   deploy-landing:
     runs-on: ubuntu-latest
+    env:
+      PUBLIC_AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -37,6 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VITE_COMMIT_HASH: ${{ github.sha }}
+      VITE_AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

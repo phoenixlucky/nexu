@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { identify, track } from "@/lib/tracking";
 import { Loader2 } from "lucide-react";
-import { type ReactNode, useCallback, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import "@/lib/api";
@@ -1021,6 +1022,8 @@ function ChannelConnectModal({
         if (error) throw new Error("Connection failed");
       }
       toast.success(`${channelName} connected!`);
+      track("channel_ready", { channel: channelId });
+      identify({ primary_platform: channelId, channels_connected: 1 });
       // Advance to next step (events/test) if there is one, otherwise close
       if (stepIdx < steps.length - 1) {
         setStepIdx(stepIdx + 1);
@@ -1798,6 +1801,14 @@ export function OnboardingPage() {
 
   const returnTo = searchParams.get("returnTo") || "/workspace";
 
+  const trackedStart = useRef(false);
+  useEffect(() => {
+    if (!trackedStart.current) {
+      track("onboarding_start");
+      trackedStart.current = true;
+    }
+  }, []);
+
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["me"],
     queryFn: async () => {
@@ -1835,6 +1846,10 @@ export function OnboardingPage() {
       if (stepData) setData(newData);
       if (currentStep < STEPS.length - 1) setCurrentStep(newStep);
       saveProgress(newStep, newData);
+      // Identify user properties per step
+      if (currentStep === 0 && newData.role) identify({ user_role: newData.role });
+      if (currentStep === 1 && newData.useCases) identify({ use_cases: newData.useCases });
+      if (currentStep === 2 && newData.referralSource) identify({ referral_source: newData.referralSource });
     },
     [currentStep, data],
   );
@@ -1851,6 +1866,7 @@ export function OnboardingPage() {
     (stepData?: Partial<OnboardingData>) => {
       const finalData = { ...data, ...stepData } as OnboardingData;
       setData(finalData);
+      if (finalData.selectedAvatar) identify({ avatar_choice: finalData.selectedAvatar });
       completeMutation.mutate(finalData);
     },
     [data, completeMutation],

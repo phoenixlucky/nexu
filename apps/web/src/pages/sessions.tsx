@@ -1,8 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { track } from "@/lib/tracking";
 import { useQuery } from "@tanstack/react-query";
 import { Clock, Hash, MessageCircle, MessageSquare } from "lucide-react";
+import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { getV1SessionsById } from "../../lib/api/sdk.gen";
 
@@ -50,6 +52,10 @@ function EmptyState() {
 
 export function SessionsPage() {
   const { id } = useParams<{ id: string }>();
+
+  useEffect(() => {
+    if (id) track("session_start");
+  }, [id]);
 
   const { data: session } = useQuery({
     queryKey: ["session", id],
