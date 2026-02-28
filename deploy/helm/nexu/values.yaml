@@ -79,6 +79,8 @@ gateway:
     limits:
       cpu: "2"
       memory: 4Gi
+  persistence:
+    size: 20Gi
   hpa:
     enabled: true
     minReplicas: 1

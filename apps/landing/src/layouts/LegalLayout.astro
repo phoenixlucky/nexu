@@ -1,0 +1,67 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+const frontmatter = Astro.props.frontmatter ?? Astro.props;
+const pageTitle = frontmatter.title ?? title ?? "Nexu";
+---
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{pageTitle} - Nexu</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="min-h-full bg-surface-0 relative">
+
+      {/* Nav */}
+      <nav class="sticky top-0 z-50 border-b backdrop-blur-md border-border bg-surface-0/85">
+        <div class="flex justify-between items-center px-6 mx-auto max-w-5xl h-14">
+          <a href="/" class="flex items-center gap-2.5 transition-opacity hover:opacity-80">
+            <div class="flex justify-center items-center w-7 h-7 rounded-lg bg-accent">
+              <span class="text-xs font-bold text-accent-fg">N</span>
+            </div>
+            <span class="text-sm font-semibold tracking-tight text-text-primary">Nexu</span>
+          </a>
+          <div class="flex items-center gap-6 text-[13px] text-text-tertiary">
+            <a href="/" class="transition-colors hover:text-text-primary">&larr; Back</a>
+          </div>
+        </div>
+      </nav>
+
+      {/* Content */}
+      <main class="px-6 py-16 mx-auto max-w-3xl">
+        <article class="prose">
+          <slot />
+        </article>
+      </main>
+
+      {/* Footer */}
+      <footer class="border-t border-border">
+        <div class="flex justify-between items-center px-6 py-8 mx-auto max-w-5xl">
+          <div class="flex items-center gap-2.5">
+            <div class="flex justify-center items-center w-5 h-5 rounded bg-accent">
+              <span class="text-[9px] font-bold text-accent-fg">N</span>
+            </div>
+            <span class="text-xs text-text-muted">&copy; 2026 Powerformer, Inc.</span>
+          </div>
+          <div class="flex gap-6 text-xs text-text-muted">
+            <a href="#" class="transition-colors hover:text-text-secondary">X / Twitter</a>
+            <a href="#" class="transition-colors hover:text-text-secondary">Docs</a>
+            <a href="/privacy" class="transition-colors hover:text-text-secondary">Privacy Policy</a>
+            <a href="/terms" class="transition-colors hover:text-text-secondary">Terms of Service</a>
+          </div>
+        </div>
+      </footer>
+
+    </div>
+  </body>
+</html>

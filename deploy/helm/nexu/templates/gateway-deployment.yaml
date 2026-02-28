@@ -60,9 +60,13 @@ spec:
                   fieldPath: status.podIP
             - name: OPENCLAW_CONFIG_PATH
               value: /etc/openclaw/config.json
+            - name: OPENCLAW_STATE_DIR
+              value: /data/openclaw
           volumeMounts:
             - name: openclaw-config
               mountPath: /etc/openclaw
+            - name: openclaw-data
+              mountPath: /data/openclaw
           readinessProbe:
             tcpSocket:
               port: gateway
@@ -80,3 +84,12 @@ spec:
       volumes:
         - name: openclaw-config
           emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: openclaw-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3
+        resources:
+          requests:
+            storage: {{ .Values.gateway.persistence.size | default "20Gi" }}

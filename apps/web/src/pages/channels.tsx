@@ -59,6 +59,16 @@ interface StepDef {
   hasInputs?: boolean;
 }
 
+function renderBold(text: string) {
+  const parts = text.split(/(\*\*.+?\*\*)/g);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    part.startsWith("**") && part.endsWith("**")
+      ? <strong key={i} className="font-semibold text-text-primary">{part.slice(2, -2)}</strong>
+      : <span key={i}>{part}</span>,
+  );
+}
+
 const DISCORD_STEPS: StepDef[] = [
   {
     step: 1,
@@ -66,9 +76,9 @@ const DISCORD_STEPS: StepDef[] = [
     desc: "Go to the Discord Developer Portal and create a new application.",
     detail: [
       { text: "Discord Developer Portal", url: "https://discord.com/developers/applications" },
-      'Click "New Application"',
-      "Set the App Name to Nexu",
-      "Save and navigate to the Bot page",
+      'Click **"New Application"**',
+      "Set the App Name to **Nexu**",
+      "Save and navigate to the **Bot** page",
     ],
   },
   {
@@ -76,8 +86,8 @@ const DISCORD_STEPS: StepDef[] = [
     title: "Configure Bot Permissions",
     desc: "Enable Privileged Gateway Intents on the Bot page.",
     detail: [
-      "Go to Application → Bot",
-      "Enable the following Intents:",
+      "Go to Application → **Bot**",
+      "**Enable** the following Intents:",
       "  · MESSAGE CONTENT INTENT — read message content",
       "  · SERVER MEMBERS INTENT — read member information",
     ],
@@ -94,8 +104,8 @@ const DISCORD_STEPS: StepDef[] = [
     desc: "Add the Bot to your Discord server, then mention @Nexu to test.",
     detail: [
       "Click the button below to invite the bot to your server",
-      "Select the server and authorize",
-      'Send "@Nexu hello" in a channel to test',
+      "Select the server and **authorize**",
+      'Send **"@Nexu hello"** in a channel to test',
     ],
   },
 ];
@@ -107,9 +117,9 @@ const SLACK_STEPS: StepDef[] = [
     desc: "Go to the Slack API dashboard and create a new App.",
     detail: [
       { text: "Slack API Dashboard", url: "https://api.slack.com/apps" },
-      'Click "Create New App"',
-      'Select "From scratch"',
-      "Set the App Name to Nexu",
+      'Click **"Create New App"**',
+      'Select **"From scratch"**',
+      "Set the App Name to **Nexu**",
       "Choose the workspace to install it to",
     ],
   },
@@ -118,9 +128,9 @@ const SLACK_STEPS: StepDef[] = [
     title: "Configure Bot Permissions",
     desc: "Add Bot Token Scopes under OAuth & Permissions.",
     detail: [
-      "Go to App → OAuth & Permissions",
-      "Scroll down to \"Bot Token Scopes\"",
-      "Add the following scopes:",
+      "Go to App → **OAuth & Permissions**",
+      "Scroll down to **\"Bot Token Scopes\"**",
+      "**Add** the following scopes:",
       "  · chat:write — send messages",
       "  · app_mentions:read — receive @mentions",
       "  · files:read — read uploaded files",
@@ -132,10 +142,10 @@ const SLACK_STEPS: StepDef[] = [
     title: "Install & Connect",
     desc: "Install the App to your workspace, then paste the credentials below.",
     detail: [
-      "Go to App → Install App",
-      'Click "Install to Workspace" and authorize',
-      "After install, go to App → OAuth & Permissions → copy the \"Bot User OAuth Token\" (starts with xoxb-)",
-      "Then go to App → Basic Information → App Credentials → copy the \"Signing Secret\"",
+      "Go to App → **Install App**",
+      'Click **"Install to Workspace"** and authorize',
+      "After install, go to App → **OAuth & Permissions** → copy the **\"Bot User OAuth Token\"** (starts with xoxb-)",
+      "Then go to App → **Basic Information** → **App Credentials** → copy the **\"Signing Secret\"**",
       "Paste both values below:",
     ],
     hasInputs: true,
@@ -145,18 +155,18 @@ const SLACK_STEPS: StepDef[] = [
     title: "Configure Events & Test",
     desc: "Set up Event Subscriptions so Slack forwards messages to Nexu.",
     detail: [
-      "Go to App → Event Subscriptions",
-      "Toggle \"Enable Events\" on",
+      "Go to App → **Event Subscriptions**",
+      "Toggle **\"Enable Events\"** on",
       "Enter the following Request URL:",
     ],
     copyable: "/api/slack/events",
     detail2: [
-      "Under \"Subscribe to bot events\", add:",
+      "Under **\"Subscribe to bot events\"**, add:",
       "  · app_mention — when someone @mentions your bot",
       "  · message.channels — messages in public channels",
-      "Click \"Save Changes\"",
-      "In any Slack channel, type /invite @Nexu",
-      'Send "@Nexu hello" to test',
+      "Click **\"Save Changes\"**",
+      "In any Slack channel, type **/invite @Nexu**",
+      'Send **"@Nexu hello"** to test',
     ],
   },
 ];
@@ -631,7 +641,7 @@ function SetupGuideView({
                     ) : (
                       <span className="flex gap-2.5 items-start">
                         <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-accent/40 shrink-0" />
-                        {d}
+                        {renderBold(d)}
                       </span>
                     )}
                   </div>
@@ -703,7 +713,7 @@ function SetupGuideView({
                     ) : (
                       <span className="flex gap-2.5 items-start">
                         <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-accent/40 shrink-0" />
-                        {d}
+                        {renderBold(d)}
                       </span>
                     )}
                   </div>

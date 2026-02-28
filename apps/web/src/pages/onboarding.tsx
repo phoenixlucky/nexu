@@ -408,21 +408,31 @@ function ReferralStep({ data, onNext, onBack }: {
 
 interface SetupStep { title: string; bullets: string[]; copyable?: string; hasInputs?: boolean; link?: { label: string; url: string } }
 
+function renderBold(text: string) {
+  const parts = text.split(/(\*\*.+?\*\*)/g);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    part.startsWith("**") && part.endsWith("**")
+      ? <strong key={i} className="font-semibold text-text-primary">{part.slice(2, -2)}</strong>
+      : <span key={i}>{part}</span>,
+  );
+}
+
 const SLACK_SETUP_STEPS: SetupStep[] = [
-  { title: "Create Slack App", link: { label: "Open Slack API Dashboard", url: "https://api.slack.com/apps" }, bullets: ['Click "Create New App"', 'Select "From scratch"', "Set the App Name to Nexu", "Choose the workspace to install it to"] },
-  { title: "Configure Bot Permissions", bullets: ['Go to your app \u2192 "OAuth & Permissions" tab', 'Scroll to "Bot Token Scopes"', "Add these scopes:", "\u2003\u00B7 chat:write \u2014 send messages", "\u2003\u00B7 app_mentions:read \u2014 receive @mentions", "\u2003\u00B7 files:read \u2014 read uploaded files", "\u2003\u00B7 channels:history \u2014 read channel messages"] },
-  { title: "Install & Connect", bullets: ['Go to your app \u2192 "Install App"', 'Click "Install to Workspace" and authorize', 'After install, go to "OAuth & Permissions" \u2192 copy the "Bot User OAuth Token" (starts with xoxb-)', 'Then go to "Basic Information" \u2192 "App Credentials" \u2192 copy the "Signing Secret"', "Paste both values below:"], hasInputs: true },
-  { title: "Configure Events & Test", bullets: ['Go to your app \u2192 "Event Subscriptions"', 'Toggle "Enable Events" on', "Enter this Request URL:"], copyable: "/api/slack/events", },
+  { title: "Create Slack App", link: { label: "Open Slack API Dashboard", url: "https://api.slack.com/apps" }, bullets: ['Click **"Create New App"**', 'Select **"From scratch"**', "Set the App Name to **Nexu**", "Choose the workspace to install it to"] },
+  { title: "Configure Bot Permissions", bullets: ['Go to your app \u2192 **"OAuth & Permissions"** tab', 'Scroll to **"Bot Token Scopes"**', "**Add** these scopes:", "\u2003\u00B7 chat:write \u2014 send messages", "\u2003\u00B7 app_mentions:read \u2014 receive @mentions", "\u2003\u00B7 files:read \u2014 read uploaded files", "\u2003\u00B7 channels:history \u2014 read channel messages"] },
+  { title: "Install & Connect", bullets: ['Go to your app \u2192 **"Install App"**', 'Click **"Install to Workspace"** and authorize', 'After install, go to **"OAuth & Permissions"** \u2192 copy the **"Bot User OAuth Token"** (starts with xoxb-)', 'Then go to **"Basic Information"** \u2192 **"App Credentials"** \u2192 copy the **"Signing Secret"**', "Paste both values below:"], hasInputs: true },
+  { title: "Configure Events & Test", bullets: ['Go to your app \u2192 **"Event Subscriptions"**', 'Toggle **"Enable Events"** on', "Enter this Request URL:"], copyable: "/api/slack/events", },
 ];
 
 // Extra bullets shown after the copyable URL in the last Slack step
-const SLACK_EVENTS_EXTRA = ['Under "Subscribe to bot events", add:', "\u2003\u00B7 app_mention", "\u2003\u00B7 message.channels", 'Click "Save Changes"', "In any Slack channel, type /invite @Nexu", 'Send "@Nexu hello" to test'];
+const SLACK_EVENTS_EXTRA = ['Under **"Subscribe to bot events"**, add:', "\u2003\u00B7 app_mention", "\u2003\u00B7 message.channels", 'Click **"Save Changes"**', "In any Slack channel, type **/invite @Nexu**", 'Send **"@Nexu hello"** to test'];
 
 const DISCORD_SETUP_STEPS: SetupStep[] = [
-  { title: "Create Discord Application", link: { label: "Open Discord Developer Portal", url: "https://discord.com/developers/applications" }, bullets: ['Click "New Application"', "Set the App Name to Nexu", "Save and go to the Bot page"] },
-  { title: "Configure Bot Permissions", bullets: ['Go to Application \u2192 "Bot"', "Enable these Privileged Gateway Intents:", "\u2003\u00B7 MESSAGE CONTENT INTENT", "\u2003\u00B7 SERVER MEMBERS INTENT"] },
+  { title: "Create Discord Application", link: { label: "Open Discord Developer Portal", url: "https://discord.com/developers/applications" }, bullets: ['Click **"New Application"**', "Set the App Name to **Nexu**", "Save and go to the **Bot** page"] },
+  { title: "Configure Bot Permissions", bullets: ['Go to Application \u2192 **"Bot"**', "**Enable** these Privileged Gateway Intents:", "\u2003\u00B7 MESSAGE CONTENT INTENT", "\u2003\u00B7 SERVER MEMBERS INTENT"] },
   { title: "Enter Credentials & Connect", hasInputs: true, bullets: [] },
-  { title: "Invite Bot & Test", bullets: ["Click the button below to invite the bot to your server", "Select the server and authorize", 'Send "@Nexu hello" in a channel to test'] },
+  { title: "Invite Bot & Test", bullets: ["Click the button below to invite the bot to your server", "Select the server and **authorize**", 'Send **"@Nexu hello"** in a channel to test'] },
 ];
 
 const SETUP_STEPS_MAP: Record<string, SetupStep[]> = { slack: SLACK_SETUP_STEPS, discord: DISCORD_SETUP_STEPS };
@@ -538,7 +548,7 @@ function ChannelConnectModal({ channelId, channelName, channelColor, onClose, on
                   {b.startsWith("\u2003") ? (
                     <span className="ml-3 text-text-muted font-mono text-[11px]">{b.trim()}</span>
                   ) : (
-                    <span className="flex gap-2 items-start"><span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: channelColor, opacity: 0.5 }} />{b}</span>
+                    <span className="flex gap-2 items-start"><span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: channelColor, opacity: 0.5 }} />{renderBold(b)}</span>
                   )}
                 </div>
               ))}
@@ -575,7 +585,7 @@ function ChannelConnectModal({ channelId, channelName, channelColor, onClose, on
                         {b.startsWith("\u2003") ? (
                           <span className="ml-3 text-text-muted font-mono text-[11px]">{b.trim()}</span>
                         ) : (
-                          <span className="flex gap-2 items-start"><span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: channelColor, opacity: 0.5 }} />{b}</span>
+                          <span className="flex gap-2 items-start"><span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: channelColor, opacity: 0.5 }} />{renderBold(b)}</span>
                         )}
                       </div>
                     ))}
