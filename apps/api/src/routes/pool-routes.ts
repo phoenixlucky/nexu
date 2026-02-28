@@ -14,8 +14,8 @@ import { gatewayPools } from "../db/schema/index.js";
 import { generatePoolConfig } from "../lib/config-generator.js";
 import { requireInternalToken } from "../middleware/internal-auth.js";
 import {
-  getLatestPoolConfigSnapshot,
   getPoolConfigSnapshotByVersion,
+  publishPoolConfigSnapshot,
 } from "../services/runtime/pool-config-service.js";
 import type { AppBindings } from "../types.js";
 
@@ -213,7 +213,7 @@ export function registerPoolRoutes(app: OpenAPIHono<AppBindings>) {
       return c.json({ message: `Pool ${poolId} not found` }, 404);
     }
 
-    const snapshot = await getLatestPoolConfigSnapshot(db, poolId);
+    const snapshot = await publishPoolConfigSnapshot(db, poolId);
     return c.json(
       {
         poolId: snapshot.poolId,

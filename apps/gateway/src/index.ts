@@ -4,6 +4,7 @@ import {
   runGatewayHealthLoops,
   runHeartbeatLoop,
   runPollLoop,
+  runSkillsPollLoop,
 } from "./loops.js";
 import { stopManagedOpenclawGateway } from "./openclaw-process.js";
 import { createRuntimeState } from "./state.js";
@@ -16,6 +17,7 @@ async function main(): Promise<void> {
   runGatewayHealthLoops(state);
   void runHeartbeatLoop(state);
   void runDiscordSessionSyncLoop();
+  void runSkillsPollLoop(state);
   await runPollLoop(state);
 }
 

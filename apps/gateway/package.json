@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "OPENCLAW_STATE_DIR=../../.openclaw RUNTIME_GATEWAY_PROBE_ENABLED=false RUNTIME_POOL_ID=pool_local_01 RUNTIME_POD_IP=127.0.0.1 NODE_OPTIONS=--conditions=development tsx watch src/index.ts",
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@nexu/shared": "workspace:*",
@@ -16,6 +17,7 @@
   "devDependencies": {
     "@types/node": "^22.13.4",
     "tsx": "^4.19.3",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.0"
   }
 }

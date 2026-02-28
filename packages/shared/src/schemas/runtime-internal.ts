@@ -53,3 +53,12 @@ export type RuntimePoolHeartbeatInput = z.infer<
 export type RuntimePoolConfigResponse = z.infer<
   typeof runtimePoolConfigResponseSchema
 >;
+
+export const runtimeSkillsResponseSchema = z.object({
+  version: z.number().int().nonnegative(),
+  skillsHash: z.string(),
+  skills: z.record(z.string()),
+  createdAt: z.string().datetime(),
+});
+
+export type RuntimeSkillsResponse = z.infer<typeof runtimeSkillsResponseSchema>;

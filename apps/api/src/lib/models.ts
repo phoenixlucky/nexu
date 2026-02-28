@@ -2,8 +2,8 @@ import type { Model } from "@nexu/shared";
 
 export const PLATFORM_MODELS: Model[] = [
   {
-    id: "anthropic/claude-sonnet-4-6",
-    name: "Claude Sonnet 4.6",
+    id: "anthropic/claude-sonnet-4",
+    name: "Claude Sonnet 4",
     provider: "anthropic",
     isDefault: true,
     description: "Recommended - best balance of speed and capability",

@@ -67,7 +67,7 @@ export async function migrate(dbUrl?: string) {
       name TEXT NOT NULL,
       slug TEXT NOT NULL,
       system_prompt TEXT,
-      model_id TEXT DEFAULT 'anthropic/claude-sonnet-4-6',
+      model_id TEXT DEFAULT 'anthropic/claude-sonnet-4',
       agent_config TEXT DEFAULT '{}',
       tools_config TEXT DEFAULT '{}',
       status TEXT DEFAULT 'active',
@@ -237,6 +237,25 @@ export async function migrate(dbUrl?: string) {
     CREATE INDEX IF NOT EXISTS sessions_status_idx ON sessions(status);
     CREATE INDEX IF NOT EXISTS sessions_created_at_idx ON sessions(created_at);
     CREATE INDEX IF NOT EXISTS sessions_channel_type_idx ON sessions(channel_type);
+
+    CREATE TABLE IF NOT EXISTS skills (
+      pk SERIAL PRIMARY KEY,
+      id TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL UNIQUE,
+      content TEXT NOT NULL,
+      status TEXT DEFAULT 'active',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS skills_snapshots (
+      pk SERIAL PRIMARY KEY,
+      id TEXT NOT NULL UNIQUE,
+      version INTEGER NOT NULL UNIQUE,
+      skills_hash TEXT NOT NULL,
+      skills_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
   `);
 
   // Migrations

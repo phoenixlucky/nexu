@@ -189,6 +189,31 @@ export const poolConfigSnapshots = pgTable(
   ],
 );
 
+export const skills = pgTable("skills", {
+  pk: serial("pk").primaryKey(),
+  id: text("id").notNull().unique(),
+  name: text("name").notNull().unique(),
+  content: text("content").notNull(),
+  status: text("status").default("active"),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
+export const skillsSnapshots = pgTable("skills_snapshots", {
+  pk: serial("pk").primaryKey(),
+  id: text("id").notNull().unique(),
+  version: integer("version").notNull().unique(),
+  skillsHash: text("skills_hash").notNull(),
+  skillsJson: text("skills_json").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
 export const oauthStates = pgTable("oauth_states", {
   pk: serial("pk").primaryKey(),
   id: text("id").notNull().unique(),

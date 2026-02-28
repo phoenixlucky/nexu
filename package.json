@@ -18,7 +18,8 @@
     "db:push": "pnpm --filter @nexu/api db:push"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4"
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^25.3.1"
   },
   "engines": {
     "node": ">=20",

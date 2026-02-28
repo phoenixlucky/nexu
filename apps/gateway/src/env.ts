@@ -37,6 +37,7 @@ const envSchema = z.object({
   INTERNAL_API_TOKEN: z.string().min(1).default("gw-secret-token"),
   OPENCLAW_CONFIG_PATH: z.string().min(1).optional(),
   OPENCLAW_STATE_DIR: z.string().min(1).optional(),
+  OPENCLAW_SKILLS_DIR: z.string().min(1).optional(),
   RUNTIME_API_BASE_URL: z.string().url().default("http://localhost:3000"),
   RUNTIME_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
   RUNTIME_POLL_JITTER_MS: z.coerce.number().int().nonnegative().default(300),
@@ -132,11 +133,16 @@ const openclawConfigPath = normalizeConfigPath(
   parsedEnv.OPENCLAW_CONFIG_PATH ?? `${openclawStateDir}/openclaw.json`,
 );
 
+const openclawSkillsDir = normalizeConfigPath(
+  parsedEnv.OPENCLAW_SKILLS_DIR ?? `${openclawStateDir}/skills`,
+);
+
 const runtimePoolId = parsedEnv.RUNTIME_POOL_ID ?? hostname();
 
 export const env = {
   ...parsedEnv,
   OPENCLAW_CONFIG_PATH: openclawConfigPath,
+  OPENCLAW_SKILLS_DIR: openclawSkillsDir,
   RUNTIME_POOL_ID: runtimePoolId,
 };
 
