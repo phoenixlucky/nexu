@@ -242,9 +242,7 @@ export function AuthPage() {
               toast.info("Verification code sent to your email");
               return;
             }
-            toast.error(
-              "This email is already registered. Please log in.",
-            );
+            toast.error("This email is already registered. Please log in.");
             setLoading(null);
             return;
           }

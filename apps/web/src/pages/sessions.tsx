@@ -8,10 +8,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useParams } from "react-router-dom";
-import {
-  getApiV1Artifacts,
-  getApiV1SessionsById,
-} from "../../lib/api/sdk.gen";
+import { getApiV1Artifacts, getApiV1SessionsById } from "../../lib/api/sdk.gen";
 
 type Platform = "slack" | "discord" | "whatsapp" | "telegram" | "web";
 
@@ -115,7 +112,7 @@ export function SessionsPage() {
     queryKey: ["artifacts", session?.sessionKey],
     queryFn: async () => {
       const { data } = await getApiV1Artifacts({
-        query: { sessionKey: session!.sessionKey },
+        query: { sessionKey: session?.sessionKey },
       });
       return data;
     },
@@ -238,8 +235,7 @@ export function SessionsPage() {
                           rel="noreferrer"
                           className="text-[11px] text-emerald-600 shrink-0 hover:underline"
                         >
-                          Preview{" "}
-                          <ExternalLink size={9} className="inline" />
+                          Preview <ExternalLink size={9} className="inline" />
                         </a>
                       )}
                     </div>
