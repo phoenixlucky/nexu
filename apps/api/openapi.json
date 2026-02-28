@@ -695,175 +695,6 @@
         }
       }
     },
-    "/api/internal/skills/latest": {
-      "get": {
-        "tags": [
-          "Internal"
-        ],
-        "responses": {
-          "200": {
-            "description": "Latest skills snapshot",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "version": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "skillsHash": {
-                      "type": "string"
-                    },
-                    "skills": {
-                      "type": "object",
-                      "additionalProperties": {
-                        "type": "string"
-                      }
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
-                  },
-                  "required": [
-                    "version",
-                    "skillsHash",
-                    "skills",
-                    "createdAt"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "message"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/internal/skills/{name}": {
-      "put": {
-        "tags": [
-          "Internal"
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "name": "name",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "content": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "active",
-                      "inactive"
-                    ]
-                  }
-                },
-                "required": [
-                  "content"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Skill upserted",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "version": {
-                      "type": "integer",
-                      "minimum": 0
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "name",
-                    "version"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid name or body",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "message"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/me": {
       "get": {
         "tags": [
@@ -1684,6 +1515,16 @@
       "get": {
         "tags": [
           "Channels"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "returnTo",
+            "in": "query"
+          }
         ],
         "responses": {
           "200": {
@@ -2531,28 +2372,6 @@
                         }
                       }
                     },
-                    "skills": {
-                      "type": "object",
-                      "properties": {
-                        "load": {
-                          "type": "object",
-                          "properties": {
-                            "watch": {
-                              "type": "boolean"
-                            },
-                            "watchDebounceMs": {
-                              "type": "number"
-                            },
-                            "extraDirs": {
-                              "type": "array",
-                              "items": {
-                                "type": "string"
-                              }
-                            }
-                          }
-                        }
-                      }
-                    },
                     "agents": {
                       "type": "object",
                       "properties": {
@@ -3290,28 +3109,6 @@
                             }
                           }
                         },
-                        "skills": {
-                          "type": "object",
-                          "properties": {
-                            "load": {
-                              "type": "object",
-                              "properties": {
-                                "watch": {
-                                  "type": "boolean"
-                                },
-                                "watchDebounceMs": {
-                                  "type": "number"
-                                },
-                                "extraDirs": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string"
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        },
                         "agents": {
                           "type": "object",
                           "properties": {
@@ -3916,28 +3713,6 @@
                                     "gateway",
                                     "node"
                                   ]
-                                }
-                              }
-                            }
-                          }
-                        },
-                        "skills": {
-                          "type": "object",
-                          "properties": {
-                            "load": {
-                              "type": "object",
-                              "properties": {
-                                "watch": {
-                                  "type": "boolean"
-                                },
-                                "watchDebounceMs": {
-                                  "type": "number"
-                                },
-                                "extraDirs": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string"
-                                  }
                                 }
                               }
                             }

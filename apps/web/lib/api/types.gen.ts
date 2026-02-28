@@ -233,82 +233,6 @@ export type PatchApiInternalSessionsByIdResponses = {
 
 export type PatchApiInternalSessionsByIdResponse = PatchApiInternalSessionsByIdResponses[keyof PatchApiInternalSessionsByIdResponses];
 
-export type GetApiInternalSkillsLatestData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/internal/skills/latest';
-};
-
-export type GetApiInternalSkillsLatestErrors = {
-    /**
-     * Unauthorized
-     */
-    401: {
-        message: string;
-    };
-};
-
-export type GetApiInternalSkillsLatestError = GetApiInternalSkillsLatestErrors[keyof GetApiInternalSkillsLatestErrors];
-
-export type GetApiInternalSkillsLatestResponses = {
-    /**
-     * Latest skills snapshot
-     */
-    200: {
-        version: number;
-        skillsHash: string;
-        skills: {
-            [key: string]: string;
-        };
-        createdAt: string;
-    };
-};
-
-export type GetApiInternalSkillsLatestResponse = GetApiInternalSkillsLatestResponses[keyof GetApiInternalSkillsLatestResponses];
-
-export type PutApiInternalSkillsByNameData = {
-    body?: {
-        content: string;
-        status?: 'active' | 'inactive';
-    };
-    path: {
-        name: string;
-    };
-    query?: never;
-    url: '/api/internal/skills/{name}';
-};
-
-export type PutApiInternalSkillsByNameErrors = {
-    /**
-     * Invalid name or body
-     */
-    400: {
-        message: string;
-    };
-    /**
-     * Unauthorized
-     */
-    401: {
-        message: string;
-    };
-};
-
-export type PutApiInternalSkillsByNameError = PutApiInternalSkillsByNameErrors[keyof PutApiInternalSkillsByNameErrors];
-
-export type PutApiInternalSkillsByNameResponses = {
-    /**
-     * Skill upserted
-     */
-    200: {
-        ok: boolean;
-        name: string;
-        version: number;
-    };
-};
-
-export type PutApiInternalSkillsByNameResponse = PutApiInternalSkillsByNameResponses[keyof PutApiInternalSkillsByNameResponses];
-
 export type GetApiV1MeData = {
     body?: never;
     path?: never;
@@ -637,7 +561,9 @@ export type PostApiV1BotsByBotIdResumeResponse = PostApiV1BotsByBotIdResumeRespo
 export type GetApiV1ChannelsSlackOauthUrlData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        returnTo?: string;
+    };
     url: '/api/v1/channels/slack/oauth-url';
 };
 
@@ -966,13 +892,6 @@ export type GetApiInternalPoolsByPoolIdConfigResponses = {
                 host?: 'sandbox' | 'gateway' | 'node';
             };
         };
-        skills?: {
-            load?: {
-                watch?: boolean;
-                watchDebounceMs?: number;
-                extraDirs?: Array<string>;
-            };
-        };
         agents: {
             defaults?: {
                 model?: string | {
@@ -1173,13 +1092,6 @@ export type GetApiInternalPoolsByPoolIdConfigLatestResponses = {
                     host?: 'sandbox' | 'gateway' | 'node';
                 };
             };
-            skills?: {
-                load?: {
-                    watch?: boolean;
-                    watchDebounceMs?: number;
-                    extraDirs?: Array<string>;
-                };
-            };
             agents: {
                 defaults?: {
                     model?: string | {
@@ -1332,13 +1244,6 @@ export type GetApiInternalPoolsByPoolIdConfigVersionsByVersionResponses = {
                     security?: 'deny' | 'allowlist' | 'full';
                     ask?: 'off' | 'on-miss' | 'always';
                     host?: 'sandbox' | 'gateway' | 'node';
-                };
-            };
-            skills?: {
-                load?: {
-                    watch?: boolean;
-                    watchDebounceMs?: number;
-                    extraDirs?: Array<string>;
                 };
             };
             agents: {

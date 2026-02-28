@@ -265,13 +265,13 @@ const CREDENTIAL_FIELDS: Record<
     hint2: "Application → Bot → Reset Token, copy the generated token",
   },
   slack: {
-    label1: "Bot User OAuth Token",
-    placeholder1: "xoxb-xxxxxxxxxxxxx",
-    hint1:
+    label1: "Signing Secret",
+    placeholder1: "xxxxxxxxxxxxxxxxxxxxxxx",
+    hint1: "App → Basic Information → App Credentials → Signing Secret",
+    label2: "Bot User OAuth Token",
+    placeholder2: "xoxb-xxxxxxxxxxxxx",
+    hint2:
       "App → OAuth & Permissions → Bot User OAuth Token (starts with xoxb-)",
-    label2: "Signing Secret",
-    placeholder2: "xxxxxxxxxxxxxxxxxxxxxxx",
-    hint2: "App → Basic Information → App Credentials → Signing Secret",
   },
   whatsapp: {
     label1: "Access Token",
@@ -493,8 +493,8 @@ function SetupGuideView({
     mutationFn: async () => {
       const { data, error } = await postApiV1ChannelsSlackConnect({
         body: {
-          botToken: field1,
-          signingSecret: field2,
+          botToken: field2,
+          signingSecret: field1,
         },
       });
       if (error) throw new Error(error.message);

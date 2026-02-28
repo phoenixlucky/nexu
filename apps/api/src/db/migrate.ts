@@ -271,6 +271,7 @@ export async function migrate(dbUrl?: string) {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_avatar TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_avatar_votes TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed_at TEXT;
+    ALTER TABLE oauth_states ADD COLUMN IF NOT EXISTS return_to TEXT;
   `);
 
   console.log("Database migrated successfully");

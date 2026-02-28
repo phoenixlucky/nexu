@@ -127,6 +127,11 @@ const slackOAuthUrlRoute = createRoute({
   method: "get",
   path: "/api/v1/channels/slack/oauth-url",
   tags: ["Channels"],
+  request: {
+    query: z.object({
+      returnTo: z.string().optional(),
+    }),
+  },
   responses: {
     200: {
       content: {
@@ -253,12 +258,14 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
     // Generate CSRF state token (10 min TTL) — botId is null
     const nonce = createId();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const returnTo = c.req.query("returnTo");
 
     await db.insert(oauthStates).values({
       id: createId(),
       state: nonce,
       userId,
       expiresAt,
+      returnTo,
     });
 
     const url = new URL("https://slack.com/oauth/v2/authorize");
@@ -991,6 +998,9 @@ export function registerSlackOAuthCallback(app: OpenAPIHono<AppBindings>) {
     successUrl.searchParams.set("success", "true");
     successUrl.searchParams.set("channelId", channelId);
     successUrl.searchParams.set("teamName", teamName);
+    if (stateRow.returnTo) {
+      successUrl.searchParams.set("returnTo", stateRow.returnTo);
+    }
     return c.redirect(successUrl.toString(), 302);
   });
 }
