@@ -42,6 +42,7 @@ pnpm generate-types                   # OpenAPI spec → frontend SDK
 - Do not modify OpenClaw source code.
 - Never commit code changes until explicitly told to do so.
 - Whenever you add a new environment variable, update `deploy/helm/nexu/values.yaml` in the same change.
+- Gateway sidecar: never derive state paths from `OPENCLAW_CONFIG_PATH`. Use `env.OPENCLAW_STATE_DIR` for state-related files (sessions, skills, nexu-context.json). See `docs/guides/gateway-environment-guide.md`.
 
 ## Required checks
 
@@ -71,6 +72,7 @@ pnpm generate-types                   # OpenAPI spec → frontend SDK
 | Config schema & pitfalls | `docs/references/openclaw-config-schema.md` |
 | API coding patterns | `docs/references/api-patterns.md` |
 | Infrastructure | `docs/references/infrastructure.md` |
+| Gateway environment (dev vs prod) | `docs/guides/gateway-environment-guide.md` |
 | Local Slack testing | `docs/references/local-slack-testing.md` |
 | Frontend conventions | `docs/FRONTEND.md` |
 | Security posture | `docs/SECURITY.md` |

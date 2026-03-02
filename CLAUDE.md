@@ -67,6 +67,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | Config schema & pitfalls | `docs/references/openclaw-config-schema.md` |
 | API coding patterns | `docs/references/api-patterns.md` |
 | Infrastructure | `docs/references/infrastructure.md` |
+| Gateway environment (dev vs prod) | `docs/guides/gateway-environment-guide.md` |
 | Local Slack testing | `docs/references/local-slack-testing.md` |
 | Frontend conventions | `docs/FRONTEND.md` |
 | Security posture | `docs/SECURITY.md` |

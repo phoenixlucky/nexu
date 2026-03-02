@@ -21,7 +21,7 @@ async function writeNexuContext(
   agentMeta: Record<string, { botId: string }> | undefined,
   poolSecrets: Record<string, string> | undefined,
 ): Promise<void> {
-  const stateDir = dirname(env.OPENCLAW_CONFIG_PATH);
+  const stateDir = env.OPENCLAW_STATE_DIR;
   const contextPath = join(stateDir, "nexu-context.json");
   const context = {
     apiUrl: env.RUNTIME_API_BASE_URL,
@@ -30,6 +30,7 @@ async function writeNexuContext(
     agents: agentMeta ?? {},
     secrets: poolSecrets ?? {},
   };
+  await mkdir(stateDir, { recursive: true });
   const tempPath = `${contextPath}.tmp`;
   await writeFile(tempPath, JSON.stringify(context, null, 2), "utf8");
   await rename(tempPath, contextPath);

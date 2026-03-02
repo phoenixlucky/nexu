@@ -143,6 +143,7 @@ export const env = {
   ...parsedEnv,
   OPENCLAW_CONFIG_PATH: openclawConfigPath,
   OPENCLAW_SKILLS_DIR: openclawSkillsDir,
+  OPENCLAW_STATE_DIR: openclawStateDir,
   RUNTIME_POOL_ID: runtimePoolId,
 };
 
