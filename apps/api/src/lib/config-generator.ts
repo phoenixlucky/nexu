@@ -234,6 +234,13 @@ export async function generatePoolConfig(
         ask: "off",
         host: "sandbox",
       },
+      web: {
+        search: { enabled: true },
+        fetch: { enabled: true },
+      },
+    },
+    cron: {
+      enabled: true,
     },
     channels: {},
     bindings: bindingsList,

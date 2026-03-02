@@ -1,3 +1,4 @@
+import { track } from "@/lib/tracking";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -7,15 +8,23 @@ import {
   Loader2,
   MessageSquare,
 } from "lucide-react";
+import { useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { getV1Artifacts, getV1SessionsById } from "../../lib/api/sdk.gen";
+import { getApiV1Artifacts, getApiV1SessionsById } from "../../lib/api/sdk.gen";
 
 type Platform = "slack" | "discord" | "whatsapp" | "telegram" | "web";
 
-const PLATFORM_CONFIG: Record<Platform, { bg: string; emoji: string; label: string }> = {
+const PLATFORM_CONFIG: Record<
+  Platform,
+  { bg: string; emoji: string; label: string }
+> = {
   slack: { bg: "bg-purple-500/15", emoji: "#", label: "Slack" },
   discord: { bg: "bg-indigo-500/15", emoji: "\uD83C\uDFAE", label: "Discord" },
-  whatsapp: { bg: "bg-emerald-500/15", emoji: "\uD83D\uDCAC", label: "WhatsApp" },
+  whatsapp: {
+    bg: "bg-emerald-500/15",
+    emoji: "\uD83D\uDCAC",
+    label: "WhatsApp",
+  },
   telegram: { bg: "bg-blue-500/15", emoji: "\u2708\uFE0F", label: "Telegram" },
   web: { bg: "bg-gray-500/15", emoji: "\uD83C\uDF10", label: "Web" },
 };
@@ -89,13 +98,17 @@ function MetaTag({
 export function SessionsPage() {
   const { id } = useParams<{ id: string }>();
 
+  useEffect(() => {
+    if (id) track("session_start");
+  }, [id]);
+
   const { data: session } = useQuery({
     queryKey: ["session", id],
     queryFn: async () => {
       if (!id) {
         throw new Error("Session id is required");
       }
-      const { data } = await getV1SessionsById({ path: { id } });
+      const { data } = await getApiV1SessionsById({ path: { id } });
       return data;
     },
     enabled: !!id,
@@ -104,8 +117,8 @@ export function SessionsPage() {
   const { data: artifactsData } = useQuery({
     queryKey: ["artifacts", session?.sessionKey],
     queryFn: async () => {
-      const { data } = await getV1Artifacts({
-        query: { sessionKey: session!.sessionKey },
+      const { data } = await getApiV1Artifacts({
+        query: { sessionKey: session?.sessionKey },
       });
       return data;
     },
@@ -127,7 +140,9 @@ export function SessionsPage() {
   const platform = (session.channelType ?? "web") as Platform;
   const platformCfg = PLATFORM_CONFIG[platform] ?? PLATFORM_CONFIG.web;
   const artifacts = artifactsData?.artifacts ?? [];
-  const codingArtifacts = artifacts.filter((a) => a.source === "coding");
+  const codingArtifacts = artifacts.filter(
+    (a: { source: string }) => a.source === "coding",
+  );
 
   return (
     <div className="p-8 mx-auto max-w-5xl">
@@ -188,42 +203,51 @@ export function SessionsPage() {
             </div>
           ) : (
             <div>
-              {codingArtifacts.map((d) => {
-                const sc = STATUS_CONFIG[d.status];
-                const Icon = sc?.icon ?? CheckCircle2;
-                const iconColor = sc?.color ?? "text-text-muted";
+              {codingArtifacts.map(
+                (d: {
+                  id: string;
+                  status: string;
+                  title: string;
+                  createdAt: string;
+                  linesOfCode: number;
+                  contentType: string;
+                  previewUrl: string;
+                }) => {
+                  const sc = STATUS_CONFIG[d.status];
+                  const Icon = sc?.icon ?? CheckCircle2;
+                  const iconColor = sc?.color ?? "text-text-muted";
 
-                return (
-                  <div
-                    key={d.id}
-                    className="flex gap-4 items-center px-5 py-3.5 border-b border-border last:border-0"
-                  >
-                    <Icon size={14} className={iconColor} />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-medium text-text-primary truncate">
-                        {d.title}
+                  return (
+                    <div
+                      key={d.id}
+                      className="flex gap-4 items-center px-5 py-3.5 border-b border-border last:border-0"
+                    >
+                      <Icon size={14} className={iconColor} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-medium text-text-primary truncate">
+                          {d.title}
+                        </div>
+                        <div className="text-[11px] text-text-muted mt-0.5">
+                          {formatDate(d.createdAt)}
+                          {d.linesOfCode > 0 &&
+                            ` \u00B7 ${d.linesOfCode} lines`}
+                          {d.contentType && ` \u00B7 ${d.contentType}`}
+                        </div>
                       </div>
-                      <div className="text-[11px] text-text-muted mt-0.5">
-                        {formatDate(d.createdAt)}
-                        {d.linesOfCode > 0 &&
-                          ` \u00B7 ${d.linesOfCode} lines`}
-                        {d.contentType && ` \u00B7 ${d.contentType}`}
-                      </div>
+                      {d.previewUrl && (
+                        <a
+                          href={d.previewUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[11px] text-emerald-600 shrink-0 hover:underline"
+                        >
+                          Preview <ExternalLink size={9} className="inline" />
+                        </a>
+                      )}
                     </div>
-                    {d.previewUrl && (
-                      <a
-                        href={d.previewUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[11px] text-emerald-600 shrink-0 hover:underline"
-                      >
-                        Preview{" "}
-                        <ExternalLink size={9} className="inline" />
-                      </a>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                },
+              )}
             </div>
           )}
         </div>

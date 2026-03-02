@@ -125,8 +125,13 @@ const SLACK_BOT_SCOPES = [
 
 const slackOAuthUrlRoute = createRoute({
   method: "get",
-  path: "/v1/channels/slack/oauth-url",
+  path: "/api/v1/channels/slack/oauth-url",
   tags: ["Channels"],
+  request: {
+    query: z.object({
+      returnTo: z.string().optional(),
+    }),
+  },
   responses: {
     200: {
       content: {
@@ -143,7 +148,7 @@ const slackOAuthUrlRoute = createRoute({
 
 const connectSlackRoute = createRoute({
   method: "post",
-  path: "/v1/channels/slack/connect",
+  path: "/api/v1/channels/slack/connect",
   tags: ["Channels"],
   request: {
     body: { content: { "application/json": { schema: connectSlackSchema } } },
@@ -162,7 +167,7 @@ const connectSlackRoute = createRoute({
 
 const listChannelsRoute = createRoute({
   method: "get",
-  path: "/v1/channels",
+  path: "/api/v1/channels",
   tags: ["Channels"],
   responses: {
     200: {
@@ -174,7 +179,7 @@ const listChannelsRoute = createRoute({
 
 const disconnectChannelRoute = createRoute({
   method: "delete",
-  path: "/v1/channels/{channelId}",
+  path: "/api/v1/channels/{channelId}",
   tags: ["Channels"],
   request: {
     params: channelIdParam,
@@ -195,7 +200,7 @@ const disconnectChannelRoute = createRoute({
 
 const connectDiscordRoute = createRoute({
   method: "post",
-  path: "/v1/channels/discord/connect",
+  path: "/api/v1/channels/discord/connect",
   tags: ["Channels"],
   request: {
     body: {
@@ -216,7 +221,7 @@ const connectDiscordRoute = createRoute({
 
 const channelStatusRoute = createRoute({
   method: "get",
-  path: "/v1/channels/{channelId}/status",
+  path: "/api/v1/channels/{channelId}/status",
   tags: ["Channels"],
   request: {
     params: channelIdParam,
@@ -253,12 +258,14 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
     // Generate CSRF state token (10 min TTL) — botId is null
     const nonce = createId();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const returnTo = c.req.query("returnTo");
 
     await db.insert(oauthStates).values({
       id: createId(),
       state: nonce,
       userId,
       expiresAt,
+      returnTo,
     });
 
     const url = new URL("https://slack.com/oauth/v2/authorize");
@@ -991,6 +998,9 @@ export function registerSlackOAuthCallback(app: OpenAPIHono<AppBindings>) {
     successUrl.searchParams.set("success", "true");
     successUrl.searchParams.set("channelId", channelId);
     successUrl.searchParams.set("teamName", teamName);
+    if (stateRow.returnTo) {
+      successUrl.searchParams.set("returnTo", stateRow.returnTo);
+    }
     return c.redirect(successUrl.toString(), 302);
   });
 }

@@ -20,6 +20,7 @@ export function SlackOAuthCallbackPage() {
   const success = searchParams.get("success") === "true";
   const error = searchParams.get("error");
   const teamName = searchParams.get("teamName");
+  const returnTo = searchParams.get("returnTo");
 
   useEffect(() => {
     if (success) {
@@ -27,11 +28,15 @@ export function SlackOAuthCallbackPage() {
       toast.success(`Slack workspace "${teamName}" connected!`);
 
       const timer = setTimeout(() => {
-        navigate("/workspace/channels", { replace: true });
+        if (returnTo === "/onboarding") {
+          navigate("/onboarding?slackConnected=true", { replace: true });
+        } else {
+          navigate("/workspace/channels", { replace: true });
+        }
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [success, teamName, queryClient, navigate]);
+  }, [success, teamName, queryClient, navigate, returnTo]);
 
   if (success) {
     return (

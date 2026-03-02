@@ -1,4 +1,5 @@
 import { authClient } from "@/lib/auth-client";
+import { identify, setUserId, track } from "@/lib/tracking";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
@@ -149,12 +150,38 @@ export function AuthPage() {
           return;
         }
       }
+      track(isLogin ? "login_email_success" : "signup_email_success");
+      identify({
+        auth_method: "email",
+        user_email: email,
+        ...(isLogin ? {} : { signup_date: new Date().toISOString() }),
+      });
       navigate("/invite");
     } catch {
       toast.error("Verification failed");
       setVerifying(false);
     }
   };
+
+  useEffect(() => {
+    if (!session?.user) return;
+    setUserId(session.user.id);
+    const mode = sessionStorage.getItem("nexu_auth_mode");
+    const provider = sessionStorage.getItem("nexu_auth_provider");
+    sessionStorage.removeItem("nexu_auth_mode");
+    sessionStorage.removeItem("nexu_auth_provider");
+    if (provider) {
+      const event =
+        mode === "login"
+          ? `login_${provider}_success`
+          : `signup_${provider}_success`;
+      track(event);
+      identify({
+        auth_method: provider,
+        user_email: session.user.email,
+      });
+    }
+  }, [session?.user]);
 
   if (isPending) {
     return (
@@ -170,10 +197,12 @@ export function AuthPage() {
 
   const handleOAuth = async (provider: "google") => {
     setLoading(provider);
+    sessionStorage.setItem("nexu_auth_mode", isLogin ? "login" : "signup");
+    sessionStorage.setItem("nexu_auth_provider", provider);
     try {
       await authClient.signIn.social({
         provider,
-        callbackURL: window.location.origin,
+        callbackURL: `${window.location.origin}/workspace`,
       });
     } catch {
       setLoading(null);
@@ -210,6 +239,8 @@ export function AuthPage() {
           setLoading(null);
           return;
         }
+        track("login_email_success");
+        identify({ auth_method: "email", user_email: email });
         navigate("/invite");
       } else {
         const { error } = await authClient.signUp.email({
@@ -218,17 +249,32 @@ export function AuthPage() {
           name: name || email.split("@")[0] || "User",
         });
         if (error) {
-          // If user already exists (unverified), resend OTP and show verification screen
           const msg = (error.message ?? "").toLowerCase();
           if (msg.includes("already") || msg.includes("exist")) {
-            await authClient.emailOtp.sendVerificationOtp({
-              email,
-              type: "email-verification",
+            // Check backend to determine verified vs unverified
+            const res = await fetch("/api/auth/check-email", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email }),
             });
-            setPendingVerification(true);
-            setResendCooldown(RESEND_COOLDOWN);
+            const check = (await res.json()) as {
+              exists: boolean;
+              verified: boolean;
+            };
+            if (check.exists && !check.verified) {
+              // Unverified account — resend OTP
+              await authClient.emailOtp.sendVerificationOtp({
+                email,
+                type: "email-verification",
+              });
+              setPendingVerification(true);
+              setResendCooldown(RESEND_COOLDOWN);
+              setLoading(null);
+              toast.info("Verification code sent to your email");
+              return;
+            }
+            toast.error("This email is already registered. Please log in.");
             setLoading(null);
-            toast.info("Verification code sent to your email");
             return;
           }
           toast.error(error.message ?? "Sign up failed");

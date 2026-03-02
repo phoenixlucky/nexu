@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { identify, track } from "@/lib/tracking";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -24,12 +25,13 @@ import {
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import "@/lib/api";
+import { whatsappQrImageUrl, whatsappWaMeUrl } from "@/lib/whatsapp";
 import {
-  deleteV1ChannelsByChannelId,
-  getV1Channels,
-  getV1ChannelsSlackOauthUrl,
-  postV1ChannelsDiscordConnect,
-  postV1ChannelsSlackConnect,
+  deleteApiV1ChannelsByChannelId,
+  getApiV1Channels,
+  getApiV1ChannelsSlackOauthUrl,
+  postApiV1ChannelsDiscordConnect,
+  postApiV1ChannelsSlackConnect,
 } from "../../lib/api/sdk.gen";
 
 type Platform = "slack" | "discord" | "whatsapp";
@@ -144,8 +146,17 @@ const SLACK_STEPS: StepDef[] = [
       "**Add** the following scopes:",
       "  · chat:write — send messages",
       "  · app_mentions:read — receive @mentions",
-      "  · files:read — read uploaded files",
       "  · channels:history — read channel messages",
+      "  · channels:read — list channels",
+      "  · groups:history — read private channel messages",
+      "  · groups:read — list private channels",
+      "  · im:history — read direct messages",
+      "  · im:read — read DM info",
+      "  · im:write — open direct messages",
+      "  · mpim:history — read group DMs",
+      "  · mpim:read — read group DM info",
+      "  · files:read — read uploaded files",
+      "  · users:read — resolve user info",
     ],
   },
   {
@@ -263,13 +274,13 @@ const CREDENTIAL_FIELDS: Record<
     hint2: "Application → Bot → Reset Token, copy the generated token",
   },
   slack: {
-    label1: "Bot User OAuth Token",
-    placeholder1: "xoxb-xxxxxxxxxxxxx",
-    hint1:
+    label1: "Signing Secret",
+    placeholder1: "xxxxxxxxxxxxxxxxxxxxxxx",
+    hint1: "App → Basic Information → App Credentials → Signing Secret",
+    label2: "Bot User OAuth Token",
+    placeholder2: "xoxb-xxxxxxxxxxxxx",
+    hint2:
       "App → OAuth & Permissions → Bot User OAuth Token (starts with xoxb-)",
-    label2: "Signing Secret",
-    placeholder2: "xxxxxxxxxxxxxxxxxxxxxxx",
-    hint2: "App → Basic Information → App Credentials → Signing Secret",
   },
   whatsapp: {
     label1: "Access Token",
@@ -291,7 +302,7 @@ export function ChannelsPage() {
   const { data: channelsData } = useQuery({
     queryKey: ["channels"],
     queryFn: async () => {
-      const { data } = await getV1Channels();
+      const { data } = await getApiV1Channels();
       return data;
     },
   });
@@ -471,7 +482,7 @@ function SetupGuideView({
   // Discord connect
   const discordConnect = useMutation({
     mutationFn: async () => {
-      const { data, error } = await postV1ChannelsDiscordConnect({
+      const { data, error } = await postApiV1ChannelsDiscordConnect({
         body: { botToken: field2, appId: field1 },
       });
       if (error) throw new Error(error.message);
@@ -479,6 +490,8 @@ function SetupGuideView({
     },
     onSuccess: () => {
       toast.success("Discord connected!");
+      track("channel_ready", { channel: "discord" });
+      identify({ channels_connected: 1 });
       setCurrentStep((prev) => prev + 1);
     },
     onError: (err: Error) => toast.error(err.message),
@@ -487,10 +500,10 @@ function SetupGuideView({
   // Slack manual connect
   const slackConnect = useMutation({
     mutationFn: async () => {
-      const { data, error } = await postV1ChannelsSlackConnect({
+      const { data, error } = await postApiV1ChannelsSlackConnect({
         body: {
-          botToken: field1,
-          signingSecret: field2,
+          botToken: field2,
+          signingSecret: field1,
         },
       });
       if (error) throw new Error(error.message);
@@ -498,6 +511,8 @@ function SetupGuideView({
     },
     onSuccess: () => {
       toast.success("Slack connected!");
+      track("channel_ready", { channel: "slack" });
+      identify({ channels_connected: 1 });
       setCurrentStep((prev) => prev + 1);
     },
     onError: (err: Error) => toast.error(err.message),
@@ -506,7 +521,7 @@ function SetupGuideView({
   const handleSlackOAuth = async () => {
     setOauthLoading(true);
     try {
-      const { data, error } = await getV1ChannelsSlackOauthUrl();
+      const { data, error } = await getApiV1ChannelsSlackOauthUrl();
       if (error) {
         toast.error(error.message ?? "Failed to get Slack OAuth URL");
         return;
@@ -865,7 +880,7 @@ function ConfiguredView({
 
   const disconnectMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await deleteV1ChannelsByChannelId({
+      const { error } = await deleteApiV1ChannelsByChannelId({
         path: { channelId: channel.id },
       });
       if (error) throw new Error(error.message);
@@ -1034,7 +1049,7 @@ function ConfiguredView({
   );
 }
 
-// ─── WhatsApp QR placeholder ─────────────────────────────────
+// ─── WhatsApp QR setup ───────────────────────────────────────
 
 function WhatsAppQRView() {
   return (
@@ -1044,10 +1059,36 @@ function WhatsAppQRView() {
           <Smartphone size={22} className="text-emerald-500" />
         </div>
         <h3 className="text-[15px] font-semibold text-text-primary mb-1">
-          WhatsApp Coming Soon
+          Scan to connect WhatsApp
         </h3>
         <p className="text-[12px] text-text-muted mb-6 leading-relaxed">
-          WhatsApp Business API integration is under development. Stay tuned.
+          Open WhatsApp and scan the QR code below to start chatting with Nexu.
+        </p>
+        <div className="mx-auto mb-4 w-full max-w-[240px] rounded-xl border border-border bg-white p-2">
+          <img
+            src={whatsappQrImageUrl}
+            alt="WhatsApp QR code"
+            className="w-full h-auto rounded-lg"
+          />
+        </div>
+        <a
+          href={whatsappWaMeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12px] font-medium rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+        >
+          Open WhatsApp
+          <ExternalLink size={12} />
+        </a>
+        <p className="mt-3 text-[11px] text-text-muted break-all">
+          <a
+            href={whatsappWaMeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-text-secondary underline underline-offset-2"
+          >
+            {whatsappWaMeUrl}
+          </a>
         </p>
       </div>
 

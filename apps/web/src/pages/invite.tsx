@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
+import { track } from "@/lib/tracking";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -13,7 +14,7 @@ import {
 import { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import "@/lib/api";
-import { getV1Me, postV1InviteValidate } from "../../lib/api/sdk.gen";
+import { getApiV1Me, postApiV1InviteValidate } from "../../lib/api/sdk.gen";
 
 const CAPABILITY_PILLS = [
   { emoji: "\u{1F4BB}", label: "Code & Deploy" },
@@ -32,14 +33,14 @@ export function InvitePage() {
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["me"],
     queryFn: async () => {
-      const { data } = await getV1Me();
+      const { data } = await getApiV1Me();
       return data;
     },
   });
 
   const mutation = useMutation({
     mutationFn: async (inviteCode: string) => {
-      const { data, error } = await postV1InviteValidate({
+      const { data, error } = await postApiV1InviteValidate({
         body: { code: inviteCode },
       });
       if (error) throw new Error("Validation failed");
@@ -47,6 +48,7 @@ export function InvitePage() {
     },
     onSuccess: (data) => {
       if (data?.valid) {
+        track("invite_success");
         setSuccess(true);
         setTimeout(() => navigate("/onboarding"), 1200);
       } else {

@@ -1,15 +1,24 @@
+import { identify, track } from "@/lib/tracking";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { type ReactNode, useCallback, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import "@/lib/api";
 import { client } from "@/lib/api";
+import { whatsappQrImageUrl, whatsappWaMeUrl } from "@/lib/whatsapp";
 import {
-  getV1ChannelsSlackOauthUrl,
-  getV1Me,
-  postV1ChannelsDiscordConnect,
-  postV1ChannelsSlackConnect,
+  getApiV1Channels,
+  getApiV1ChannelsSlackOauthUrl,
+  getApiV1Me,
+  postApiV1ChannelsDiscordConnect,
+  postApiV1ChannelsSlackConnect,
 } from "../../lib/api/sdk.gen";
 
 // ── Constants ──────────────────────────────────────────────
@@ -838,18 +847,23 @@ const SLACK_SETUP_STEPS: SetupStep[] = [
       "**Add** these scopes:",
       "\u2003\u00B7 chat:write \u2014 send messages",
       "\u2003\u00B7 app_mentions:read \u2014 receive @mentions",
-      "\u2003\u00B7 files:read \u2014 read uploaded files",
       "\u2003\u00B7 channels:history \u2014 read channel messages",
+      "\u2003\u00B7 channels:read \u2014 list channels",
+      "\u2003\u00B7 groups:history \u2014 read private channel messages",
+      "\u2003\u00B7 groups:read \u2014 list private channels",
+      "\u2003\u00B7 im:history \u2014 read direct messages",
+      "\u2003\u00B7 im:read \u2014 read DM info",
+      "\u2003\u00B7 im:write \u2014 open direct messages",
+      "\u2003\u00B7 mpim:history \u2014 read group DMs",
+      "\u2003\u00B7 mpim:read \u2014 read group DM info",
+      "\u2003\u00B7 files:read \u2014 read uploaded files",
+      "\u2003\u00B7 users:read \u2014 resolve user info",
     ],
   },
   {
     title: "Install & Connect",
     bullets: [
-      'Go to your app \u2192 **"Install App"**',
-      'Click **"Install to Workspace"** and authorize',
-      'After install, go to **"OAuth & Permissions"** \u2192 copy the **"Bot User OAuth Token"** (starts with xoxb-)',
-      'Then go to **"Basic Information"** \u2192 **"App Credentials"** \u2192 copy the **"Signing Secret"**',
-      "Paste both values below:",
+      'Go to **"Basic Information"** \u2192 **"App Credentials"** \u2192 copy the **"Signing Secret"**',
     ],
     hasInputs: true,
   },
@@ -917,10 +931,10 @@ const CREDENTIAL_FIELDS: Record<
   { label1: string; placeholder1: string; label2: string; placeholder2: string }
 > = {
   slack: {
-    label1: "Bot User OAuth Token",
-    placeholder1: "xoxb-xxxxxxxxxxxxx",
-    label2: "Signing Secret",
-    placeholder2: "xxxxxxxxxxxxxxxxxxxxxxx",
+    label1: "Signing Secret",
+    placeholder1: "xxxxxxxxxxxxxxxxxxxxxxx",
+    label2: "Bot User OAuth Token",
+    placeholder2: "xoxb-xxxxxxxxxxxxx",
   },
   discord: {
     label1: "Application ID",
@@ -936,12 +950,14 @@ function ChannelConnectModal({
   channelColor,
   onClose,
   onConnected,
+  onLinked,
 }: {
   channelId: string;
   channelName: string;
   channelColor: string;
   onClose: () => void;
   onConnected: (channelId: string) => void;
+  onLinked?: (channelId: string) => void;
 }) {
   const steps = SETUP_STEPS_MAP[channelId];
   const fields = CREDENTIAL_FIELDS[channelId];
@@ -949,10 +965,12 @@ function ChannelConnectModal({
   const [field1, setField1] = useState("");
   const [field2, setField2] = useState("");
   const [connecting, setConnecting] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const connectingRef = useRef(false);
   const [oauthLoading, setOauthLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // WhatsApp — coming soon
+  // WhatsApp QR connect
   if (channelId === "whatsapp" || !steps || !fields) {
     return (
       <div
@@ -968,11 +986,36 @@ function ChannelConnectModal({
           <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">{"\u{1F4F1}"}</span>
           </div>
-          <p className="text-[13px] text-text-secondary mb-1">
-            WhatsApp Business API integration is under development.
+          <p className="text-[13px] font-medium text-text-primary mb-1">
+            Scan to connect on WhatsApp
           </p>
-          <p className="text-[11px] text-text-muted mb-5">
-            Vote for it to help us prioritize!
+          <p className="text-[11px] text-text-muted mb-4">
+            Use your WhatsApp app to scan this QR code.
+          </p>
+          <div className="mx-auto mb-4 w-full max-w-[220px] rounded-xl border border-border bg-white p-2">
+            <img
+              src={whatsappQrImageUrl}
+              alt="WhatsApp QR code"
+              className="w-full h-auto rounded-lg"
+            />
+          </div>
+          <a
+            href={whatsappWaMeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center px-3 py-2 text-[12px] font-medium rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+          >
+            Open WhatsApp
+          </a>
+          <p className="mt-3 mb-5 text-[11px] text-text-muted break-all">
+            <a
+              href={whatsappWaMeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-text-secondary underline underline-offset-2"
+            >
+              {whatsappWaMeUrl}
+            </a>
           </p>
           <button
             type="button"
@@ -992,7 +1035,9 @@ function ChannelConnectModal({
   const handleSlackOAuth = async () => {
     setOauthLoading(true);
     try {
-      const { data, error } = await getV1ChannelsSlackOauthUrl();
+      const { data, error } = await getApiV1ChannelsSlackOauthUrl({
+        query: { returnTo: "/onboarding" },
+      });
       if (error) {
         toast.error("Failed to get Slack OAuth URL");
         return;
@@ -1006,30 +1051,49 @@ function ChannelConnectModal({
   };
 
   const handleConnect = async () => {
-    if (!field1.trim() || !field2.trim()) return;
+    if (!field1.trim() || !field2.trim() || connected || connectingRef.current)
+      return;
+    connectingRef.current = true;
     setConnecting(true);
     try {
       if (channelId === "slack") {
-        const { error } = await postV1ChannelsSlackConnect({
-          body: { botToken: field1, signingSecret: field2 },
+        const { error } = await postApiV1ChannelsSlackConnect({
+          body: { botToken: field2, signingSecret: field1 },
         });
         if (error) throw new Error("Connection failed");
       } else if (channelId === "discord") {
-        const { error } = await postV1ChannelsDiscordConnect({
+        const { error } = await postApiV1ChannelsDiscordConnect({
           body: { botToken: field2, appId: field1 },
         });
         if (error) throw new Error("Connection failed");
       }
       toast.success(`${channelName} connected!`);
+      console.log("[connect] success, advancing step", {
+        stepIdx,
+        stepsLen: steps.length,
+      });
+      try {
+        track("channel_ready", { channel: channelId });
+        identify({ primary_platform: channelId, channels_connected: 1 });
+      } catch (e) {
+        console.warn("[connect] tracking error (ignored):", e);
+      }
+      // Mark as linked (green) immediately, but keep modal open for remaining steps
+      setConnected(true);
+      onLinked?.(channelId);
+      console.log("[connect] onLinked called, setting stepIdx to", stepIdx + 1);
       // Advance to next step (events/test) if there is one, otherwise close
       if (stepIdx < steps.length - 1) {
         setStepIdx(stepIdx + 1);
       } else {
         onConnected(channelId);
       }
-    } catch {
+      console.log("[connect] done");
+    } catch (err) {
+      console.error("[connect] error:", err);
       toast.error(`Failed to connect ${channelName}`);
     } finally {
+      connectingRef.current = false;
       setConnecting(false);
     }
   };
@@ -1155,7 +1219,7 @@ function ChannelConnectModal({
                         className="mt-1.5 w-1 h-1 rounded-full shrink-0"
                         style={{ backgroundColor: channelColor, opacity: 0.5 }}
                       />
-                      {renderBold(b)}
+                      <span className="flex-1 min-w-0">{renderBold(b)}</span>
                     </span>
                   )}
                 </div>
@@ -1276,6 +1340,29 @@ function ChannelConnectModal({
                   className="w-full px-3.5 py-2.5 bg-surface-0 border border-border rounded-lg text-text-primary placeholder:text-text-muted text-[13px] font-mono focus:outline-none focus:border-border-hover transition-colors"
                 />
               </div>
+              {channelId === "slack" && (
+                <p className="text-[12px] leading-relaxed text-text-secondary flex gap-2 items-start">
+                  <span
+                    className="mt-1.5 w-1 h-1 rounded-full shrink-0"
+                    style={{ backgroundColor: channelColor, opacity: 0.5 }}
+                  />
+                  <span className="flex-1 min-w-0">
+                    Go to{" "}
+                    <strong className="font-semibold text-text-primary">
+                      &ldquo;Install App&rdquo;
+                    </strong>{" "}
+                    &rarr; click{" "}
+                    <strong className="font-semibold text-text-primary">
+                      &ldquo;Install to Workspace&rdquo;
+                    </strong>
+                    , then copy the{" "}
+                    <strong className="font-semibold text-text-primary">
+                      &ldquo;Bot User OAuth Token&rdquo;
+                    </strong>{" "}
+                    (starts with xoxb-)
+                  </span>
+                </p>
+              )}
               <div className="space-y-1.5">
                 <label
                   htmlFor="channel-field2"
@@ -1309,7 +1396,9 @@ function ChannelConnectModal({
             <button
               type="button"
               onClick={handleConnect}
-              disabled={!field1.trim() || !field2.trim() || connecting}
+              disabled={
+                !field1.trim() || !field2.trim() || connecting || connected
+              }
               className="inline-flex items-center gap-1.5 px-4 py-1.5 text-[12px] font-medium rounded-lg text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               style={{ backgroundColor: channelColor }}
             >
@@ -1357,9 +1446,36 @@ function ChannelsStep({
   onNext: (d: Partial<OnboardingData>) => void;
   onBack: () => void;
 }) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [votes, setVotes] = useState<string[]>(data.channelVotes || []);
   const [connected, setConnected] = useState<string[]>([]);
   const [modal, setModal] = useState<string | null>(null);
+
+  // Load already-connected channels from backend on mount
+  useEffect(() => {
+    getApiV1Channels().then(({ data }) => {
+      const list = data?.channels;
+      if (!list) return;
+      const types = list
+        .filter((ch) => ch.status === "connected")
+        .map((ch) => ch.channelType);
+      if (types.length > 0) {
+        setConnected((prev) => [...new Set([...prev, ...types])]);
+      }
+    });
+  }, []);
+
+  // Detect Slack OAuth completion via query param
+  useEffect(() => {
+    if (searchParams.get("slackConnected") === "true") {
+      setConnected((prev) =>
+        prev.includes("slack") ? prev : [...prev, "slack"],
+      );
+      const next = new URLSearchParams(searchParams);
+      next.delete("slackConnected");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const toggleVote = (channelId: string) => {
     setVotes((prev) =>
@@ -1477,6 +1593,9 @@ function ChannelsStep({
           channelColor={modalChannel.color}
           onClose={() => setModal(null)}
           onConnected={handleConnected}
+          onLinked={(id) =>
+            setConnected((prev) => (prev.includes(id) ? prev : [...prev, id]))
+          }
         />
       )}
     </div>
@@ -1798,10 +1917,18 @@ export function OnboardingPage() {
 
   const returnTo = searchParams.get("returnTo") || "/workspace";
 
+  const trackedStart = useRef(false);
+  useEffect(() => {
+    if (!trackedStart.current) {
+      track("onboarding_start");
+      trackedStart.current = true;
+    }
+  }, []);
+
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["me"],
     queryFn: async () => {
-      const { data } = await getV1Me();
+      const { data } = await getApiV1Me();
       return data;
     },
   });
@@ -1809,7 +1936,7 @@ export function OnboardingPage() {
   const completeMutation = useMutation({
     mutationFn: async (payload: OnboardingData) => {
       const resp = await client.post({
-        url: "/v1/onboarding/complete",
+        url: "/api/v1/onboarding/complete",
         body: payload,
         headers: { "Content-Type": "application/json" },
       });
@@ -1835,6 +1962,13 @@ export function OnboardingPage() {
       if (stepData) setData(newData);
       if (currentStep < STEPS.length - 1) setCurrentStep(newStep);
       saveProgress(newStep, newData);
+      // Identify user properties per step
+      if (currentStep === 0 && newData.role)
+        identify({ user_role: newData.role });
+      if (currentStep === 1 && newData.useCases)
+        identify({ use_cases: newData.useCases });
+      if (currentStep === 2 && newData.referralSource)
+        identify({ referral_source: newData.referralSource });
     },
     [currentStep, data],
   );
@@ -1851,6 +1985,8 @@ export function OnboardingPage() {
     (stepData?: Partial<OnboardingData>) => {
       const finalData = { ...data, ...stepData } as OnboardingData;
       setData(finalData);
+      if (finalData.selectedAvatar)
+        identify({ avatar_choice: finalData.selectedAvatar });
       completeMutation.mutate(finalData);
     },
     [data, completeMutation],

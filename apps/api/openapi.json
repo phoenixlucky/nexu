@@ -695,7 +695,7 @@
         }
       }
     },
-    "/v1/me": {
+    "/api/v1/me": {
       "get": {
         "tags": [
           "User"
@@ -726,6 +726,9 @@
                     },
                     "inviteAccepted": {
                       "type": "boolean"
+                    },
+                    "onboardingCompleted": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -733,7 +736,8 @@
                     "email",
                     "name",
                     "plan",
-                    "inviteAccepted"
+                    "inviteAccepted",
+                    "onboardingCompleted"
                   ]
                 }
               }
@@ -742,7 +746,92 @@
         }
       }
     },
-    "/v1/bots": {
+    "/api/v1/onboarding/complete": {
+      "post": {
+        "tags": [
+          "Onboarding"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "company": {
+                    "type": "string",
+                    "default": ""
+                  },
+                  "useCases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1
+                  },
+                  "referralSource": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "referralDetail": {
+                    "type": "string",
+                    "default": ""
+                  },
+                  "channelVotes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": []
+                  },
+                  "selectedAvatar": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "avatarVotes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": []
+                  }
+                },
+                "required": [
+                  "role",
+                  "useCases",
+                  "referralSource",
+                  "selectedAvatar"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Onboarding completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bots": {
       "post": {
         "tags": [
           "Bots"
@@ -973,7 +1062,7 @@
         }
       }
     },
-    "/v1/bots/{botId}": {
+    "/api/v1/bots/{botId}": {
       "get": {
         "tags": [
           "Bots"
@@ -1234,7 +1323,7 @@
         }
       }
     },
-    "/v1/bots/{botId}/pause": {
+    "/api/v1/bots/{botId}/pause": {
       "post": {
         "tags": [
           "Bots"
@@ -1328,7 +1417,7 @@
         }
       }
     },
-    "/v1/bots/{botId}/resume": {
+    "/api/v1/bots/{botId}/resume": {
       "post": {
         "tags": [
           "Bots"
@@ -1422,10 +1511,20 @@
         }
       }
     },
-    "/v1/channels/slack/oauth-url": {
+    "/api/v1/channels/slack/oauth-url": {
       "get": {
         "tags": [
           "Channels"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "returnTo",
+            "in": "query"
+          }
         ],
         "responses": {
           "200": {
@@ -1467,7 +1566,7 @@
         }
       }
     },
-    "/v1/channels/slack/connect": {
+    "/api/v1/channels/slack/connect": {
       "post": {
         "tags": [
           "Channels"
@@ -1487,22 +1586,18 @@
                     "minLength": 1
                   },
                   "teamId": {
-                    "type": "string",
-                    "minLength": 1
+                    "type": "string"
                   },
                   "teamName": {
                     "type": "string"
                   },
                   "appId": {
-                    "type": "string",
-                    "minLength": 1
+                    "type": "string"
                   }
                 },
                 "required": [
                   "botToken",
-                  "signingSecret",
-                  "teamId",
-                  "appId"
+                  "signingSecret"
                 ]
               }
             }
@@ -1591,7 +1686,7 @@
         }
       }
     },
-    "/v1/channels/discord/connect": {
+    "/api/v1/channels/discord/connect": {
       "post": {
         "tags": [
           "Channels"
@@ -1708,7 +1803,7 @@
         }
       }
     },
-    "/v1/channels": {
+    "/api/v1/channels": {
       "get": {
         "tags": [
           "Channels"
@@ -1789,7 +1884,7 @@
         }
       }
     },
-    "/v1/channels/{channelId}": {
+    "/api/v1/channels/{channelId}": {
       "delete": {
         "tags": [
           "Channels"
@@ -1844,7 +1939,7 @@
         }
       }
     },
-    "/v1/channels/{channelId}/status": {
+    "/api/v1/channels/{channelId}/status": {
       "get": {
         "tags": [
           "Channels"
@@ -1942,7 +2037,7 @@
         }
       }
     },
-    "/v1/invite/validate": {
+    "/api/v1/invite/validate": {
       "post": {
         "tags": [
           "Invite"
@@ -1990,7 +2085,7 @@
         }
       }
     },
-    "/v1/models": {
+    "/api/v1/models": {
       "get": {
         "tags": [
           "Models"
@@ -2243,6 +2338,40 @@
                         "providers"
                       ]
                     },
+                    "tools": {
+                      "type": "object",
+                      "properties": {
+                        "exec": {
+                          "type": "object",
+                          "properties": {
+                            "security": {
+                              "type": "string",
+                              "enum": [
+                                "deny",
+                                "allowlist",
+                                "full"
+                              ]
+                            },
+                            "ask": {
+                              "type": "string",
+                              "enum": [
+                                "off",
+                                "on-miss",
+                                "always"
+                              ]
+                            },
+                            "host": {
+                              "type": "string",
+                              "enum": [
+                                "sandbox",
+                                "gateway",
+                                "node"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
                     "agents": {
                       "type": "object",
                       "properties": {
@@ -2451,6 +2580,12 @@
                                 "allowlist",
                                 "open"
                               ]
+                            },
+                            "allowFrom": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
                             },
                             "accounts": {
                               "type": "object",
@@ -2940,6 +3075,40 @@
                             "providers"
                           ]
                         },
+                        "tools": {
+                          "type": "object",
+                          "properties": {
+                            "exec": {
+                              "type": "object",
+                              "properties": {
+                                "security": {
+                                  "type": "string",
+                                  "enum": [
+                                    "deny",
+                                    "allowlist",
+                                    "full"
+                                  ]
+                                },
+                                "ask": {
+                                  "type": "string",
+                                  "enum": [
+                                    "off",
+                                    "on-miss",
+                                    "always"
+                                  ]
+                                },
+                                "host": {
+                                  "type": "string",
+                                  "enum": [
+                                    "sandbox",
+                                    "gateway",
+                                    "node"
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        },
                         "agents": {
                           "type": "object",
                           "properties": {
@@ -3148,6 +3317,12 @@
                                     "allowlist",
                                     "open"
                                   ]
+                                },
+                                "allowFrom": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
                                 },
                                 "accounts": {
                                   "type": "object",
@@ -3509,6 +3684,40 @@
                             "providers"
                           ]
                         },
+                        "tools": {
+                          "type": "object",
+                          "properties": {
+                            "exec": {
+                              "type": "object",
+                              "properties": {
+                                "security": {
+                                  "type": "string",
+                                  "enum": [
+                                    "deny",
+                                    "allowlist",
+                                    "full"
+                                  ]
+                                },
+                                "ask": {
+                                  "type": "string",
+                                  "enum": [
+                                    "off",
+                                    "on-miss",
+                                    "always"
+                                  ]
+                                },
+                                "host": {
+                                  "type": "string",
+                                  "enum": [
+                                    "sandbox",
+                                    "gateway",
+                                    "node"
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        },
                         "agents": {
                           "type": "object",
                           "properties": {
@@ -3718,6 +3927,12 @@
                                     "open"
                                   ]
                                 },
+                                "allowFrom": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
                                 "accounts": {
                                   "type": "object",
                                   "additionalProperties": {
@@ -3854,7 +4069,7 @@
         }
       }
     },
-    "/v1/artifacts": {
+    "/api/v1/artifacts": {
       "get": {
         "tags": [
           "Artifacts"
@@ -4043,7 +4258,7 @@
         }
       }
     },
-    "/v1/artifacts/stats": {
+    "/api/v1/artifacts/stats": {
       "get": {
         "tags": [
           "Artifacts"
@@ -4094,7 +4309,7 @@
         }
       }
     },
-    "/v1/artifacts/{id}": {
+    "/api/v1/artifacts/{id}": {
       "get": {
         "tags": [
           "Artifacts"
@@ -4285,7 +4500,7 @@
         }
       }
     },
-    "/v1/sessions": {
+    "/api/v1/sessions": {
       "get": {
         "tags": [
           "Sessions"
@@ -4434,7 +4649,7 @@
         }
       }
     },
-    "/v1/sessions/{id}": {
+    "/api/v1/sessions/{id}": {
       "get": {
         "tags": [
           "Sessions"

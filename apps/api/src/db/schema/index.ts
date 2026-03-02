@@ -182,7 +182,7 @@ export const poolConfigSnapshots = pgTable(
       table.poolId,
       table.version,
     ),
-    uniqueIndex("pool_config_snapshots_pool_hash_idx").on(
+    index("pool_config_snapshots_pool_hash_idx").on(
       table.poolId,
       table.configHash,
     ),
@@ -223,6 +223,7 @@ export const oauthStates = pgTable("oauth_states", {
   userId: text("user_id").notNull(),
   expiresAt: text("expires_at").notNull(),
   usedAt: text("used_at"),
+  returnTo: text("return_to"),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),

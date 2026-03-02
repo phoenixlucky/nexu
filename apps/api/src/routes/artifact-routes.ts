@@ -211,7 +211,7 @@ export function registerArtifactInternalRoutes(app: OpenAPIHono<AppBindings>) {
 
 const listArtifactsRoute = createRoute({
   method: "get",
-  path: "/v1/artifacts",
+  path: "/api/v1/artifacts",
   tags: ["Artifacts"],
   request: {
     query: z.object({
@@ -235,7 +235,7 @@ const listArtifactsRoute = createRoute({
 
 const artifactStatsRoute = createRoute({
   method: "get",
-  path: "/v1/artifacts/stats",
+  path: "/api/v1/artifacts/stats",
   tags: ["Artifacts"],
   responses: {
     200: {
@@ -249,7 +249,7 @@ const artifactStatsRoute = createRoute({
 
 const getArtifactRoute = createRoute({
   method: "get",
-  path: "/v1/artifacts/{id}",
+  path: "/api/v1/artifacts/{id}",
   tags: ["Artifacts"],
   request: {
     params: artifactIdParam,
@@ -268,7 +268,7 @@ const getArtifactRoute = createRoute({
 
 const deleteArtifactRoute = createRoute({
   method: "delete",
-  path: "/v1/artifacts/{id}",
+  path: "/api/v1/artifacts/{id}",
   tags: ["Artifacts"],
   request: {
     params: artifactIdParam,

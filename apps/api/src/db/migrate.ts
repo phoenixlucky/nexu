@@ -168,7 +168,8 @@ export async function migrate(dbUrl?: string) {
       created_at TEXT NOT NULL
     );
     CREATE UNIQUE INDEX IF NOT EXISTS pool_config_snapshots_pool_version_idx ON pool_config_snapshots(pool_id, version);
-    CREATE UNIQUE INDEX IF NOT EXISTS pool_config_snapshots_pool_hash_idx ON pool_config_snapshots(pool_id, config_hash);
+    DROP INDEX IF EXISTS pool_config_snapshots_pool_hash_idx;
+    CREATE INDEX IF NOT EXISTS pool_config_snapshots_pool_hash_idx ON pool_config_snapshots(pool_id, config_hash);
 
     CREATE TABLE IF NOT EXISTS oauth_states (
       pk SERIAL PRIMARY KEY,
@@ -289,6 +290,7 @@ export async function migrate(dbUrl?: string) {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_avatar TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_avatar_votes TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed_at TEXT;
+    ALTER TABLE oauth_states ADD COLUMN IF NOT EXISTS return_to TEXT;
   `);
 
   // Pool secrets

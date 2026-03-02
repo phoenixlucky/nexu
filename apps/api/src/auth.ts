@@ -7,21 +7,9 @@ import { sendEmail } from "./lib/email.js";
 const databaseUrl =
   process.env.DATABASE_URL ?? "postgresql://nexu:nexu@localhost:5433/nexu_dev";
 
-const socialProviders: BetterAuthOptions["socialProviders"] = {};
-
-if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
-  socialProviders.github = {
-    clientId: process.env.GITHUB_CLIENT_ID,
-    clientSecret: process.env.GITHUB_CLIENT_SECRET,
-  };
-}
-
-if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  socialProviders.google = {
-    clientId: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  };
-}
+// Enable cross-subdomain cookies in production so session cookies set on
+// api.nexu.io are readable from nexu.io (the frontend).
+const cookieDomain = process.env.COOKIE_DOMAIN; // e.g. ".nexu.io"
 
 const options: BetterAuthOptions = {
   baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
@@ -44,7 +32,20 @@ const options: BetterAuthOptions = {
       },
     }),
   ],
-  socialProviders,
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+    },
+  },
+  ...(cookieDomain && {
+    advanced: {
+      crossSubDomainCookies: {
+        enabled: true,
+        domain: cookieDomain,
+      },
+    },
+  }),
   trustedOrigins: [process.env.WEB_URL ?? "http://localhost:5173"],
   account: {
     accountLinking: {

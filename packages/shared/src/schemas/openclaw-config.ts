@@ -174,9 +174,35 @@ const toolsExecSchema = z
   })
   .passthrough();
 
+const toolsWebSearchSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+  })
+  .passthrough();
+
+const toolsWebFetchSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+  })
+  .passthrough();
+
+const toolsWebSchema = z
+  .object({
+    search: toolsWebSearchSchema.optional(),
+    fetch: toolsWebFetchSchema.optional(),
+  })
+  .passthrough();
+
 const toolsConfigSchema = z
   .object({
     exec: toolsExecSchema.optional(),
+    web: toolsWebSchema.optional(),
+  })
+  .passthrough();
+
+const cronConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
   })
   .passthrough();
 
@@ -189,6 +215,7 @@ export const openclawConfigSchema = z.object({
   channels: channelsConfigSchema,
   bindings: z.array(bindingSchema),
   commands: commandsConfigSchema.optional(),
+  cron: cronConfigSchema.optional(),
 });
 
 export type OpenClawConfig = z.infer<typeof openclawConfigSchema>;

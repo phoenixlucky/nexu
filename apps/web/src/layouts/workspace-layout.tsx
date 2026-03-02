@@ -1,4 +1,5 @@
 import { authClient } from "@/lib/auth-client";
+import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -13,7 +14,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import "@/lib/api";
-import { getV1Sessions } from "../../lib/api/sdk.gen";
+import { getApiV1Sessions } from "../../lib/api/sdk.gen";
 
 type Platform = "slack" | "discord" | "whatsapp" | "telegram" | "web";
 
@@ -110,6 +111,10 @@ export function WorkspaceLayout() {
   const { data: session } = authClient.useSession();
 
   useEffect(() => {
+    track("workspace_view");
+  }, []);
+
+  useEffect(() => {
     if (!showLogoutConfirm) return;
     const handler = (e: MouseEvent) => {
       if (logoutRef.current && !logoutRef.current.contains(e.target as Node)) {
@@ -123,7 +128,7 @@ export function WorkspaceLayout() {
   const { data: sessionsData } = useQuery({
     queryKey: ["sessions"],
     queryFn: async () => {
-      const { data } = await getV1Sessions({
+      const { data } = await getApiV1Sessions({
         query: { limit: 100 },
       });
       return data;
@@ -224,7 +229,12 @@ export function WorkspaceLayout() {
                   <button
                     type="button"
                     key={s.id}
-                    onClick={() => navigate(`/workspace/sessions/${s.id}`)}
+                    onClick={() => {
+                      track("workspace_channel_click", {
+                        channel_type: s.channelType ?? "web",
+                      });
+                      navigate(`/workspace/sessions/${s.id}`);
+                    }}
                     title={collapsed ? (s.title ?? undefined) : undefined}
                     className={cn(
                       "flex items-center gap-2.5 w-full rounded-lg transition-colors cursor-pointer",
@@ -290,6 +300,7 @@ export function WorkspaceLayout() {
             <Link
               to="/workspace/channels"
               title={collapsed ? "Channels" : undefined}
+              onClick={() => track("workspace_config_click")}
               className={cn(
                 "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-1",
                 collapsed ? "justify-center p-2" : "px-3 py-2",
