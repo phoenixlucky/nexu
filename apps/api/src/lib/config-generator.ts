@@ -300,6 +300,15 @@ export async function generatePoolConfig(
     };
   }
 
+  // Enable skill hot-reload watcher so OpenClaw picks up managed skills
+  // written to ~/.openclaw/skills/ by the sidecar without requiring a restart.
+  config.skills = {
+    load: {
+      watch: true,
+      watchDebounceMs: 250,
+    },
+  };
+
   // Standard command config for multi-tenant gateway
   config.commands = {
     native: "auto",

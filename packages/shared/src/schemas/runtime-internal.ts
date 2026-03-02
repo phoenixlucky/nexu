@@ -29,6 +29,9 @@ export const runtimePoolConfigResponseSchema = z.object({
   version: z.number().int().nonnegative(),
   configHash: z.string(),
   config: openclawConfigSchema,
+  agentMeta: z.record(z.object({ botId: z.string() })).optional(),
+  poolSecrets: z.record(z.string()).optional(),
+  secretsHash: z.string().optional(),
   createdAt: z.string(),
 });
 
@@ -53,3 +56,12 @@ export type RuntimePoolHeartbeatInput = z.infer<
 export type RuntimePoolConfigResponse = z.infer<
   typeof runtimePoolConfigResponseSchema
 >;
+
+export const runtimeSkillsResponseSchema = z.object({
+  version: z.number().int().nonnegative(),
+  skillsHash: z.string(),
+  skills: z.record(z.record(z.string())),
+  createdAt: z.string().datetime(),
+});
+
+export type RuntimeSkillsResponse = z.infer<typeof runtimeSkillsResponseSchema>;

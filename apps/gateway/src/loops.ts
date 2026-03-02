@@ -16,12 +16,14 @@ import {
   onLivenessSuccess,
 } from "./health-state.js";
 import { log } from "./log.js";
+import { pollLatestSkills } from "./skills.js";
 import {
   type RuntimeState,
   markGatewayProbeFailure,
   markGatewayProbeSuccess,
   setConfigSyncStatus,
   setGatewayStatus,
+  setSkillsSyncStatus,
 } from "./state.js";
 import { sleep } from "./utils.js";
 
@@ -84,6 +86,30 @@ export async function runPollLoop(state: RuntimeState): Promise<never> {
     } catch (error) {
       setConfigSyncStatus(state, "degraded");
       log("config poll failed", {
+        error: error instanceof Error ? error.message : "unknown_error",
+        retryInMs: backoffMs,
+      });
+      await sleep(backoffMs);
+      backoffMs = Math.min(backoffMs * 2, env.RUNTIME_MAX_BACKOFF_MS);
+    }
+  }
+}
+
+export async function runSkillsPollLoop(state: RuntimeState): Promise<never> {
+  let backoffMs = env.RUNTIME_POLL_INTERVAL_MS;
+
+  for (;;) {
+    try {
+      await pollLatestSkills(state);
+      backoffMs = env.RUNTIME_POLL_INTERVAL_MS;
+
+      const jitter = Math.floor(
+        Math.random() * (env.RUNTIME_POLL_JITTER_MS + 1),
+      );
+      await sleep(env.RUNTIME_POLL_INTERVAL_MS + jitter);
+    } catch (error) {
+      setSkillsSyncStatus(state, "degraded");
+      log("skills poll failed", {
         error: error instanceof Error ? error.message : "unknown_error",
         retryInMs: backoffMs,
       });

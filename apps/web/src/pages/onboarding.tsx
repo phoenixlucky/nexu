@@ -1068,7 +1068,10 @@ function ChannelConnectModal({
         if (error) throw new Error("Connection failed");
       }
       toast.success(`${channelName} connected!`);
-      console.log("[connect] success, advancing step", { stepIdx, stepsLen: steps.length });
+      console.log("[connect] success, advancing step", {
+        stepIdx,
+        stepsLen: steps.length,
+      });
       try {
         track("channel_ready", { channel: channelId });
         identify({ primary_platform: channelId, channels_connected: 1 });
@@ -1216,9 +1219,7 @@ function ChannelConnectModal({
                         className="mt-1.5 w-1 h-1 rounded-full shrink-0"
                         style={{ backgroundColor: channelColor, opacity: 0.5 }}
                       />
-                      <span className="flex-1 min-w-0">
-                        {renderBold(b)}
-                      </span>
+                      <span className="flex-1 min-w-0">{renderBold(b)}</span>
                     </span>
                   )}
                 </div>
@@ -1395,7 +1396,9 @@ function ChannelConnectModal({
             <button
               type="button"
               onClick={handleConnect}
-              disabled={!field1.trim() || !field2.trim() || connecting || connected}
+              disabled={
+                !field1.trim() || !field2.trim() || connecting || connected
+              }
               className="inline-flex items-center gap-1.5 px-4 py-1.5 text-[12px] font-medium rounded-lg text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               style={{ backgroundColor: channelColor }}
             >
@@ -1591,9 +1594,7 @@ function ChannelsStep({
           onClose={() => setModal(null)}
           onConnected={handleConnected}
           onLinked={(id) =>
-            setConnected((prev) =>
-              prev.includes(id) ? prev : [...prev, id],
-            )
+            setConnected((prev) => (prev.includes(id) ? prev : [...prev, id]))
           }
         />
       )}

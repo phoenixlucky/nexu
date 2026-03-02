@@ -152,6 +152,20 @@ const commandsConfigSchema = z
   })
   .passthrough();
 
+const skillsLoadSchema = z
+  .object({
+    watch: z.boolean().optional(),
+    watchDebounceMs: z.number().optional(),
+    extraDirs: z.array(z.string()).optional(),
+  })
+  .passthrough();
+
+const skillsConfigSchema = z
+  .object({
+    load: skillsLoadSchema.optional(),
+  })
+  .passthrough();
+
 const toolsExecSchema = z
   .object({
     security: z.enum(["deny", "allowlist", "full"]).optional(),
@@ -196,6 +210,7 @@ export const openclawConfigSchema = z.object({
   gateway: gatewayConfigSchema,
   models: modelsConfigSchema.optional(),
   tools: toolsConfigSchema.optional(),
+  skills: skillsConfigSchema.optional(),
   agents: agentsConfigSchema,
   channels: channelsConfigSchema,
   bindings: z.array(bindingSchema),

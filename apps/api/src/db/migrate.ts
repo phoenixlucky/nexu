@@ -67,7 +67,7 @@ export async function migrate(dbUrl?: string) {
       name TEXT NOT NULL,
       slug TEXT NOT NULL,
       system_prompt TEXT,
-      model_id TEXT DEFAULT 'anthropic/claude-sonnet-4-6',
+      model_id TEXT DEFAULT 'anthropic/claude-sonnet-4',
       agent_config TEXT DEFAULT '{}',
       tools_config TEXT DEFAULT '{}',
       status TEXT DEFAULT 'active',
@@ -238,6 +238,25 @@ export async function migrate(dbUrl?: string) {
     CREATE INDEX IF NOT EXISTS sessions_status_idx ON sessions(status);
     CREATE INDEX IF NOT EXISTS sessions_created_at_idx ON sessions(created_at);
     CREATE INDEX IF NOT EXISTS sessions_channel_type_idx ON sessions(channel_type);
+
+    CREATE TABLE IF NOT EXISTS skills (
+      pk SERIAL PRIMARY KEY,
+      id TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL UNIQUE,
+      content TEXT NOT NULL,
+      status TEXT DEFAULT 'active',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS skills_snapshots (
+      pk SERIAL PRIMARY KEY,
+      id TEXT NOT NULL UNIQUE,
+      version INTEGER NOT NULL UNIQUE,
+      skills_hash TEXT NOT NULL,
+      skills_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
   `);
 
   // Migrations
@@ -272,6 +291,27 @@ export async function migrate(dbUrl?: string) {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_avatar_votes TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed_at TEXT;
     ALTER TABLE oauth_states ADD COLUMN IF NOT EXISTS return_to TEXT;
+  `);
+
+  // Pool secrets
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS pool_secrets (
+      pk SERIAL PRIMARY KEY,
+      id TEXT NOT NULL UNIQUE,
+      pool_id TEXT NOT NULL,
+      secret_name TEXT NOT NULL,
+      encrypted_value TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS pool_secrets_uniq_idx ON pool_secrets(pool_id, secret_name);
+  `);
+
+  // Multi-file skills support
+  await client.query(`
+    ALTER TABLE skills ADD COLUMN IF NOT EXISTS files TEXT NOT NULL DEFAULT '{}';
+    UPDATE skills SET files = json_build_object('SKILL.md', content)::text
+      WHERE files = '{}' AND content IS NOT NULL AND content != '';
   `);
 
   console.log("Database migrated successfully");

@@ -189,6 +189,32 @@ export const poolConfigSnapshots = pgTable(
   ],
 );
 
+export const skills = pgTable("skills", {
+  pk: serial("pk").primaryKey(),
+  id: text("id").notNull().unique(),
+  name: text("name").notNull().unique(),
+  content: text("content").notNull(),
+  files: text("files").notNull().default("{}"),
+  status: text("status").default("active"),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
+export const skillsSnapshots = pgTable("skills_snapshots", {
+  pk: serial("pk").primaryKey(),
+  id: text("id").notNull().unique(),
+  version: integer("version").notNull().unique(),
+  skillsHash: text("skills_hash").notNull(),
+  skillsJson: text("skills_json").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
 export const oauthStates = pgTable("oauth_states", {
   pk: serial("pk").primaryKey(),
   id: text("id").notNull().unique(),
@@ -241,6 +267,26 @@ export const artifacts = pgTable("artifacts", {
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
 });
+
+export const poolSecrets = pgTable(
+  "pool_secrets",
+  {
+    pk: serial("pk").primaryKey(),
+    id: text("id").notNull().unique(),
+    poolId: text("pool_id").notNull(),
+    secretName: text("secret_name").notNull(),
+    encryptedValue: text("encrypted_value").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    updatedAt: text("updated_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    uniqueIndex("pool_secrets_uniq_idx").on(table.poolId, table.secretName),
+  ],
+);
 
 export const sessions = pgTable(
   "sessions",
