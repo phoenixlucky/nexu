@@ -31,8 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install flyctl
-        uses: superfly/flyctl-actions/setup-flyctl@v2
+      - uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Generate app name
         id: slug
@@ -232,8 +231,7 @@ jobs:
           echo "worker_name=nexu-app-preview-${SLUG}" >> "$GITHUB_OUTPUT"
           echo "preview_hostname=${SLUG}.${{ env.PREVIEW_DOMAIN_SUFFIX }}" >> "$GITHUB_OUTPUT"
 
-      - name: Install flyctl
-        uses: superfly/flyctl-actions/setup-flyctl@v2
+      - uses: superfly/flyctl-actions/setup-flyctl@master
         continue-on-error: true
 
       - name: Delete API preview
