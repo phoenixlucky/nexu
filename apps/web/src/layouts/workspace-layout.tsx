@@ -3,6 +3,7 @@ import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
+  BellRing,
   ChevronUp,
   LogOut,
   MessageSquare,
@@ -141,6 +142,8 @@ export function WorkspaceLayout() {
   const sessionMatch = location.pathname.match(/\/workspace\/sessions\/(.+)/);
   const selectedSessionId = sessionMatch?.[1] ?? null;
   const isChannelsPage = location.pathname.includes("/channels");
+  const isNotificationDemoPage =
+    location.pathname.includes("/notification-demo");
 
   const handleLogout = async () => {
     setShowLogoutConfirm(false);
@@ -152,7 +155,10 @@ export function WorkspaceLayout() {
   const userInitial = (userEmail[0] ?? "U").toUpperCase();
 
   const showEmptyState =
-    sessions.length === 0 && !isChannelsPage && !selectedSessionId;
+    sessions.length === 0 &&
+    !isChannelsPage &&
+    !isNotificationDemoPage &&
+    !selectedSessionId;
 
   return (
     <div className="flex h-screen">
@@ -311,6 +317,20 @@ export function WorkspaceLayout() {
             >
               <Settings size={14} />
               {!collapsed && "Channels"}
+            </Link>
+            <Link
+              to="/workspace/notification-demo"
+              title={collapsed ? "Notification Demo" : undefined}
+              className={cn(
+                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-1",
+                collapsed ? "justify-center p-2" : "px-3 py-2",
+                isNotificationDemoPage
+                  ? "bg-accent/10 text-accent"
+                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+              )}
+            >
+              <BellRing size={14} />
+              {!collapsed && "Notification Demo"}
             </Link>
           </div>
         </div>

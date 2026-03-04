@@ -5,6 +5,7 @@ import { WorkspaceLayout } from "./layouts/workspace-layout";
 import { AuthPage } from "./pages/auth";
 import { ChannelsPage } from "./pages/channels";
 import { InvitePage } from "./pages/invite";
+import { NotificationDemoPage } from "./pages/notification-demo";
 import { OnboardingPage } from "./pages/onboarding";
 import { SessionsPage } from "./pages/sessions";
 import { SlackOAuthCallbackPage } from "./pages/slack-oauth-callback";
@@ -23,6 +24,10 @@ export function App() {
             <Route path="/workspace/sessions" element={<SessionsPage />} />
             <Route path="/workspace/sessions/:id" element={<SessionsPage />} />
             <Route path="/workspace/channels" element={<ChannelsPage />} />
+            <Route
+              path="/workspace/notification-demo"
+              element={<NotificationDemoPage />}
+            />
             <Route
               path="/workspace/channels/slack/callback"
               element={<SlackOAuthCallbackPage />}
