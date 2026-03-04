@@ -271,16 +271,20 @@ export async function generatePoolConfig(
             enabled: true,
           },
         },
-        memorySearch: {
-          enabled: true,
-          sources: ["memory"],
-          provider: "openai",
-          model: "google/gemini-embedding-001",
-          remote: {
-            baseUrl: "https://openrouter.ai/api/v1/",
-            apiKey: process.env.OPENROUTER_API_KEY ?? "",
-          },
-        },
+        ...(process.env.OPENROUTER_API_KEY
+          ? {
+              memorySearch: {
+                enabled: true,
+                sources: ["memory"],
+                provider: "openai",
+                model: "google/gemini-embedding-001",
+                remote: {
+                  baseUrl: "https://openrouter.ai/api/v1/",
+                  apiKey: process.env.OPENROUTER_API_KEY,
+                },
+              },
+            }
+          : {}),
       },
       list: agentList,
     },
