@@ -53,7 +53,7 @@ function parseStatusLine(line: string): StatusEntry | null {
   };
 }
 
-function getPullRequestChangedMigrationFiles(): string[] {
+function getPullRequestChangedFiles(pathSpec: string): string[] {
   if (eventName !== "pull_request" || !baseRef) {
     return [];
   }
@@ -63,7 +63,7 @@ function getPullRequestChangedMigrationFiles(): string[] {
     "--name-only",
     `origin/${baseRef}...HEAD`,
     "--",
-    "migrations",
+    pathSpec,
   ]);
 
   if (diffResult.status !== 0) {
@@ -79,6 +79,7 @@ function getPullRequestChangedMigrationFiles(): string[] {
 function formatFailureReport(
   entries: StatusEntry[],
   pullRequestChangedMigrations: string[],
+  pullRequestChangedSchemas: string[],
 ): string {
   const untracked = entries.filter((entry) => entry.code === "??");
   const tracked = entries.filter((entry) => entry.code !== "??");
@@ -113,6 +114,13 @@ function formatFailureReport(
   if (hasMigrationChangesInPr) {
     lines.push("", "**Migration files changed in this PR**");
     for (const filePath of pullRequestChangedMigrations) {
+      lines.push(`- ${filePath}`);
+    }
+  }
+
+  if (pullRequestChangedSchemas.length > 0) {
+    lines.push("", "**Schema files changed in this PR**");
+    for (const filePath of pullRequestChangedSchemas) {
       lines.push(`- ${filePath}`);
     }
   }
@@ -195,7 +203,8 @@ async function main() {
     .map(parseStatusLine)
     .filter((entry): entry is StatusEntry => entry !== null);
 
-  const pullRequestChangedMigrations = getPullRequestChangedMigrationFiles();
+  const pullRequestChangedMigrations = getPullRequestChangedFiles("migrations");
+  const pullRequestChangedSchemas = getPullRequestChangedFiles("src/db/schema");
 
   if (entries.length === 0) {
     const success =
@@ -205,7 +214,11 @@ async function main() {
     return;
   }
 
-  const report = formatFailureReport(entries, pullRequestChangedMigrations);
+  const report = formatFailureReport(
+    entries,
+    pullRequestChangedMigrations,
+    pullRequestChangedSchemas,
+  );
   await writeReport(report);
   console.error(report);
   process.exitCode = 1;
