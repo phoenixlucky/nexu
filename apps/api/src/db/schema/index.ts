@@ -303,6 +303,7 @@ export const sessions = pgTable(
     messageCount: integer("message_count").default(0),
     lastMessageAt: text("last_message_at"),
     metadata: text("metadata"),
+    debugTag: text("debug_tag"),
     createdAt: text("created_at")
       .notNull()
       .$defaultFn(() => new Date().toISOString()),
