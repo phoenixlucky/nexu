@@ -14,7 +14,10 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import "@/lib/api";
-import { getApiV1Sessions } from "../../lib/api/sdk.gen";
+import {
+  getApiV1Sessions,
+  getApiV1StatsUserCount,
+} from "../../lib/api/sdk.gen";
 
 type Platform = "slack" | "discord" | "whatsapp" | "telegram" | "web";
 
@@ -105,6 +108,9 @@ function EmptyState({ onGoConfig }: { onGoConfig: () => void }) {
 export function WorkspaceLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [userCount, setUserCount] = useState<number | null>(null);
+  const [isUserCountLoading, setIsUserCountLoading] = useState(false);
+  const [userCountError, setUserCountError] = useState<string | null>(null);
   const logoutRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -146,6 +152,35 @@ export function WorkspaceLayout() {
     setShowLogoutConfirm(false);
     await authClient.signOut();
     window.location.href = "/";
+  };
+
+  const handleGetUserCount = async () => {
+    setIsUserCountLoading(true);
+    setUserCountError(null);
+    try {
+      const { data, error } = await getApiV1StatsUserCount();
+      if (error) {
+        const message =
+          typeof error === "object" &&
+          error !== null &&
+          "message" in error &&
+          typeof error.message === "string"
+            ? error.message
+            : "Failed to load user count";
+        throw new Error(message);
+      }
+      if (!data) {
+        throw new Error("Empty response");
+      }
+      setUserCount(data.userCount);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to load user count";
+      setUserCountError(message);
+      setUserCount(null);
+    } finally {
+      setIsUserCountLoading(false);
+    }
   };
 
   const userEmail = session?.user?.email ?? "";
@@ -393,12 +428,33 @@ export function WorkspaceLayout() {
       </div>
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto min-h-0 bg-surface-0">
-        {showEmptyState ? (
-          <EmptyState onGoConfig={() => navigate("/workspace/channels")} />
-        ) : (
-          <Outlet />
-        )}
+      <main className="flex flex-1 min-h-0 flex-col bg-surface-0">
+        <div className="border-b border-border px-4 py-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleGetUserCount}
+              disabled={isUserCountLoading}
+              className="rounded-lg border border-border bg-surface-1 px-3 py-1.5 text-[12px] font-medium text-text-primary transition-colors hover:border-border-hover disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isUserCountLoading ? "Loading..." : "Get User Count"}
+            </button>
+            <span className="text-[12px] text-text-muted">
+              {userCountError
+                ? `Error: ${userCountError}`
+                : userCount !== null
+                  ? `Total users: ${userCount}`
+                  : ""}
+            </span>
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {showEmptyState ? (
+            <EmptyState onGoConfig={() => navigate("/workspace/channels")} />
+          ) : (
+            <Outlet />
+          )}
+        </div>
       </main>
     </div>
   );
