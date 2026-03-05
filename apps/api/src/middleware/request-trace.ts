@@ -24,8 +24,6 @@ function buildRequestTraceTags(c: Context<AppBindings>): RequestTraceTags {
 
   return {
     "http.method": c.req.method,
-    "http.path": path,
-    request_id: c.get("requestId"),
     route_group: routeGroup,
     auth_required: routeGroup === "v1",
   };

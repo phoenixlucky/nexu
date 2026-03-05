@@ -1,7 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { cors } from "hono/cors";
-import { Span, Trace } from "./lib/trace-decorator.js";
+import { Span } from "./lib/trace-decorator.js";
 import { authMiddleware } from "./middleware/auth.js";
 import {
   errorMiddleware,
@@ -39,7 +39,7 @@ import type { AppBindings } from "./types.js";
 class HealthHandler {
   constructor(private readonly commitHash?: string) {}
 
-  @Trace("api.health")
+  @Span("api.health")
   async handle(c: Context<AppBindings>): Promise<Response> {
     const payload = await this.buildPayload();
     return c.json(payload);

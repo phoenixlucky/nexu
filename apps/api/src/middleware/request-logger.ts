@@ -74,7 +74,7 @@ export const requestLoggerMiddleware: MiddlewareHandler<AppBindings> = async (
     const latencyMs = Date.now() - startedAt;
     const method = c.req.method;
     const path = c.req.path;
-    const status = threw ? 500 : c.res.status;
+    const status = threw && c.res.status < 400 ? 500 : c.res.status;
     const decision = logSampleRules.get(path, status, latencyMs);
 
     if (decision.shouldLog) {
