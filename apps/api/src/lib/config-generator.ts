@@ -168,11 +168,7 @@ export async function generatePoolConfig(
         // OpenClaw Slack plugin's isConfigured requires appToken even in HTTP mode.
         // Provide a placeholder so the account passes the configured check.
         appToken: "xapp-placeholder-not-used-in-http-mode",
-        // Disable preview streaming to avoid duplicate messages.
-        // When streaming is "partial" (default), OpenClaw sends a draft preview
-        // message then a final reply — but without a thread context the draft
-        // cannot be finalized via edit, resulting in two visible messages.
-        streaming: "off",
+        streaming: "partial",
       };
 
       bindingsList.push({
@@ -263,6 +259,31 @@ export async function generatePoolConfig(
     agents: {
       defaults: {
         model: { primary: defaultModelId },
+        compaction: {
+          mode: "safeguard",
+          maxHistoryShare: 0.5,
+          keepRecentTokens: 20000,
+          memoryFlush: {
+            enabled: true,
+          },
+        },
+        ...(process.env.OPENROUTER_API_KEY
+          ? {
+              memorySearch: {
+                enabled: true,
+                sources: ["memory"],
+                provider: "openai",
+                model: "google/gemini-embedding-001",
+                remote: {
+                  baseUrl: "https://openrouter.ai/api/v1/",
+                  apiKey: process.env.OPENROUTER_API_KEY,
+                },
+                sync: {
+                  intervalMinutes: 5,
+                },
+              },
+            }
+          : {}),
       },
       list: agentList,
     },
@@ -273,12 +294,22 @@ export async function generatePoolConfig(
         host: "gateway",
       },
       web: {
-        search: { enabled: true },
+        search: {
+          enabled: true,
+          ...(process.env.BRAVE_API_KEY
+            ? { provider: "brave", apiKey: process.env.BRAVE_API_KEY }
+            : {}),
+        },
         fetch: { enabled: true },
       },
     },
     cron: {
       enabled: true,
+    },
+    messages: {
+      ackReaction: "eyes",
+      ackReactionScope: "group-mentions",
+      removeAckAfterReply: true,
     },
     channels: {},
     bindings: bindingsList,
@@ -316,9 +347,10 @@ export async function generatePoolConfig(
       signingSecret: firstAccount?.signingSecret ?? "",
       enabled: true,
       groupPolicy: "open",
-      requireMention: false,
+      requireMention: true,
       dmPolicy: "open",
       allowFrom: ["*"],
+      ackReaction: "eyes",
       accounts: slackAccounts,
     };
   }
@@ -364,6 +396,29 @@ export async function generatePoolConfig(
     restart: true,
     ownerDisplay: "raw",
   };
+
+  // Enable OpenTelemetry diagnostics via Datadog direct OTLP intake or
+  // a local Agent/Collector.  DD_API_KEY triggers agentless mode (sends
+  // directly to https://otlp.datadoghq.com); OTEL_EXPORTER_OTLP_ENDPOINT
+  // overrides the endpoint for Agent-based setups.
+  const ddApiKey = process.env.DD_API_KEY;
+  const otelEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  if (ddApiKey || otelEndpoint) {
+    const otelConfig: Record<string, unknown> = {
+      enabled: true,
+      endpoint:
+        otelEndpoint ??
+        `https://otlp.${process.env.DD_SITE ?? "datadoghq.com"}`,
+      serviceName: process.env.OTEL_SERVICE_NAME ?? "nexu-openclaw",
+      traces: true,
+      metrics: true,
+      logs: true,
+    };
+    if (ddApiKey) {
+      otelConfig.headers = { "dd-api-key": ddApiKey };
+    }
+    config.diagnostics = { enabled: true, otel: otelConfig };
+  }
 
   const validated = openclawConfigSchema.parse(config);
 
