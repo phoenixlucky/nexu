@@ -20,7 +20,10 @@ import { decrypt } from "../lib/crypto.js";
 import { BaseError, ServiceError } from "../lib/error.js";
 import { logger } from "../lib/logger.js";
 import { Span } from "../lib/trace-decorator.js";
-import { requireInternalToken } from "../middleware/internal-auth.js";
+import {
+  requireInternalToken,
+  requireSkillToken,
+} from "../middleware/internal-auth.js";
 
 import type { AppBindings } from "../types.js";
 
@@ -596,6 +599,40 @@ export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
     }
 
     return c.json(formatSession(updated), 200);
+  });
+
+  // GET /api/internal/sessions/lookup — Find a bot's most recent active session.
+  // Used by skill scripts (session-search.sh) when no local binding exists yet.
+  app.get("/api/internal/sessions/lookup", async (c) => {
+    requireSkillToken(c);
+    const botId = c.req.query("botId");
+    if (!botId) {
+      return c.json({ message: "botId query parameter is required" }, 400);
+    }
+
+    const [session] = await db
+      .select()
+      .from(sessions)
+      .where(
+        and(eq(sessions.botId, botId), eq(sessions.status, "active")),
+      )
+      .orderBy(
+        sql`${sessions.lastMessageAt} DESC NULLS LAST`,
+        desc(sessions.createdAt),
+      )
+      .limit(1);
+
+    if (!session) {
+      return c.json({ status: "not_found", message: "No active session" }, 404);
+    }
+
+    return c.json({
+      status: "ok",
+      sessionKey: session.sessionKey,
+      channelType: session.channelType,
+      channelId: session.channelId,
+      title: session.title,
+    }, 200);
   });
 
   // POST /api/internal/sessions/sync-discord — Sync Discord sessions via Discord REST API

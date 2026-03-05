@@ -107,9 +107,9 @@ fi
 
 export MESSAGE_REF THREAD_REF SESSION_KEY RUNTIME_SESSION_ID
 
-node - "$TMP_JSONL" "$TMP_SESSIONS" <<'NODE'
-const fs = require("fs");
-const path = require("path");
+AGENT_ID="$AGENT_ID" SKILL_API_TOKEN="${SKILL_API_TOKEN:-}" node --input-type=module - "$TMP_JSONL" "$TMP_SESSIONS" <<'NODE'
+import fs from "fs";
+import path from "path";
 
 const jsonlListPath = process.argv[2];
 const sessionsListPath = process.argv[3];
@@ -253,11 +253,55 @@ for (const file of prioritized) {
   }
 }
 
+// API fallback: when no local binding exists, query Nexu API for the bot's
+// most recent active session. This handles the first-deploy case where no
+// binding record has been written yet.
+if (!best) {
+  const agentId = process.env.AGENT_ID || "";
+  const skillToken = process.env.SKILL_API_TOKEN || "";
+
+  let contextFile = "";
+  const stateDir = process.env.OPENCLAW_STATE_DIR || `${process.env.HOME}/.openclaw`;
+  const contextPath = `${stateDir}/nexu-context.json`;
+  if (fs.existsSync(contextPath)) {
+    contextFile = contextPath;
+  }
+
+  if (agentId && skillToken && contextFile) {
+    try {
+      const ctx = JSON.parse(fs.readFileSync(contextFile, "utf8"));
+      const apiUrl = ctx.apiUrl || "";
+      if (apiUrl) {
+        const url = `${apiUrl}/api/internal/sessions/lookup?botId=${encodeURIComponent(agentId)}`;
+        const resp = await fetch(url, { headers: { "x-internal-token": skillToken } });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.sessionKey) {
+            best = {
+              file: "api-lookup",
+              agentId,
+              runtimeSessionId: "",
+              timestamp: "",
+              nexuSessionKey: data.sessionKey,
+              channelType: data.channelType || "",
+              accountId: "",
+              channelId: data.channelId || "",
+              threadRef: "",
+              messageRef: "",
+              senderRef: "",
+            };
+          }
+        }
+      }
+    } catch { /* non-fatal */ }
+  }
+}
+
 if (!best) {
   console.log(
     JSON.stringify({
       status: "not_found",
-      message: "No matching nexu-session-binding record found in session files",
+      message: "No matching session found in local files or API",
       query,
     }),
   );
