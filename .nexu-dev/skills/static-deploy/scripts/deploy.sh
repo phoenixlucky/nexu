@@ -170,15 +170,29 @@ step_validate() {
   SLUG="${1:-}"
   DIR="${2:-}"
   AGENT_ID="${3:-}"
-  # Prefer explicit arg (nexu session key from session-search.sh), then
-  # fallback to OPENCLAW_SESSION_KEY env var.
-  SESSION_KEY_INPUT="${4:-${OPENCLAW_SESSION_KEY:-}}"
   MESSAGE_REF_INPUT="${5:-${OPENCLAW_MESSAGE_ID:-}}"
   THREAD_REF_INPUT="${6:-${OPENCLAW_THREAD_ID:-}}"
   ACCOUNT_ID_INPUT="${7:-${OPENCLAW_ACCOUNT_ID:-}}"
   CHANNEL_ID_INPUT="${8:-${OPENCLAW_CHANNEL_ID:-}}"
   CHANNEL_TYPE_INPUT="${9:-${OPENCLAW_CHANNEL_TYPE:-slack}}"
   SENDER_REF_INPUT="${10:-${OPENCLAW_SENDER_ID:-}}"
+
+  # Resolve Nexu session key: explicit arg #4 > construct from env > raw env fallback.
+  # OPENCLAW_SESSION_KEY is an OpenClaw runtime ID (e.g. slack-xxx:user:yyy) which does
+  # NOT match the Nexu sessions table key format (agent:{botId}:{type}:channel:{id}).
+  if [[ -n "${4:-}" ]]; then
+    SESSION_KEY_INPUT="$4"
+  elif [[ -n "$AGENT_ID" && -n "${OPENCLAW_CHANNEL_ID:-}" ]]; then
+    local ch_type="${OPENCLAW_CHANNEL_TYPE:-slack}"
+    local thread_ref="${OPENCLAW_THREAD_ID:-}"
+    if [[ -n "$thread_ref" ]]; then
+      SESSION_KEY_INPUT="agent:${AGENT_ID}:${ch_type}:thread:${thread_ref}"
+    else
+      SESSION_KEY_INPUT="agent:${AGENT_ID}:${ch_type}:channel:${OPENCLAW_CHANNEL_ID}"
+    fi
+  else
+    SESSION_KEY_INPUT="${OPENCLAW_SESSION_KEY:-}"
+  fi
 
   if [[ -z "$SLUG" || -z "$DIR" || -z "$AGENT_ID" ]]; then
     json_error "Usage: deploy.sh <project-slug> <directory> <agent-id> [session-key]" 1
