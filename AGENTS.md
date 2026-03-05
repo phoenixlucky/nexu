@@ -26,9 +26,23 @@ pnpm lint                             # Biome lint
 pnpm format                           # Biome format
 pnpm test                             # Vitest
 pnpm --filter @nexu/api test          # API tests only
+pnpm db:generate                      # Generate Drizzle migration files (recommended)
 pnpm --filter @nexu/api db:push       # Drizzle schema push
 pnpm generate-types                   # OpenAPI spec → frontend SDK
 ```
+
+## DB schema change workflow
+
+When changing DB structure, follow this workflow.
+
+### Development stage
+
+1. Use TS schema (`apps/api/src/db/schema/index.ts`) as the SSoT for target DB structure.
+2. Generate migration SQL with Drizzle (`pnpm db:generate`) and commit files under `apps/api/migrations/`.
+
+### PR stage
+
+- CI automatically checks migration SQL; failures block the PR.
 
 ## Hard rules
 
@@ -43,6 +57,14 @@ pnpm generate-types                   # OpenAPI spec → frontend SDK
 - Never commit code changes until explicitly told to do so.
 - Whenever you add a new environment variable, update `deploy/helm/nexu/values.yaml` in the same change.
 - Gateway sidecar: never derive state paths from `OPENCLAW_CONFIG_PATH`. Use `env.OPENCLAW_STATE_DIR` for state-related files (sessions, skills, nexu-context.json). See `docs/guides/gateway-environment-guide.md`.
+
+## Observability conventions
+
+- Request-level tracing must be created uniformly by middleware as the root trace.
+- Logic with monitoring value must be split into named functions and annotated with `@Trace` / `@Span`.
+- Do not introduce function-wrapper transitional APIs such as `runTrace` / `runSpan`.
+- Iterate incrementally: add Trace/Span within established code patterns first, then refine based on metrics.
+- Logger usage source of truth: `apps/api/src/lib/logger.ts`; follow its exported API and nearby call-site patterns when adding logs.
 
 ## Required checks
 

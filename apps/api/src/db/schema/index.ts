@@ -1,11 +1,87 @@
 import {
+  boolean,
+  foreignKey,
   index,
   integer,
   pgTable,
   serial,
   text,
+  timestamp,
+  unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+
+// better-auth managed core auth tables (FKs intentionally preserved)
+export const authUsers = pgTable(
+  "user",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    emailVerified: boolean("emailVerified").notNull().default(false),
+    image: text("image"),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+  },
+  (table) => [unique("user_email_key").on(table.email)],
+);
+
+export const authSessions = pgTable(
+  "session",
+  {
+    id: text("id").primaryKey(),
+    expiresAt: timestamp("expiresAt").notNull(),
+    token: text("token").notNull(),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+    ipAddress: text("ipAddress"),
+    userAgent: text("userAgent"),
+    userId: text("userId").notNull(),
+  },
+  (table) => [
+    unique("session_token_key").on(table.token),
+    foreignKey({
+      name: "session_userId_fkey",
+      columns: [table.userId],
+      foreignColumns: [authUsers.id],
+    }),
+  ],
+);
+
+export const authAccounts = pgTable(
+  "account",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("accountId").notNull(),
+    providerId: text("providerId").notNull(),
+    userId: text("userId").notNull(),
+    accessToken: text("accessToken"),
+    refreshToken: text("refreshToken"),
+    idToken: text("idToken"),
+    accessTokenExpiresAt: timestamp("accessTokenExpiresAt"),
+    refreshTokenExpiresAt: timestamp("refreshTokenExpiresAt"),
+    scope: text("scope"),
+    password: text("password"),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      name: "account_userId_fkey",
+      columns: [table.userId],
+      foreignColumns: [authUsers.id],
+    }),
+  ],
+);
+
+export const authVerifications = pgTable("verification", {
+  id: text("id").primaryKey(),
+  identifier: text("identifier").notNull(),
+  value: text("value").notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+});
 
 export const bots = pgTable(
   "bots",
@@ -242,24 +318,13 @@ export const inviteCodes = pgTable("invite_codes", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
-export const artifacts = pgTable("artifacts", {
+export const workspaceTemplates = pgTable("workspace_templates", {
   pk: serial("pk").primaryKey(),
   id: text("id").notNull().unique(),
-  botId: text("bot_id").notNull(),
-  sessionKey: text("session_key"),
-  channelType: text("channel_type"),
-  channelId: text("channel_id"),
-  title: text("title").notNull(),
-  artifactType: text("artifact_type"),
-  source: text("source"),
-  contentType: text("content_type"),
-  status: text("status").default("building"),
-  previewUrl: text("preview_url"),
-  deployTarget: text("deploy_target"),
-  linesOfCode: integer("lines_of_code"),
-  fileCount: integer("file_count"),
-  durationMs: integer("duration_ms"),
-  metadata: text("metadata"),
+  name: text("name").notNull().unique(),
+  content: text("content").notNull(),
+  writeMode: text("write_mode").notNull().default("seed"),
+  status: text("status").default("active"),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
@@ -267,6 +332,55 @@ export const artifacts = pgTable("artifacts", {
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
 });
+
+export const workspaceTemplateSnapshots = pgTable(
+  "workspace_template_snapshots",
+  {
+    pk: serial("pk").primaryKey(),
+    id: text("id").notNull().unique(),
+    version: integer("version").notNull().unique(),
+    templatesHash: text("templates_hash").notNull(),
+    templatesJson: text("templates_json").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+);
+
+export const artifacts = pgTable(
+  "artifacts",
+  {
+    pk: serial("pk").primaryKey(),
+    id: text("id").notNull().unique(),
+    botId: text("bot_id").notNull(),
+    sessionKey: text("session_key"),
+    channelType: text("channel_type"),
+    channelId: text("channel_id"),
+    title: text("title").notNull(),
+    artifactType: text("artifact_type"),
+    source: text("source"),
+    contentType: text("content_type"),
+    status: text("status").default("building"),
+    previewUrl: text("preview_url"),
+    deployTarget: text("deploy_target"),
+    linesOfCode: integer("lines_of_code"),
+    fileCount: integer("file_count"),
+    durationMs: integer("duration_ms"),
+    metadata: text("metadata"),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    updatedAt: text("updated_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    index("artifacts_bot_id_idx").on(table.botId),
+    index("artifacts_session_key_idx").on(table.sessionKey),
+    index("artifacts_status_idx").on(table.status),
+    index("artifacts_created_at_idx").on(table.createdAt),
+  ],
+);
 
 export const poolSecrets = pgTable(
   "pool_secrets",
@@ -276,6 +390,7 @@ export const poolSecrets = pgTable(
     poolId: text("pool_id").notNull(),
     secretName: text("secret_name").notNull(),
     encryptedValue: text("encrypted_value").notNull(),
+    scope: text("scope").notNull().default("pool"),
     createdAt: text("created_at")
       .notNull()
       .$defaultFn(() => new Date().toISOString()),

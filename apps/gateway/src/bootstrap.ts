@@ -6,10 +6,14 @@ import { fetchInitialConfig } from "./config.js";
 import { env, envWarnings } from "./env.js";
 import { waitGatewayReady } from "./gateway-health.js";
 import { BaseError, GatewayError, logger } from "./log.js";
-import { startManagedOpenclawGateway } from "./openclaw-process.js";
+import {
+  enableAutoRestart,
+  startManagedOpenclawGateway,
+} from "./openclaw-process.js";
 import { pollLatestSkills } from "./skills.js";
 import type { RuntimeState } from "./state.js";
 import { runWithRetry, sleep } from "./utils.js";
+import { pollLatestWorkspaceTemplates } from "./workspace-templates.js";
 
 async function registerPoolWithRetry(): Promise<void> {
   return runWithRetry(
@@ -89,6 +93,34 @@ async function syncInitialSkillsWithRetry(state: RuntimeState): Promise<void> {
   );
 }
 
+async function syncInitialWorkspaceTemplatesWithRetry(
+  state: RuntimeState,
+): Promise<void> {
+  return runWithRetry(
+    () => pollLatestWorkspaceTemplates(state).then(() => undefined),
+    ({ attempt, retryDelayMs, error }) => {
+      const baseError = BaseError.from(error);
+      logger.warn(
+        GatewayError.from(
+          {
+            source: "bootstrap/sync-initial-workspace-templates",
+            message: "initial workspace templates sync failed; retrying",
+            code: baseError.code,
+          },
+          {
+            attempt,
+            poolId: env.RUNTIME_POOL_ID,
+            retryDelayMs,
+            reason: baseError.message,
+          },
+        ).toJSON(),
+        "initial workspace templates sync failed; retrying",
+      );
+    },
+    env.RUNTIME_MAX_BACKOFF_MS,
+  );
+}
+
 async function clearStaleSessionLocks(): Promise<void> {
   if (!env.RUNTIME_MANAGE_OPENCLAW_PROCESS) {
     return; // external OpenClaw may have active locks
@@ -122,6 +154,18 @@ async function clearStaleSessionLocks(): Promise<void> {
 
   if (removed > 0) {
     logger.info({ count: removed }, "cleared stale session locks");
+  }
+}
+
+async function touchConfigFile(): Promise<void> {
+  try {
+    const content = await readFile(env.OPENCLAW_CONFIG_PATH, "utf8");
+    const temp = `${env.OPENCLAW_CONFIG_PATH}.tmp`;
+    await writeFile(temp, content, "utf8");
+    await rename(temp, env.OPENCLAW_CONFIG_PATH);
+    logger.info("rewrote config file to trigger watcher");
+  } catch {
+    // config file may not exist yet
   }
 }
 
@@ -218,13 +262,24 @@ export async function bootstrapGateway(state: RuntimeState): Promise<void> {
   await syncInitialSkillsWithRetry(state);
   logger.info({ poolId: env.RUNTIME_POOL_ID }, "initial skills synced");
 
+  await syncInitialWorkspaceTemplatesWithRetry(state);
+  logger.info(
+    { poolId: env.RUNTIME_POOL_ID },
+    "initial workspace templates synced",
+  );
+
   await clearStaleSessionLocks();
 
   if (env.RUNTIME_MANAGE_OPENCLAW_PROCESS) {
     startManagedOpenclawGateway();
+    enableAutoRestart();
   }
 
   await waitGatewayReady();
   await sleep(2000);
   await rewriteSkillFiles();
+
+  // Re-touch the config file so OpenClaw's file watcher picks up the
+  // initial config that was written before the watcher was ready.
+  await touchConfigFile();
 }

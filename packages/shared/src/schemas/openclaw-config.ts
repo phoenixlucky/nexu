@@ -33,13 +33,60 @@ const agentModelSchema = z.union([
   }),
 ]);
 
-const agentSchema = z.object({
-  id: z.string(),
-  name: z.string().optional(),
-  default: z.boolean().optional(),
-  workspace: z.string().optional(),
-  model: agentModelSchema.optional(),
-});
+const agentSchema = z
+  .object({
+    id: z.string(),
+    name: z.string().optional(),
+    default: z.boolean().optional(),
+    workspace: z.string().optional(),
+    model: agentModelSchema.optional(),
+  })
+  .passthrough();
+
+const compactionMemoryFlushSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    softThresholdTokens: z.number().optional(),
+    prompt: z.string().optional(),
+  })
+  .passthrough();
+
+const compactionSchema = z
+  .object({
+    mode: z.enum(["default", "safeguard"]).optional(),
+    reserveTokens: z.number().optional(),
+    keepRecentTokens: z.number().optional(),
+    reserveTokensFloor: z.number().optional(),
+    maxHistoryShare: z.number().optional(),
+    memoryFlush: compactionMemoryFlushSchema.optional(),
+  })
+  .passthrough();
+
+const memorySearchRemoteSchema = z
+  .object({
+    baseUrl: z.string().optional(),
+    apiKey: z.string().optional(),
+  })
+  .passthrough();
+
+const memorySearchSyncSchema = z
+  .object({
+    intervalMinutes: z.number().optional(),
+  })
+  .passthrough();
+
+const memorySearchSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    sources: z.array(z.enum(["memory", "sessions"])).optional(),
+    provider: z
+      .enum(["openai", "gemini", "local", "voyage", "mistral"])
+      .optional(),
+    model: z.string().optional(),
+    remote: memorySearchRemoteSchema.optional(),
+    sync: memorySearchSyncSchema.optional(),
+  })
+  .passthrough();
 
 const agentsConfigSchema = z.object({
   defaults: z
@@ -47,33 +94,41 @@ const agentsConfigSchema = z.object({
       model: z
         .union([z.string(), z.object({ primary: z.string() })])
         .optional(),
+      compaction: compactionSchema.optional(),
+      memorySearch: memorySearchSchema.optional(),
     })
+    .passthrough()
     .optional(),
   list: z.array(agentSchema),
 });
 
-const slackAccountSchema = z.object({
-  enabled: z.boolean().default(true),
-  botToken: z.string(),
-  signingSecret: z.string().optional(),
-  appToken: z.string().optional(),
-  mode: z.enum(["socket", "http"]).default("http"),
-  webhookPath: z.string().optional(),
-  dmPolicy: z.enum(["pairing", "allowlist", "open"]).optional(),
-  groupPolicy: z.enum(["open", "allowlist", "disabled"]).optional(),
-  streaming: z.enum(["off", "partial", "block", "progress"]).optional(),
-});
+const slackAccountSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    botToken: z.string(),
+    signingSecret: z.string().optional(),
+    appToken: z.string().optional(),
+    mode: z.enum(["socket", "http"]).default("http"),
+    webhookPath: z.string().optional(),
+    dmPolicy: z.enum(["pairing", "allowlist", "open"]).optional(),
+    groupPolicy: z.enum(["open", "allowlist", "disabled"]).optional(),
+    streaming: z.enum(["off", "partial", "block", "progress"]).optional(),
+  })
+  .passthrough();
 
-const slackChannelSchema = z.object({
-  mode: z.enum(["socket", "http"]).optional(),
-  signingSecret: z.string().optional(),
-  enabled: z.boolean().optional(),
-  groupPolicy: z.enum(["open", "allowlist", "disabled"]).optional(),
-  requireMention: z.boolean().optional(),
-  dmPolicy: z.enum(["pairing", "allowlist", "open"]).optional(),
-  allowFrom: z.array(z.string()).optional(),
-  accounts: z.record(z.string(), slackAccountSchema),
-});
+const slackChannelSchema = z
+  .object({
+    mode: z.enum(["socket", "http"]).optional(),
+    signingSecret: z.string().optional(),
+    enabled: z.boolean().optional(),
+    groupPolicy: z.enum(["open", "allowlist", "disabled"]).optional(),
+    requireMention: z.boolean().optional(),
+    dmPolicy: z.enum(["pairing", "allowlist", "open"]).optional(),
+    allowFrom: z.array(z.string()).optional(),
+    ackReaction: z.string().optional(),
+    accounts: z.record(z.string(), slackAccountSchema),
+  })
+  .passthrough();
 
 const discordAccountSchema = z.object({
   enabled: z.boolean().default(true),
@@ -105,11 +160,13 @@ const feishuChannelSchema = z.object({
   accounts: z.record(z.string(), feishuAccountSchema),
 });
 
-const channelsConfigSchema = z.object({
-  slack: slackChannelSchema.optional(),
-  discord: discordChannelSchema.optional(),
-  feishu: feishuChannelSchema.optional(),
-});
+const channelsConfigSchema = z
+  .object({
+    slack: slackChannelSchema.optional(),
+    discord: discordChannelSchema.optional(),
+    feishu: feishuChannelSchema.optional(),
+  })
+  .passthrough();
 
 const bindingMatchSchema = z.object({
   channel: z.string(),
@@ -223,6 +280,35 @@ const cronConfigSchema = z
   })
   .passthrough();
 
+const diagnosticsOtelSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    endpoint: z.string().optional(),
+    serviceName: z.string().optional(),
+    traces: z.boolean().optional(),
+    metrics: z.boolean().optional(),
+    logs: z.boolean().optional(),
+    flushIntervalMs: z.number().optional(),
+  })
+  .passthrough();
+
+const diagnosticsConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    otel: diagnosticsOtelSchema.optional(),
+  })
+  .passthrough();
+
+const messagesConfigSchema = z
+  .object({
+    ackReaction: z.string().optional(),
+    ackReactionScope: z
+      .enum(["off", "none", "all", "direct", "group-all", "group-mentions"])
+      .optional(),
+    removeAckAfterReply: z.boolean().optional(),
+  })
+  .passthrough();
+
 export const openclawConfigSchema = z.object({
   gateway: gatewayConfigSchema,
   models: modelsConfigSchema.optional(),
@@ -233,6 +319,8 @@ export const openclawConfigSchema = z.object({
   bindings: z.array(bindingSchema),
   commands: commandsConfigSchema.optional(),
   cron: cronConfigSchema.optional(),
+  messages: messagesConfigSchema.optional(),
+  diagnostics: diagnosticsConfigSchema.optional(),
 });
 
 export type OpenClawConfig = z.infer<typeof openclawConfigSchema>;

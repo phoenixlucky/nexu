@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1772621591056,
+      "tag": "0000_unique_thunderbolt",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772682287660,
+      "tag": "0001_better_auth_core_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772694061321,
+      "tag": "0002_artifacts_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1772701141453,
+      "tag": "0003_curly_tomorrow_man",
+      "breakpoints": true
+    }
+  ]
+}
