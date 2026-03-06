@@ -6378,13 +6378,17 @@
                     },
                     "last30DaysNewUsers": {
                       "type": "number"
+                    },
+                    "totalChannels": {
+                      "type": "number"
                     }
                   },
                   "required": [
                     "totalUsers",
                     "todayNewUsers",
                     "last7DaysNewUsers",
-                    "last30DaysNewUsers"
+                    "last30DaysNewUsers",
+                    "totalChannels"
                   ]
                 }
               }
