@@ -1,0 +1,1 @@
+-- Additional mock migration to validate multi-file apply behavior.
