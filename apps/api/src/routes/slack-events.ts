@@ -19,6 +19,21 @@ import { Span } from "../lib/trace-decorator.js";
 import { publishPoolConfigSnapshot } from "../services/runtime/pool-config-service.js";
 import type { AppBindings } from "../types.js";
 
+export function buildSlackSessionKey(params: {
+  botId: string;
+  channelId: string;
+  threadTs?: string | null;
+  isIm: boolean;
+}): string {
+  const botId = params.botId.trim().toLowerCase();
+  const channelId = params.channelId.trim().toLowerCase();
+  const threadTs = params.threadTs?.trim().toLowerCase();
+  const baseKey = params.isIm
+    ? `agent:${botId}:main`
+    : `agent:${botId}:slack:channel:${channelId}`;
+  return threadTs ? `${baseKey}:thread:${threadTs}` : baseKey;
+}
+
 // ── Read body from Node.js IncomingMessage (bypasses Hono body reading) ──
 
 function readIncomingBody(incoming: IncomingMessage): Promise<string> {
@@ -275,10 +290,8 @@ class SlackEventsTraceHandler {
           typeof event.thread_ts === "string" && event.thread_ts.length > 0
             ? event.thread_ts
             : null;
-        const scope = threadTs ? "thread" : "channel";
-        const scopeId = threadTs ?? channelId;
-        const sessionKey = `agent:${channel.botId}:slack:${scope}:${scopeId}`;
         const now = new Date().toISOString();
+        let isIm = false;
 
         let channelName = channelId;
         const [botTokenRow] = await db
@@ -302,6 +315,7 @@ class SlackEventsTraceHandler {
               channel?: { name?: string; is_im?: boolean; user?: string };
             };
             if (infoData.ok && infoData.channel) {
+              isIm = infoData.channel.is_im === true;
               if (infoData.channel.is_im) {
                 const userId = infoData.channel.user;
                 if (userId) {
@@ -337,6 +351,13 @@ class SlackEventsTraceHandler {
             });
           }
         }
+
+        const sessionKey = buildSlackSessionKey({
+          botId: channel.botId,
+          channelId,
+          threadTs,
+          isIm,
+        });
 
         const title =
           channelName === channelId ? `Slack #${channelId}` : `#${channelName}`;

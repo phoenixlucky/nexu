@@ -4,8 +4,8 @@ set -uo pipefail
 # ============================================================================
 # Static Deploy — Cloudflare Pages via Wrangler
 # Usage:
-#   deploy.sh <project-slug> <directory> <agent-id> [session-key] \
-#     [message-ref] [thread-ref] [account-id] [channel-id] [channel-type] [sender-ref]
+#   deploy.sh <project-slug> <directory> <agent-id> [chat-id] [thread-id] \
+#     [message-ref] [account-id] [channel] [chat-type] [sender-ref]
 #
 # Flow:
 #   First deploy:  validate → create_project → wrangler deploy → add_domain → record → output
@@ -26,12 +26,12 @@ FILES_CACHED=0
 DEPLOY_URL=""
 STAGE_DIR=""
 AGENT_ID=""
-SESSION_KEY_INPUT=""
+CHAT_ID_INPUT=""
+THREAD_ID_INPUT=""
 MESSAGE_REF_INPUT=""
-THREAD_REF_INPUT=""
 ACCOUNT_ID_INPUT=""
-CHANNEL_ID_INPUT=""
-CHANNEL_TYPE_INPUT=""
+CHANNEL_INPUT=""
+CHAT_TYPE_INPUT=""
 SENDER_REF_INPUT=""
 
 # ============================================================================
@@ -47,6 +47,37 @@ json_success() {
   printf '{"status":"success","url":"%s","deployment_url":"%s","files_total":%d,"files_uploaded":%d,"files_cached":%d,"is_new_project":%s}\n' \
     "$1" "$2" "$3" "$4" "$5" "$6" >&1
   exit 0
+}
+
+resolve_api_context() {
+  local context_file api_url
+  context_file="$(resolve_context_file)" || return 1
+  api_url=$(json_val 'd.apiUrl' "$context_file") || true
+  if [[ -z "$api_url" || -z "${SKILL_API_TOKEN:-}" ]]; then
+    return 1
+  fi
+
+  printf '%s\n' "$api_url"
+}
+
+resolve_artifact_chat_id() {
+  local chat_id="$1"
+  local chat_type="${2,,}"
+  if [[ -z "$chat_id" ]]; then
+    return 0
+  fi
+
+  case "$chat_type" in
+    direct|dm)
+      printf 'user:%s\n' "$chat_id"
+      ;;
+    group|channel|thread)
+      printf 'channel:%s\n' "$chat_id"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
 }
 
 cf_api() {
@@ -170,33 +201,19 @@ step_validate() {
   SLUG="${1:-}"
   DIR="${2:-}"
   AGENT_ID="${3:-}"
-  # Prefer runtime session key from environment (authoritative), then fallback
-  # to explicit arg for compatibility with older invocations.
-  SESSION_KEY_INPUT="${OPENCLAW_SESSION_KEY:-${4:-}}"
-  MESSAGE_REF_INPUT="${5:-${OPENCLAW_MESSAGE_ID:-}}"
-  THREAD_REF_INPUT="${6:-${OPENCLAW_THREAD_ID:-}}"
-  ACCOUNT_ID_INPUT="${7:-${OPENCLAW_ACCOUNT_ID:-}}"
-  CHANNEL_ID_INPUT="${8:-${OPENCLAW_CHANNEL_ID:-}}"
-  CHANNEL_TYPE_INPUT="${9:-${OPENCLAW_CHANNEL_TYPE:-slack}}"
-  SENDER_REF_INPUT="${10:-${OPENCLAW_SENDER_ID:-}}"
+  # chat-id: raw inbound chat identifier (for example Slack user/channel id).
+  # chat-type determines whether Nexu should resolve it as user:<id> or channel:<id>.
+  CHAT_ID_INPUT="${4:-}"
+  THREAD_ID_INPUT="${5:-}"
+  MESSAGE_REF_INPUT="${6:-}"
+  ACCOUNT_ID_INPUT="${7:-}"
+  CHANNEL_INPUT="${8:-slack}"
+  CHAT_TYPE_INPUT="${9:-}"
+  SENDER_REF_INPUT="${10:-}"
 
   if [[ -z "$SLUG" || -z "$DIR" || -z "$AGENT_ID" ]]; then
-    json_error "Usage: deploy.sh <project-slug> <directory> <agent-id> [session-key]" 1
+    json_error "Usage: deploy.sh <project-slug> <directory> <agent-id> [chat-id] [thread-id]" 1
   fi
-
-  if [[ -z "$SESSION_KEY_INPUT" ]]; then
-    json_error "Missing session key: OPENCLAW_SESSION_KEY or arg #4 is required" 1
-  fi
-
-  if [[ "$SESSION_KEY_INPUT" == "$AGENT_ID" ]]; then
-    json_error "Invalid session key: must not equal agent id (got bot id as session key)" 1
-  fi
-
-  case "${SESSION_KEY_INPUT,,}" in
-    unknown|fake|test|null|undefined|none)
-      json_error "Invalid session key: placeholder value '${SESSION_KEY_INPUT}'" 1
-      ;;
-  esac
 
   if [[ ! "$SLUG" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; then
     json_error "Invalid slug: must be lowercase alphanumeric + hyphens, max 63 chars" 1
@@ -212,25 +229,27 @@ step_validate() {
     json_error "No HTML files found in ${DIR}" 1
   fi
 
-  # Fallback: fetch credentials from scoped secrets API if not in env
-  if [[ -z "${CLOUDFLARE_API_TOKEN:-}" || -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
-    local context_file="" api_url="" pool_id=""
-    context_file="$(resolve_context_file)" || true
-    if [[ -n "$context_file" && -n "${SKILL_API_TOKEN:-}" ]]; then
-      api_url=$(json_val 'd.apiUrl' "$context_file") || true
-      pool_id=$(json_val 'd.poolId' "$context_file") || true
-      if [[ -n "$api_url" && -n "$pool_id" ]]; then
-        local secrets_resp
-        secrets_resp=$(curl -s -X GET \
-          "${api_url}/api/internal/secrets/static-deploy?poolId=${pool_id}" \
-          -H "x-internal-token: ${SKILL_API_TOKEN}" 2>/dev/null) || true
-        if [[ -n "$secrets_resp" ]]; then
-          CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(echo "$secrets_resp" | json_val 'd.CLOUDFLARE_API_TOKEN')}"
-          CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-$(echo "$secrets_resp" | json_val 'd.CLOUDFLARE_ACCOUNT_ID')}"
-          export CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID
-        fi
-      fi
-    fi
+  # Fetch credentials from Nexu at runtime using SKILL_API_TOKEN.
+  local context_file="" api_url="" pool_id=""
+  context_file="$(resolve_context_file)" || true
+  if [[ -z "$context_file" || -z "${SKILL_API_TOKEN:-}" ]]; then
+    json_error "Missing runtime secret context for deploy credentials (nexu-context.json or SKILL_API_TOKEN)" 1
+  fi
+
+  api_url=$(json_val 'd.apiUrl' "$context_file") || true
+  pool_id=$(json_val 'd.poolId' "$context_file") || true
+  if [[ -z "$api_url" || -z "$pool_id" ]]; then
+    json_error "Missing apiUrl or poolId in nexu-context.json" 1
+  fi
+
+  local secrets_resp
+  secrets_resp=$(curl -s -X GET \
+    "${api_url}/api/internal/secrets/static-deploy?poolId=${pool_id}" \
+    -H "x-internal-token: ${SKILL_API_TOKEN}" 2>/dev/null) || true
+  if [[ -n "$secrets_resp" ]]; then
+    CLOUDFLARE_API_TOKEN="$(echo "$secrets_resp" | json_val 'd.CLOUDFLARE_API_TOKEN')"
+    CLOUDFLARE_ACCOUNT_ID="$(echo "$secrets_resp" | json_val 'd.CLOUDFLARE_ACCOUNT_ID')"
+    export CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID
   fi
 
   if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
@@ -370,29 +389,65 @@ step_add_domain() {
 }
 
 # ============================================================================
-# STEP 6: RECORD SESSION BINDING FILES
+# STEP 6: CHECK DOMAIN OWNERSHIP IN NEXU
 # ============================================================================
 
-step_record_session_binding() {
-  local script_dir writer
-  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  writer="${script_dir}/record-session-binding.sh"
+step_check_domain_available() {
+  local nexu_api_url nexu_token
+  nexu_api_url="$(resolve_api_context)" || {
+    json_error "Missing runtime context for domain check (apiUrl/token). Check nexu-context.json and SKILL_API_TOKEN." 3
+  }
+  nexu_token="${SKILL_API_TOKEN:-}"
 
-  if [[ ! -x "$writer" ]]; then
-    return 0
+  local resolved_chat_id=""
+  if [[ -n "$CHAT_ID_INPUT" ]]; then
+    resolved_chat_id="$(resolve_artifact_chat_id "$CHAT_ID_INPUT" "$CHAT_TYPE_INPUT")" || {
+      json_error "Missing or invalid chat_type for domain check; expected direct/dm/group/channel/thread" 3
+    }
   fi
 
-  local -a args
-  args=(--agent-id "$AGENT_ID" --session-key "$SESSION_KEY_INPUT")
-  [[ -n "$MESSAGE_REF_INPUT" ]] && args+=(--message-ref "$MESSAGE_REF_INPUT")
-  [[ -n "$THREAD_REF_INPUT" ]] && args+=(--thread-ref "$THREAD_REF_INPUT")
-  [[ -n "$ACCOUNT_ID_INPUT" ]] && args+=(--account-id "$ACCOUNT_ID_INPUT")
-  [[ -n "$CHANNEL_ID_INPUT" ]] && args+=(--channel-id "$CHANNEL_ID_INPUT")
-  [[ -n "$CHANNEL_TYPE_INPUT" ]] && args+=(--channel-type "$CHANNEL_TYPE_INPUT")
-  [[ -n "$SENDER_REF_INPUT" ]] && args+=(--sender-ref "$SENDER_REF_INPUT")
+  local custom_url="https://${SLUG}.${DOMAIN_SUFFIX}"
+  local chat_id_field=""
+  [[ -n "$resolved_chat_id" ]] && chat_id_field="\"chatId\": \"${resolved_chat_id}\","
+  local thread_id_field=""
+  [[ -n "$THREAD_ID_INPUT" ]] && thread_id_field="\"threadId\": \"${THREAD_ID_INPUT}\","
+  local channel_field=""
+  [[ -n "$CHANNEL_INPUT" ]] && channel_field="\"channelType\": \"${CHANNEL_INPUT}\","
 
-  # Non-fatal: deploy should proceed even when binding write is unavailable.
-  "$writer" "${args[@]}" >/dev/null 2>/dev/null || true
+  local payload
+  payload=$(cat <<EOJSON
+{
+  "botId": "${AGENT_ID}",
+  ${chat_id_field}
+  ${thread_id_field}
+  ${channel_field}
+  "previewUrl": "${custom_url}"
+}
+EOJSON
+  )
+
+  local resp_file http_code
+  resp_file="$(mktemp)"
+  http_code=$(curl -s -o "$resp_file" -w "%{http_code}" -X POST "${nexu_api_url}/api/internal/artifacts/check-domain" \
+    -H "x-internal-token: ${nexu_token}" \
+    -H "Content-Type: application/json" \
+    -d "$payload" 2>/dev/null || true)
+
+  if [[ "$http_code" == "409" ]]; then
+    local err_msg
+    err_msg="$(cat "$resp_file" | json_val 'd.message || d.error || ""')"
+    rm -f "$resp_file"
+    json_error "Domain already in use: ${err_msg:-${custom_url}}" 3
+  fi
+
+  if [[ "$http_code" -lt 200 || "$http_code" -ge 300 ]]; then
+    local err_msg
+    err_msg="$(cat "$resp_file" | json_val 'd.message || d.error || ""')"
+    rm -f "$resp_file"
+    json_error "Failed to validate domain ownership (HTTP ${http_code:-000}) ${err_msg}" 3
+  fi
+
+  rm -f "$resp_file"
 }
 
 # ============================================================================
@@ -402,33 +457,36 @@ step_record_session_binding() {
 step_record_artifact() {
   # Agent ID = Bot ID (1:1 mapping in Nexu)
   local nexu_bot_id="$AGENT_ID"
-  local nexu_token="${SKILL_API_TOKEN:-}"
-  local session_key="$SESSION_KEY_INPUT"
-
-  # Resolve apiUrl from nexu-context.json
-  local nexu_api_url=""
-  local context_file=""
-  context_file="$(resolve_context_file)" || true
-  if [[ -n "$context_file" ]]; then
-    nexu_api_url=$(json_val 'd.apiUrl' "$context_file") || true
-  fi
-
-  if [[ -z "$session_key" ]]; then
-    json_error "Missing session key: pass as arg #4 or set OPENCLAW_SESSION_KEY to record in session page" 3
-  fi
-
-  if [[ -z "$nexu_api_url" || -z "$nexu_token" ]]; then
+  local nexu_api_url nexu_token
+  nexu_api_url="$(resolve_api_context)" || {
     json_error "Missing runtime context for artifact record (apiUrl/token). Check nexu-context.json and SKILL_API_TOKEN." 3
+  }
+  nexu_token="${SKILL_API_TOKEN:-}"
+
+  local resolved_chat_id=""
+  if [[ -n "$CHAT_ID_INPUT" ]]; then
+    resolved_chat_id="$(resolve_artifact_chat_id "$CHAT_ID_INPUT" "$CHAT_TYPE_INPUT")" || {
+      json_error "Missing or invalid chat_type for artifact record; expected direct/dm/group/channel/thread" 3
+    }
   fi
 
   local custom_url="https://${SLUG}.${DOMAIN_SUFFIX}"
 
-  # Build JSON payload.
+  # Build JSON payload — API resolves canonical session key from chatId/threadId server-side.
+  local chat_id_field=""
+  [[ -n "$resolved_chat_id" ]] && chat_id_field="\"chatId\": \"${resolved_chat_id}\","
+  local thread_id_field=""
+  [[ -n "$THREAD_ID_INPUT" ]] && thread_id_field="\"threadId\": \"${THREAD_ID_INPUT}\","
+  local channel_field=""
+  [[ -n "$CHANNEL_INPUT" ]] && channel_field="\"channelType\": \"${CHANNEL_INPUT}\","
+
   local payload
   payload=$(cat <<EOJSON
 {
   "botId": "${nexu_bot_id}",
-  "sessionKey": "${session_key}",
+  ${chat_id_field}
+  ${thread_id_field}
+  ${channel_field}
   "title": "Deploy: ${SLUG}",
   "artifactType": "deployment",
   "source": "coding",
@@ -479,11 +537,11 @@ step_output() {
 main() {
   trap cleanup EXIT
   step_validate "$@"
+  step_check_domain_available
   step_create_project
   step_prepare_deploy_dir
   step_deploy_wrangler
   step_add_domain
-  step_record_session_binding
   step_record_artifact
   step_output
 }

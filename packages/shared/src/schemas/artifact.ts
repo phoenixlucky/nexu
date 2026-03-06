@@ -22,6 +22,8 @@ export const createArtifactSchema = z.object({
   botId: z.string().min(1),
   title: z.string().min(1).max(500),
   sessionKey: z.string().optional(),
+  chatId: z.string().optional(),
+  threadId: z.string().optional(),
   channelType: z.string().optional(),
   channelId: z.string().optional(),
   artifactType: artifactTypeSchema.optional(),

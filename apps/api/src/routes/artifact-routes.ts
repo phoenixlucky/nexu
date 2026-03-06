@@ -10,7 +10,7 @@ import {
 import { createId } from "@paralleldrive/cuid2";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { artifacts, bots } from "../db/schema/index.js";
+import { artifacts, bots, sessions } from "../db/schema/index.js";
 import { ServiceError } from "../lib/error.js";
 import { requireSkillToken } from "../middleware/internal-auth.js";
 import type { AppBindings } from "../types.js";
@@ -22,6 +22,133 @@ const errorResponseSchema = z.object({
 const artifactIdParam = z.object({
   id: z.string(),
 });
+
+function normalizeSessionKey(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function normalizePreviewUrl(value: string): string {
+  return value.trim();
+}
+
+async function resolveArtifactSessionKey(input: {
+  botId: string;
+  sessionKey?: string;
+  chatId?: string;
+  threadId?: string;
+  channelType?: string;
+}): Promise<{ sessionKey?: string; error?: string }> {
+  const rawSessionKey = input.sessionKey?.trim();
+  const rawChatId = input.chatId?.trim();
+  const rawThreadId = input.threadId?.trim();
+  const normalizedThreadId = rawThreadId
+    ? rawThreadId.toLowerCase()
+    : undefined;
+
+  if (rawSessionKey) {
+    if (!rawSessionKey.toLowerCase().startsWith("agent:")) {
+      return { error: "sessionKey must start with agent:" };
+    }
+    return { sessionKey: normalizeSessionKey(rawSessionKey) };
+  }
+
+  if (normalizedThreadId && !rawChatId) {
+    return { error: "threadId requires chatId" };
+  }
+
+  if (!rawChatId) {
+    return { error: "sessionKey or chatId is required" };
+  }
+
+  const normalizedBotId = input.botId.trim().toLowerCase();
+  if (rawChatId.startsWith("user:")) {
+    const base = `agent:${normalizedBotId}:main`;
+    return {
+      sessionKey: normalizedThreadId
+        ? `${base}:thread:${normalizedThreadId}`
+        : base,
+    };
+  }
+
+  if (!rawChatId.startsWith("channel:")) {
+    return { error: "chatId must start with user: or channel:" };
+  }
+
+  const channelId = rawChatId.slice("channel:".length).trim().toLowerCase();
+  if (!channelId) {
+    return { error: "chatId channel id is required" };
+  }
+
+  const conditions = [
+    eq(sessions.botId, input.botId),
+    eq(sessions.channelId, channelId),
+  ];
+  const normalizedChannelType = input.channelType?.trim().toLowerCase();
+  if (normalizedChannelType) {
+    conditions.push(eq(sessions.channelType, normalizedChannelType));
+  }
+
+  const rows = await db
+    .select({
+      sessionKey: sessions.sessionKey,
+      channelType: sessions.channelType,
+    })
+    .from(sessions)
+    .where(and(...conditions))
+    .orderBy(desc(sessions.lastMessageAt), desc(sessions.createdAt));
+
+  if (rows.length === 0) {
+    return { error: "No matching session found for chatId" };
+  }
+
+  const uniqueBaseKeys = new Set(
+    rows.map((row) => normalizeSessionKey(row.sessionKey)),
+  );
+  if (uniqueBaseKeys.size !== 1) {
+    return { error: "Ambiguous session resolution for chatId" };
+  }
+
+  const baseKey = rows[0]?.sessionKey
+    ? normalizeSessionKey(rows[0].sessionKey)
+    : undefined;
+  if (!baseKey) {
+    return { error: "No matching session found for chatId" };
+  }
+
+  return {
+    sessionKey: normalizedThreadId
+      ? `${baseKey}:thread:${normalizedThreadId}`
+      : baseKey,
+  };
+}
+
+async function findArtifactBySessionPreview(input: {
+  sessionKey?: string;
+  previewUrl?: string;
+  excludeId?: string;
+}) {
+  const sessionKey = input.sessionKey?.trim();
+  const previewUrl = input.previewUrl?.trim();
+  if (!sessionKey || !previewUrl) {
+    return undefined;
+  }
+
+  const conditions = [
+    eq(artifacts.sessionKey, sessionKey),
+    eq(artifacts.previewUrl, previewUrl),
+  ];
+  if (input.excludeId) {
+    conditions.push(sql`${artifacts.id} <> ${input.excludeId}`);
+  }
+
+  const rows = await db
+    .select()
+    .from(artifacts)
+    .where(and(...conditions))
+    .orderBy(desc(artifacts.updatedAt), desc(artifacts.createdAt));
+
+  return rows[0];
+}
 
 // --- Helper ---
 
@@ -78,6 +205,10 @@ const createArtifactRoute = createRoute({
       content: { "application/json": { schema: errorResponseSchema } },
       description: "Invalid request",
     },
+    409: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Preview URL already in use by another session",
+    },
   },
 });
 
@@ -103,7 +234,125 @@ const updateArtifactInternalRoute = createRoute({
   },
 });
 
+const checkArtifactDomainRoute = createRoute({
+  method: "post",
+  path: "/api/internal/artifacts/check-domain",
+  tags: ["Artifacts (Internal)"],
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            botId: z.string(),
+            sessionKey: z.string().optional(),
+            chatId: z.string().optional(),
+            threadId: z.string().optional(),
+            channelType: z.string().optional(),
+            previewUrl: z.string().url(),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            available: z.boolean(),
+            sessionKey: z.string().nullable(),
+            existingArtifactId: z.string().nullable(),
+            existingSessionKey: z.string().nullable(),
+          }),
+        },
+      },
+      description: "Domain availability result",
+    },
+    400: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Invalid request",
+    },
+    409: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Domain already in use by another session",
+    },
+  },
+});
+
 export function registerArtifactInternalRoutes(app: OpenAPIHono<AppBindings>) {
+  app.openapi(checkArtifactDomainRoute, async (c) => {
+    requireSkillToken(c);
+    const input = c.req.valid("json");
+
+    const [bot] = await db
+      .select({ id: bots.id })
+      .from(bots)
+      .where(eq(bots.id, input.botId));
+
+    if (!bot) {
+      return c.json({ message: "Bot not found" }, 400);
+    }
+
+    const resolved = await resolveArtifactSessionKey({
+      botId: input.botId,
+      sessionKey: input.sessionKey,
+      chatId: input.chatId,
+      threadId: input.threadId,
+      channelType: input.channelType,
+    });
+    if (resolved.error) {
+      return c.json({ message: resolved.error }, 400);
+    }
+
+    const normalizedPreviewUrl = normalizePreviewUrl(input.previewUrl);
+    const existing = await db
+      .select({
+        id: artifacts.id,
+        sessionKey: artifacts.sessionKey,
+      })
+      .from(artifacts)
+      .where(eq(artifacts.previewUrl, normalizedPreviewUrl))
+      .orderBy(desc(artifacts.updatedAt), desc(artifacts.createdAt));
+
+    const owner = existing[0];
+    if (!owner) {
+      return c.json(
+        {
+          available: true,
+          sessionKey: resolved.sessionKey ?? null,
+          existingArtifactId: null,
+          existingSessionKey: null,
+        },
+        200,
+      );
+    }
+
+    const normalizedOwnerKey = owner.sessionKey
+      ? normalizeSessionKey(owner.sessionKey)
+      : null;
+    const normalizedResolvedKey = resolved.sessionKey
+      ? normalizeSessionKey(resolved.sessionKey)
+      : null;
+    if (normalizedOwnerKey && normalizedOwnerKey === normalizedResolvedKey) {
+      return c.json(
+        {
+          available: true,
+          sessionKey: normalizedResolvedKey,
+          existingArtifactId: owner.id,
+          existingSessionKey: normalizedOwnerKey,
+        },
+        200,
+      );
+    }
+
+    return c.json(
+      {
+        message: "previewUrl is already in use by another session",
+      },
+      409,
+    );
+  });
+
   // POST /api/internal/artifacts — Skill creates an artifact
   app.openapi(createArtifactRoute, async (c) => {
     requireSkillToken(c);
@@ -121,32 +370,100 @@ export function registerArtifactInternalRoutes(app: OpenAPIHono<AppBindings>) {
 
     const now = new Date().toISOString();
     const id = createId();
-
-    await db.insert(artifacts).values({
-      id,
+    const resolved = await resolveArtifactSessionKey({
       botId: input.botId,
-      title: input.title,
       sessionKey: input.sessionKey,
+      chatId: input.chatId,
+      threadId: input.threadId,
       channelType: input.channelType,
-      channelId: input.channelId,
-      artifactType: input.artifactType,
-      source: input.source,
-      contentType: input.contentType,
-      status: input.status ?? "building",
-      previewUrl: input.previewUrl,
-      deployTarget: input.deployTarget,
-      linesOfCode: input.linesOfCode,
-      fileCount: input.fileCount,
-      durationMs: input.durationMs,
-      metadata: input.metadata ? JSON.stringify(input.metadata) : undefined,
-      createdAt: now,
-      updatedAt: now,
+    });
+    if (resolved.error) {
+      return c.json({ message: resolved.error }, 400);
+    }
+
+    const normalizedPreviewUrl = input.previewUrl
+      ? normalizePreviewUrl(input.previewUrl)
+      : undefined;
+    if (normalizedPreviewUrl) {
+      const existingPreviewOwner = await db
+        .select({
+          id: artifacts.id,
+          sessionKey: artifacts.sessionKey,
+        })
+        .from(artifacts)
+        .where(eq(artifacts.previewUrl, normalizedPreviewUrl))
+        .orderBy(desc(artifacts.updatedAt), desc(artifacts.createdAt));
+
+      const previewOwner = existingPreviewOwner[0];
+      const previewOwnerKey = previewOwner?.sessionKey
+        ? normalizeSessionKey(previewOwner.sessionKey)
+        : undefined;
+      if (
+        previewOwnerKey &&
+        resolved.sessionKey &&
+        previewOwnerKey !== normalizeSessionKey(resolved.sessionKey)
+      ) {
+        return c.json(
+          { message: "previewUrl is already in use by another session" },
+          409,
+        );
+      }
+    }
+    const duplicate = await findArtifactBySessionPreview({
+      sessionKey: resolved.sessionKey,
+      previewUrl: normalizedPreviewUrl,
     });
 
+    if (duplicate) {
+      await db
+        .update(artifacts)
+        .set({
+          botId: input.botId,
+          title: input.title,
+          sessionKey: resolved.sessionKey,
+          channelType: input.channelType,
+          channelId: input.channelId,
+          artifactType: input.artifactType,
+          source: input.source,
+          contentType: input.contentType,
+          status: input.status ?? duplicate.status ?? "building",
+          previewUrl: normalizedPreviewUrl,
+          deployTarget: input.deployTarget,
+          linesOfCode: input.linesOfCode,
+          fileCount: input.fileCount,
+          durationMs: input.durationMs,
+          metadata: input.metadata ? JSON.stringify(input.metadata) : undefined,
+          updatedAt: now,
+        })
+        .where(eq(artifacts.id, duplicate.id));
+    } else {
+      await db.insert(artifacts).values({
+        id,
+        botId: input.botId,
+        title: input.title,
+        sessionKey: resolved.sessionKey,
+        channelType: input.channelType,
+        channelId: input.channelId,
+        artifactType: input.artifactType,
+        source: input.source,
+        contentType: input.contentType,
+        status: input.status ?? "building",
+        previewUrl: normalizedPreviewUrl,
+        deployTarget: input.deployTarget,
+        linesOfCode: input.linesOfCode,
+        fileCount: input.fileCount,
+        durationMs: input.durationMs,
+        metadata: input.metadata ? JSON.stringify(input.metadata) : undefined,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    const targetId = duplicate?.id ?? id;
     const [created] = await db
       .select()
       .from(artifacts)
-      .where(eq(artifacts.id, id));
+      .where(eq(artifacts.id, targetId));
 
     if (!created) {
       throw ServiceError.from("artifact-routes", {

@@ -26,31 +26,25 @@ Any static files: HTML, CSS, JS, images, fonts, etc. Common use cases:
    - Lowercase alphanumeric + hyphens only, max 63 characters
    - Reuse the same slug for redeployments
    - Ask user to confirm if ambiguous
-3. Resolve session-related parameters from session files first, then run deploy.
-
-Resolve (example):
+3. Run deploy with the inbound structured context:
 
 ```bash
-"$SKILL_DIR/scripts/session-search.sh" --message-ref <message-ref> --agent-id <agent-id>
-```
-
-Then run deploy:
-
-```bash
-"$SKILL_DIR/scripts/deploy.sh" <project-slug> <directory> <agent-id> <session-key>
-```
-
-Optional: pass source context so deploy will also persist/update binding files:
-
-```bash
-"$SKILL_DIR/scripts/deploy.sh" <project-slug> <directory> <agent-id> <session-key> <message-ref> <thread-ref> <account-id> <channel-id> <channel-type> <sender-ref>
+"$SKILL_DIR/scripts/deploy.sh" <project-slug> <directory> <agent-id> <chat-id> [thread-id] [message-ref] [account-id] [channel] [chat-type] [sender-ref]
 ```
 
 `agent-id` is required. The script uses it to resolve the corresponding `botId`
 from `nexu-context.json` when recording deployment artifacts.
-`session-key` is required if you want the record to appear in `/workspace/sessions/:id`.
-Prefer runtime `OPENCLAW_SESSION_KEY` (authoritative). Never use `agent-id` as
-`session-key`.
+
+`chat-id` is the raw inbound chat identifier from the message context.
+
+- DM example: `U0AHLMC6C8G`
+- Channel example: `C0AJKG60H6D`
+
+`chat-type` tells the script whether to send that id to Nexu as `user:<chat-id>`
+or `channel:<chat-id>`. The script does that translation; do not concatenate
+those prefixes yourself.
+
+`thread-id` is optional — pass it when deploying from within a thread context.
 4. Parse the JSON output and report to user:
    - Brief summary of what was deployed
    - Live URL from the `url` field
@@ -69,10 +63,11 @@ Prefer runtime `OPENCLAW_SESSION_KEY` (authoritative). Never use `agent-id` as
 - Always use the bundled `deploy.sh` — do not call Cloudflare API directly
 - Do not set `DEPLOY_BACKEND` or any other env overrides — the script handles everything
 - Always pass the caller `<agent-id>` as arg #3 to `deploy.sh`
-- Always pass the current `<session-key>` as arg #4 to ensure deployment appears in the session Deployments list
-- Never pass `<agent-id>` as `<session-key>`; they are different values
-- Prefer resolving `<session-key>` from `session-search.sh` output instead of guessing from prompt text
-- If source refs are available, pass them to `deploy.sh` so it can write/update `sessions.json` + rolling `binding-*.jsonl` records
+- Always pass raw inbound `<chat-id>` as arg #4
+- Never pass `<agent-id>` as `<chat-id>`; they are different values
+- If deploying from a thread, pass `<thread-id>` as arg #5
+- Always pass `<channel>` and `<chat-type>` when available so Nexu can resolve the correct session deterministically
+- Do not try to look up or persist a canonical session key in this skill; Nexu resolves it server-side
 - Do not hand-edit source files just to add cache-busting query params; the deploy script handles cache revalidation via a staged `_headers` file
 - If the script fails, show the `message` field from the JSON error to the user
 - Cloudflare credentials are fetched at runtime via the scoped secrets API using `SKILL_API_TOKEN` from env — do not attempt to read or inject them manually

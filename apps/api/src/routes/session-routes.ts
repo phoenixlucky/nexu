@@ -32,6 +32,10 @@ const sessionIdParam = z.object({
   id: z.string(),
 });
 
+function normalizeStoredSessionKey(sessionKey: string): string {
+  return sessionKey.trim().toLowerCase();
+}
+
 // --- Helper ---
 
 function formatSession(row: typeof sessions.$inferSelect) {
@@ -236,7 +240,9 @@ class SessionSyncTraceHandler {
         const now = new Date().toISOString();
 
         for (const guild of guilds) {
-          const sessionKey = `agent:${ch.botId}:discord:channel:${guild.id}`;
+          const sessionKey = normalizeStoredSessionKey(
+            `agent:${ch.botId}:discord:channel:${guild.id}`,
+          );
           const title = guild.name;
 
           await db
@@ -425,7 +431,9 @@ class SessionSyncTraceHandler {
         const now = new Date().toISOString();
 
         for (const chat of allChats) {
-          const sessionKey = `feishu_${ch.accountId}_${chat.chat_id}`;
+          const sessionKey = normalizeStoredSessionKey(
+            `feishu_${ch.accountId}_${chat.chat_id}`,
+          );
           const title = chat.name || chat.chat_id;
 
           await db
@@ -489,6 +497,7 @@ export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
 
     const now = new Date().toISOString();
     const id = createId();
+    const normalizedSessionKey = normalizeStoredSessionKey(input.sessionKey);
 
     // Upsert on sessionKey
     await db
@@ -496,7 +505,7 @@ export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
       .values({
         id,
         botId: input.botId,
-        sessionKey: input.sessionKey,
+        sessionKey: normalizedSessionKey,
         title: input.title,
         channelType: input.channelType,
         channelId: input.channelId,
@@ -535,12 +544,12 @@ export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
     const [created] = await db
       .select()
       .from(sessions)
-      .where(eq(sessions.sessionKey, input.sessionKey));
+      .where(eq(sessions.sessionKey, normalizedSessionKey));
 
     if (!created) {
       throw ServiceError.from("session-routes", {
         code: "session_upsert_failed",
-        session_key: input.sessionKey,
+        session_key: normalizedSessionKey,
         bot_id: input.botId,
       });
     }
