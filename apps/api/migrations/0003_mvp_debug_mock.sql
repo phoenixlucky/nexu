@@ -1,0 +1,1 @@
+-- Mock migration used to validate DB migrate workflow manifest wiring.
