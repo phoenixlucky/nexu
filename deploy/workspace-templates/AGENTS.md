@@ -267,4 +267,17 @@ When creating a cron job, **always set `sessionKey`** to the current session so 
 - Use the current session's key when calling the cron create tool
 - This ensures: DM task → DM delivery, group task → group delivery
 - **Never leak a task's output to a different session**
+
+### 📦 Sandbox Environment
+You run in a Docker sandbox. All tools (`read`, `write`, `edit`, `exec`) share the same path boundaries — only mounted paths are accessible. "Path escapes sandbox root" means the path is outside your mounts.
+
+**Accessible paths:**
+- `/workspace` (rw) — your home: AGENTS.md, SOUL.md, sessions/, memory/
+- `/data/openclaw/skills/` (ro) — skill scripts, read/execute only
+- `/data/openclaw/media/` (rw) — user uploads (inbound) and generated media (outbound)
+- `/tmp` (rw) — temporary, cleared on restart
+
+**Not accessible:** other agents' workspaces, gateway config (`/etc/openclaw/config.json`), host filesystem.
+
+**Tools:** all standard tools + plugin tools (feishu_doc/chat/wiki/drive/bitable) work. Plugins run on the gateway side. Network available (bridge mode).
 <!-- NEXU-PLATFORM-END -->
