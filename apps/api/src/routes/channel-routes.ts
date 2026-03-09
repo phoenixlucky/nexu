@@ -20,7 +20,7 @@ import {
 } from "../db/schema/index.js";
 import { findOrCreateDefaultBot } from "../lib/bot-helpers.js";
 import { checkBotQuota } from "../lib/bot-quota.js";
-import { encrypt } from "../lib/crypto.js";
+import { decrypt, encrypt } from "../lib/crypto.js";
 import { BaseError, ServiceError } from "../lib/error.js";
 import { logger } from "../lib/logger.js";
 import { Span } from "../lib/trace-decorator.js";
@@ -780,6 +780,63 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
       .select()
       .from(botChannels)
       .where(eq(botChannels.botId, bot.id));
+
+    // Lazy backfill: resolve botUserId for Slack channels missing it
+    const backfillPromises = channels
+      .filter((ch) => {
+        if (ch.channelType !== "slack") return false;
+        try {
+          const config =
+            typeof ch.channelConfig === "string"
+              ? JSON.parse(ch.channelConfig)
+              : (ch.channelConfig as Record<string, unknown>);
+          return !config?.botUserId;
+        } catch {
+          return false;
+        }
+      })
+      .map(async (ch) => {
+        try {
+          const [cred] = await db
+            .select()
+            .from(channelCredentials)
+            .where(
+              and(
+                eq(channelCredentials.botChannelId, ch.id),
+                eq(channelCredentials.credentialType, "botToken"),
+              ),
+            );
+          if (!cred) return;
+
+          const botToken = decrypt(cred.encryptedValue);
+          const authResp = await channelSpanHandler.slackAuthTest(botToken);
+          const authData = (await authResp.json()) as {
+            ok: boolean;
+            user_id?: string;
+          };
+          if (!authData.ok || !authData.user_id) return;
+
+          const config =
+            typeof ch.channelConfig === "string"
+              ? JSON.parse(ch.channelConfig)
+              : ((ch.channelConfig as Record<string, unknown>) ?? {});
+          const updatedConfig = { ...config, botUserId: authData.user_id };
+
+          await db
+            .update(botChannels)
+            .set({
+              channelConfig: JSON.stringify(updatedConfig),
+              updatedAt: new Date().toISOString(),
+            })
+            .where(eq(botChannels.id, ch.id));
+
+          ch.channelConfig = JSON.stringify(updatedConfig);
+        } catch {
+          // Non-critical — skip silently, will retry on next page load
+        }
+      });
+
+    await Promise.all(backfillPromises);
 
     return c.json({ channels: channels.map(formatChannel) }, 200);
   });
