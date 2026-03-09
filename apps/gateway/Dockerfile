@@ -10,7 +10,8 @@ RUN apt-get update && \
 RUN git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" && \
     git config --global --add url."https://github.com/".insteadOf "git@github.com:"
 
-RUN npm install -g openclaw@${OPENCLAW_VERSION}
+RUN npm install -g openclaw@${OPENCLAW_VERSION} && \
+    cd "$(npm root -g)/openclaw/extensions/feishu" && npm install --omit=dev
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"

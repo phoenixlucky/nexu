@@ -26,7 +26,7 @@ const BASE_RESTART_DELAY_MS = 3000;
 const RESTART_WINDOW_MS = 120_000; // reset counter after 2 min of stable running
 
 function buildOpenclawGatewayArgs(): string[] {
-  const args = ["gateway"];
+  const args = ["gateway", "--force"];
 
   if (env.OPENCLAW_PROFILE) {
     args.push("--profile", env.OPENCLAW_PROFILE);
