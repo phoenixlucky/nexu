@@ -332,7 +332,7 @@ export async function generatePoolConfig(
       exec: {
         security: "full",
         ask: "off",
-        host: "gateway",
+        host: process.env.SANDBOX_ENABLED === "true" ? "sandbox" : "gateway",
       },
       web: {
         search: {
