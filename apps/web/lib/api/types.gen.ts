@@ -530,6 +530,57 @@ export type PostApiInternalFeedbackResponses = {
 
 export type PostApiInternalFeedbackResponse = PostApiInternalFeedbackResponses[keyof PostApiInternalFeedbackResponses];
 
+export type PostApiInternalSharedSlackClaimKeyData = {
+    body?: {
+        teamId: string;
+        teamName?: string;
+        slackUserId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/shared-slack/claim-key';
+};
+
+export type PostApiInternalSharedSlackClaimKeyResponses = {
+    /**
+     * Claim key generated
+     */
+    200: {
+        claimUrl: string;
+        key: string;
+        expiresAt: string;
+    };
+};
+
+export type PostApiInternalSharedSlackClaimKeyResponse = PostApiInternalSharedSlackClaimKeyResponses[keyof PostApiInternalSharedSlackClaimKeyResponses];
+
+export type GetApiSharedSlackResolveClaimKeyData = {
+    body?: never;
+    path?: never;
+    query: {
+        key: string;
+    };
+    url: '/api/shared-slack/resolve-claim-key';
+};
+
+export type GetApiSharedSlackResolveClaimKeyResponses = {
+    /**
+     * Claim key resolved
+     */
+    200: {
+        valid: boolean;
+        expired: boolean;
+        used: boolean;
+        teamId?: string;
+        teamName?: string;
+        slackUserId?: string;
+        isExistingWorkspace?: boolean;
+        memberCount?: number;
+    };
+};
+
+export type GetApiSharedSlackResolveClaimKeyResponse = GetApiSharedSlackResolveClaimKeyResponses[keyof GetApiSharedSlackResolveClaimKeyResponses];
+
 export type GetApiV1MeData = {
     body?: never;
     path?: never;
@@ -2034,9 +2085,7 @@ export type PostApiInternalPoolsByPoolIdCheckSlackTokensResponse = PostApiIntern
 
 export type PostApiV1SharedSlackClaimData = {
     body?: {
-        teamId: string;
-        teamName?: string;
-        slackUserId: string;
+        key: string;
     };
     path?: never;
     query?: never;

@@ -159,7 +159,9 @@ export function AuthPage() {
           return;
         }
       }
-      track(isLogin ? "login_email_success" : "signup_email_success");
+      track(isLogin ? "login_email_success" : "signup_email_success", {
+        source: authSourceParam ?? "Landing",
+      });
       identify({
         auth_method: "email",
         user_email: email,
@@ -192,7 +194,7 @@ export function AuthPage() {
         mode === "login"
           ? `login_${provider}_success`
           : `signup_${provider}_success`;
-      track(event);
+      track(event, { source: source ?? "Landing" });
       identify({
         auth_method: provider,
         user_email: session.user.email,
@@ -266,7 +268,7 @@ export function AuthPage() {
           setLoading(null);
           return;
         }
-        track("login_email_success");
+        track("login_email_success", { source: authSourceParam ?? "Landing" });
         identify({ auth_method: "email", user_email: email });
         navigate(returnTo);
       } else {

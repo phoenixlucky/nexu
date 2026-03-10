@@ -332,6 +332,27 @@ export const slackUserClaims = pgTable(
   ],
 );
 
+export const slackClaimKeys = pgTable(
+  "slack_claim_keys",
+  {
+    pk: serial("pk").primaryKey(),
+    id: text("id").notNull().unique(),
+    key: text("key").notNull().unique(),
+    teamId: text("team_id").notNull(),
+    teamName: text("team_name"),
+    slackUserId: text("slack_user_id").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    usedAt: text("used_at"),
+    claimedBy: text("claimed_by"),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    index("slack_claim_keys_team_user_idx").on(table.teamId, table.slackUserId),
+  ],
+);
+
 export const inviteCodes = pgTable("invite_codes", {
   pk: serial("pk").primaryKey(),
   id: text("id").notNull().unique(),
