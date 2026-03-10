@@ -320,6 +320,9 @@ export async function generatePoolConfig(
                       process.env.NEXU_API_URL ||
                       "",
                     SKILL_API_TOKEN: process.env.SKILL_API_TOKEN ?? "",
+                    // Ensure skill scripts can resolve globally-installed
+                    // npm packages (e.g. sharp in nano-banana).
+                    NODE_PATH: "/usr/local/lib/node_modules",
                   },
                 },
                 prune: {
