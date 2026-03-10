@@ -30,6 +30,10 @@ import {
   registerSessionInternalRoutes,
   registerSessionRoutes,
 } from "./routes/session-routes.js";
+import {
+  registerSharedSlackClaimPublicRoutes,
+  registerSharedSlackClaimRoutes,
+} from "./routes/shared-slack-claim-routes.js";
 import { registerSkillRoutes } from "./routes/skill-routes.js";
 import { registerSlackEvents } from "./routes/slack-events.js";
 import { registerUserRoutes } from "./routes/user-routes.js";
@@ -85,6 +89,7 @@ export function createApp() {
   registerSkillRoutes(app);
   registerWorkspaceTemplateRoutes(app);
   registerFeedbackRoutes(app);
+  registerSharedSlackClaimPublicRoutes(app);
 
   app.use("/api/v1/*", authMiddleware);
 
@@ -95,6 +100,7 @@ export function createApp() {
   registerInviteRoutes(app);
   registerModelRoutes(app);
   registerPoolRoutes(app);
+  registerSharedSlackClaimRoutes(app);
   registerArtifactRoutes(app);
   registerSessionRoutes(app);
 

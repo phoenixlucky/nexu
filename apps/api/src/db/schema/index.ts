@@ -181,6 +181,8 @@ export const users = pgTable("users", {
   pk: serial("pk").primaryKey(),
   id: text("id").notNull().unique(),
   authUserId: text("auth_user_id").notNull().unique(),
+  authSource: text("auth_source"),
+  authSourceDetail: text("auth_source_detail"),
   plan: text("plan").default("free"),
   inviteAcceptedAt: text("invite_accepted_at"),
   onboardingRole: text("onboarding_role"),
@@ -305,6 +307,52 @@ export const oauthStates = pgTable("oauth_states", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
+export const workspaceMemberships = pgTable(
+  "workspace_memberships",
+  {
+    pk: serial("pk").primaryKey(),
+    id: text("id").notNull().unique(),
+    teamId: text("team_id").notNull(),
+    teamName: text("team_name"),
+    imUserId: text("im_user_id").notNull(),
+    authUserId: text("auth_user_id").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    updatedAt: text("updated_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    uniqueIndex("workspace_memberships_team_user_idx").on(
+      table.teamId,
+      table.imUserId,
+    ),
+    index("workspace_memberships_auth_user_idx").on(table.authUserId),
+  ],
+);
+
+export const claimTokens = pgTable(
+  "claim_tokens",
+  {
+    pk: serial("pk").primaryKey(),
+    id: text("id").notNull().unique(),
+    token: text("token").notNull().unique(),
+    teamId: text("team_id").notNull(),
+    teamName: text("team_name"),
+    imUserId: text("im_user_id").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    usedAt: text("used_at"),
+    claimedBy: text("claimed_by"),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    index("claim_tokens_team_user_idx").on(table.teamId, table.imUserId),
+  ],
+);
+
 export const inviteCodes = pgTable("invite_codes", {
   pk: serial("pk").primaryKey(),
   id: text("id").notNull().unique(),
@@ -354,6 +402,7 @@ export const artifacts = pgTable(
     id: text("id").notNull().unique(),
     botId: text("bot_id").notNull(),
     sessionKey: text("session_key"),
+    nexuUserId: text("nexu_user_id"),
     channelType: text("channel_type"),
     channelId: text("channel_id"),
     title: text("title").notNull(),
@@ -376,6 +425,7 @@ export const artifacts = pgTable(
   },
   (table) => [
     index("artifacts_bot_id_idx").on(table.botId),
+    index("artifacts_nexu_user_id_idx").on(table.nexuUserId),
     index("artifacts_session_key_idx").on(table.sessionKey),
     index("artifacts_status_idx").on(table.status),
     index("artifacts_created_at_idx").on(table.createdAt),
@@ -410,6 +460,7 @@ export const sessions = pgTable(
     id: text("id").notNull().unique(),
     botId: text("bot_id").notNull(),
     sessionKey: text("session_key").notNull().unique(),
+    nexuUserId: text("nexu_user_id"),
     channelType: text("channel_type"),
     channelId: text("channel_id"),
     title: text("title").notNull(),
@@ -426,6 +477,7 @@ export const sessions = pgTable(
   },
   (table) => [
     index("sessions_bot_id_idx").on(table.botId),
+    index("sessions_nexu_user_id_idx").on(table.nexuUserId),
     index("sessions_status_idx").on(table.status),
     index("sessions_created_at_idx").on(table.createdAt),
     index("sessions_channel_type_idx").on(table.channelType),
