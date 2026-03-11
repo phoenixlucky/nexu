@@ -329,8 +329,7 @@ export async function generatePoolConfig(
                   },
                 },
                 browser: {
-                  enabled: true,
-                  allowHostControl: true,
+                  enabled: false,
                 },
                 prune: {
                   idleHours: 4,
