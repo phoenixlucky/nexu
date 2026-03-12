@@ -408,6 +408,7 @@ export function IntegrationsPage() {
     state: string;
     timer: ReturnType<typeof setInterval>;
   } | null>(null);
+  const oauthTabRef = useRef<Window | null>(null);
 
   // Handle OAuth callback from search params
   const callbackToolkit = searchParams.get("toolkit");
@@ -528,20 +529,32 @@ export function IntegrationsPage() {
             }),
           );
         }
-        window.open(result.connectUrl, "_blank", "noopener");
+        // Use pre-opened tab to avoid popup blocking
+        if (oauthTabRef.current) {
+          oauthTabRef.current.location.href = result.connectUrl;
+          oauthTabRef.current = null;
+        } else {
+          window.open(result.connectUrl, "_blank", "noopener");
+        }
         toast.info("Complete the authorization in the new tab");
         if (result.integration.id && result.state) {
           startPolling(result.integration.id, result.state);
         }
-      } else if (result.integration.status === "active") {
-        // API key saved
-        toast.success(
-          `${result.integration.toolkit.displayName} connected successfully`,
-        );
-        setExpandedSlug(null);
+      } else {
+        oauthTabRef.current?.close();
+        oauthTabRef.current = null;
+        if (result.integration.status === "active") {
+          // API key saved
+          toast.success(
+            `${result.integration.toolkit.displayName} connected successfully`,
+          );
+          setExpandedSlug(null);
+        }
       }
     },
     onError: () => {
+      oauthTabRef.current?.close();
+      oauthTabRef.current = null;
       toast.error("Failed to connect. Please try again.");
     },
   });
@@ -679,9 +692,15 @@ export function IntegrationsPage() {
               <IntegrationCard
                 key={integration.toolkit.slug}
                 integration={integration}
-                onConnect={(slug, credentials) =>
-                  connectMutation.mutate({ slug, credentials })
-                }
+                onConnect={(slug, credentials) => {
+                  const isOAuth =
+                    filtered.find((i) => i.toolkit.slug === slug)?.toolkit
+                      .authScheme === "oauth2";
+                  oauthTabRef.current = isOAuth
+                    ? window.open("about:blank", "_blank")
+                    : null;
+                  connectMutation.mutate({ slug, credentials });
+                }}
                 onDisconnect={() => {
                   setDisconnectTarget(integration);
                 }}

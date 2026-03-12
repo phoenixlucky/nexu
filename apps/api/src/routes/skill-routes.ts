@@ -9,6 +9,7 @@ import { createId } from "@paralleldrive/cuid2";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
+  integrationCredentials,
   skills,
   supportedSkills,
   supportedToolkits,
@@ -393,6 +394,25 @@ export function registerSkillCatalogRoutes(app: OpenAPIHono<AppBindings>) {
           integrationMap.set(row.toolkitSlug, {
             status: row.status ?? "pending",
             id: row.id,
+          });
+        }
+      }
+
+      // Check global credentials for api_key_global toolkits
+      const globalToolkitSlugs = toolkitRows
+        .filter((tk) => tk.authScheme === "api_key_global")
+        .map((tk) => tk.slug);
+
+      for (const gSlug of globalToolkitSlugs) {
+        const [globalCred] = await db
+          .select({ pk: integrationCredentials.pk })
+          .from(integrationCredentials)
+          .where(eq(integrationCredentials.integrationId, `global:${gSlug}`))
+          .limit(1);
+        if (globalCred) {
+          integrationMap.set(gSlug, {
+            status: "active",
+            id: `global:${gSlug}`,
           });
         }
       }
