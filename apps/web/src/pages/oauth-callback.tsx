@@ -147,7 +147,7 @@ export function OAuthCallbackPage() {
                 ...new Set(
                   channels
                     .map((ch) => ch.channelType)
-                    .filter((t): t is string => !!t),
+                    .filter((t) => !!t),
                 ),
               ];
 
