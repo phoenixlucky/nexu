@@ -144,6 +144,9 @@ export async function generatePoolConfig(
       (agent as Record<string, unknown>).sandbox = {
         docker: {
           binds: [`${stateDir}/agents/${bot.id}/.tmp:/tmp:rw`],
+          // Override default tmpfs to exclude /tmp — Docker rejects duplicate
+          // mount points when both a bind mount and tmpfs target the same path.
+          tmpfs: ["/var/tmp", "/run"],
         },
       };
     }
