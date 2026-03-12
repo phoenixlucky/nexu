@@ -745,33 +745,6 @@ export type PostApiV1MeAuthSourceResponses = {
 
 export type PostApiV1MeAuthSourceResponse = PostApiV1MeAuthSourceResponses[keyof PostApiV1MeAuthSourceResponses];
 
-export type PostApiV1OnboardingCompleteData = {
-    body?: {
-        role: string;
-        company?: string;
-        useCases: Array<string>;
-        referralSource: string;
-        referralDetail?: string;
-        channelVotes?: Array<string>;
-        selectedAvatar: string;
-        avatarVotes?: Array<string>;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/v1/onboarding/complete';
-};
-
-export type PostApiV1OnboardingCompleteResponses = {
-    /**
-     * Onboarding completed
-     */
-    200: {
-        ok: boolean;
-    };
-};
-
-export type PostApiV1OnboardingCompleteResponse = PostApiV1OnboardingCompleteResponses[keyof PostApiV1OnboardingCompleteResponses];
-
 export type GetApiV1BotsData = {
     body?: never;
     path?: never;

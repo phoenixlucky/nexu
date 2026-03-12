@@ -8,7 +8,6 @@ import { ChannelsPage } from "./pages/channels";
 import { FeishuBindPage } from "./pages/feishu-bind";
 import { IntegrationsPage } from "./pages/integrations";
 import { OAuthCallbackPage } from "./pages/oauth-callback";
-import { OnboardingPage } from "./pages/onboarding";
 import { SessionsPage } from "./pages/sessions";
 import { SkillDetailPage } from "./pages/skill-detail";
 import { SkillsPage } from "./pages/skills";
@@ -22,7 +21,6 @@ function DocumentTitleSync() {
     const titleByPathname: Record<string, string> = {
       "/auth": "Sign In · Nexu",
       "/claim": "Claim · Nexu",
-      "/onboarding": "Get Started · Nexu",
       "/workspace": "Workspace · Nexu",
       "/workspace/integrations": "Integrations · Nexu",
       "/workspace/skills": "Skills · Nexu",
@@ -51,7 +49,6 @@ export function App() {
         <Route path="/feishu/bind" element={<FeishuBindPage />} />
         <Route element={<AuthLayout />}>
           <Route element={<InviteGuardLayout />}>
-            <Route path="/onboarding" element={<OnboardingPage />} />
             {/* OAuth callback — outside WorkspaceLayout for clean full-page card */}
             <Route
               path="/workspace/oauth-callback/:integrationId"
