@@ -159,6 +159,10 @@ const feishuAccountSchema = z.object({
   enabled: z.boolean().default(true),
   appId: z.string(),
   appSecret: z.string(),
+  groupPolicy: z.enum(["open", "allowlist", "disabled"]).optional(),
+  dmPolicy: z.enum(["pairing", "allowlist", "open"]).optional(),
+  allowFrom: z.array(z.string()).optional(),
+  requireMention: z.boolean().optional(),
 });
 
 const feishuChannelSchema = z

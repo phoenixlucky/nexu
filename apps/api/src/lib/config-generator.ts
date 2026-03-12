@@ -242,6 +242,12 @@ export async function generatePoolConfig(
         enabled: true,
         appId,
         appSecret,
+        // Explicit per-account policies (same pattern as Slack) so
+        // `openclaw doctor --fix` cannot break routing.
+        groupPolicy: "open",
+        dmPolicy: "open",
+        allowFrom: ["*"],
+        requireMention: true,
       };
 
       bindingsList.push({
