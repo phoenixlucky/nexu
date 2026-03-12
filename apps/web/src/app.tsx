@@ -5,6 +5,7 @@ import { InviteGuardLayout } from "./layouts/invite-guard-layout";
 import { WorkspaceLayout } from "./layouts/workspace-layout";
 import { AuthPage } from "./pages/auth";
 import { ChannelsPage } from "./pages/channels";
+import { FeishuBindPage } from "./pages/feishu-bind";
 import { IntegrationsPage } from "./pages/integrations";
 import { OAuthCallbackPage } from "./pages/oauth-callback";
 import { OnboardingPage } from "./pages/onboarding";
@@ -25,6 +26,7 @@ function DocumentTitleSync() {
       "/workspace": "Workspace · Nexu",
       "/workspace/integrations": "Integrations · Nexu",
       "/workspace/skills": "Skills · Nexu",
+      "/feishu/bind": "Link Feishu · Nexu",
     };
 
     if (location.pathname.startsWith("/workspace/oauth-callback")) {
@@ -46,6 +48,7 @@ export function App() {
         <Route path="/" element={<Navigate to="/workspace" replace />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/claim" element={<SlackClaimPage />} />
+        <Route path="/feishu/bind" element={<FeishuBindPage />} />
         <Route element={<AuthLayout />}>
           <Route element={<InviteGuardLayout />}>
             <Route path="/onboarding" element={<OnboardingPage />} />

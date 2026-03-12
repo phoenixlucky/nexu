@@ -332,6 +332,7 @@ export const oauthStates = pgTable("oauth_states", {
   expiresAt: text("expires_at").notNull(),
   usedAt: text("used_at"),
   returnTo: text("return_to"),
+  workspaceKey: text("workspace_key"),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),

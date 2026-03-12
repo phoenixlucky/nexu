@@ -27,6 +27,10 @@ import {
 import { registerComposioRoutes } from "./routes/composio-routes.js";
 import { registerFeedbackRoutes } from "./routes/feedback-routes.js";
 import { registerFeishuEvents } from "./routes/feishu-events.js";
+import {
+  registerFeishuOAuthCallback,
+  registerFeishuOAuthRoutes,
+} from "./routes/feishu-oauth-routes.js";
 import { registerIntegrationRoutes } from "./routes/integration-routes.js";
 import { registerInviteRoutes } from "./routes/invite-routes.js";
 import { registerModelRoutes } from "./routes/model-routes.js";
@@ -92,6 +96,7 @@ export function createApp() {
 
   registerAuthRoutes(app);
   registerSlackOAuthCallback(app);
+  registerFeishuOAuthCallback(app);
   registerSlackEvents(app);
   registerFeishuEvents(app);
   registerArtifactInternalRoutes(app);
@@ -117,6 +122,7 @@ export function createApp() {
   registerArtifactRoutes(app);
   registerSessionRoutes(app);
   registerClaimRoutes(app);
+  registerFeishuOAuthRoutes(app);
   registerIntegrationRoutes(app);
   registerSkillCatalogRoutes(app);
 

@@ -64,6 +64,13 @@
       "when": 1773299719847,
       "tag": "0008_colorful_rocket_racer",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1773305994853,
+      "tag": "0009_sticky_betty_brant",
+      "breakpoints": true
     }
   ]
 }

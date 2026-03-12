@@ -15,20 +15,14 @@ import {
 } from "../db/schema/index.js";
 import { decrypt } from "../lib/crypto.js";
 import { BaseError } from "../lib/error.js";
-import {
-  buildFeishuClaimCard,
-  buildFeishuClaimCardDone,
-  buildFeishuClaimCardWithUrl,
-} from "../lib/feishu-claim-card.js";
+import { buildFeishuBindPromptCard } from "../lib/feishu-claim-card.js";
 import {
   getFeishuTenantToken,
-  patchFeishuCardMessage,
   sendFeishuCardMessage,
 } from "../lib/feishu-webhook.js";
 import { logger } from "../lib/logger.js";
 import { Span } from "../lib/trace-decorator.js";
 import type { AppBindings } from "../types.js";
-import { generateClaimToken } from "./claim-routes.js";
 
 // ── In-memory LRU cache for registered users ──────────────────────────────
 // Only caches positive results (user IS registered). Unregistered users always
@@ -344,16 +338,12 @@ class FeishuEventsTraceHandler {
                 feishuAppSecret,
               );
               if (tenantToken) {
-                // Action button card — no claim token yet; token is generated
-                // when the user clicks the button (card action callback).
-                const card = buildFeishuClaimCard(
-                  workspaceKey,
-                  route.botId,
-                  appId,
-                );
+                // Send a bind prompt card with a link to the OAuth bind page
+                const webUrl = process.env.WEB_URL ?? "http://localhost:5173";
+                const bindUrl = `${webUrl}/feishu/bind?ws=${encodeURIComponent(workspaceKey)}&bot=${encodeURIComponent(route.botId)}`;
+                const card = buildFeishuBindPromptCard(bindUrl);
 
                 if (chatType === "p2p") {
-                  // DM: send to sender's open_id, quote original message
                   await sendFeishuCardMessage(
                     card,
                     senderOpenId,
@@ -362,7 +352,6 @@ class FeishuEventsTraceHandler {
                     messageId,
                   );
                 } else if (chatId) {
-                  // Group: reply in the group chat, quoting original message
                   await sendFeishuCardMessage(
                     card,
                     chatId,
@@ -373,7 +362,7 @@ class FeishuEventsTraceHandler {
                 }
 
                 logger.info({
-                  message: "feishu_claim_card_sent",
+                  message: "feishu_bind_prompt_sent",
                   scope: "feishu-events",
                   open_id: senderOpenId,
                   chat_type: chatType,
@@ -514,183 +503,60 @@ class FeishuEventsTraceHandler {
   }
 }
 
-// ── Card action callback handler ─────────────────────────────────────────
-// When a user clicks the claim card's action button, Feishu POSTs here.
-// We generate a claim token for the clicker and return an updated card
-// with a multi_url button pointing to the claim page.
+// ── Card action callback handler (backward compatibility) ────────────────
+// Legacy claim cards may still exist in chat history. This handler responds
+// to old card button clicks with a toast message directing users to the
+// new OAuth-based bind flow.
 
 async function handleCardAction(c: Context<AppBindings>): Promise<Response> {
   try {
     const payload = (await c.req.json()) as Record<string, unknown>;
 
-    // Handle url_verification challenge (sent when configuring the callback URL)
+    // Handle url_verification challenge
     if (payload.type === "url_verification") {
       return c.json({ challenge: payload.challenge });
     }
 
-    // Feishu card callbacks come in two formats:
-    // v1: { open_id, action: { value, tag }, token, ... }
-    // v2: { schema: "2.0", header: {...}, event: { operator: { open_id }, action: { value, tag } } }
+    // Parse v1/v2 format to check if user is already registered
     const isV2 = payload.schema === "2.0";
     const event = isV2
       ? (payload.event as Record<string, unknown> | undefined)
       : undefined;
-
     const operator = event?.operator as Record<string, unknown> | undefined;
     const openId = isV2
       ? (operator?.open_id as string | undefined)
       : (payload.open_id as string | undefined);
-
     const action = isV2
       ? (event?.action as Record<string, unknown> | undefined)
       : (payload.action as Record<string, unknown> | undefined);
     const actionValue = action?.value as Record<string, unknown> | undefined;
-
     const workspaceKey = actionValue?.workspaceKey as string | undefined;
-    const botId = actionValue?.botId as string | undefined;
-    const appId = actionValue?.appId as string | undefined;
 
-    logger.info({
-      message: "feishu_card_action_parsed",
-      is_v2: isV2,
-      open_id: openId,
-      action_tag: action?.tag,
-      workspace_key: workspaceKey,
-    });
+    if (openId && workspaceKey) {
+      const [membership] = await db
+        .select({ userId: workspaceMemberships.userId })
+        .from(workspaceMemberships)
+        .where(
+          and(
+            eq(workspaceMemberships.workspaceKey, workspaceKey),
+            eq(workspaceMemberships.imUserId, openId),
+          ),
+        );
 
-    // v2 callback: open_message_id is in event.context
-    const context = event?.context as Record<string, unknown> | undefined;
-    const openMessageId = isV2
-      ? (context?.open_message_id as string | undefined)
-      : (payload.open_message_id as string | undefined);
-
-    if (!openId || !workspaceKey || !botId || !appId) {
-      logger.warn({
-        message: "feishu_card_action_missing_fields",
-        open_id: openId,
-        workspace_key: workspaceKey,
-      });
-      return c.json({});
-    }
-
-    logger.info({
-      message: "feishu_card_action_received",
-      open_id: openId,
-      workspace_key: workspaceKey,
-      app_id: appId,
-      open_message_id: openMessageId,
-    });
-
-    // Look up credentials to get tenant token for PATCH API
-    const [route] = await db
-      .select({ botChannelId: webhookRoutes.botChannelId })
-      .from(webhookRoutes)
-      .where(
-        and(
-          eq(webhookRoutes.channelType, "feishu"),
-          eq(webhookRoutes.externalId, appId),
-        ),
-      );
-
-    let tenantToken: string | null = null;
-    if (route) {
-      const creds = await db
-        .select({
-          credentialType: channelCredentials.credentialType,
-          encryptedValue: channelCredentials.encryptedValue,
-        })
-        .from(channelCredentials)
-        .where(eq(channelCredentials.botChannelId, route.botChannelId));
-
-      const credMap = new Map<string, string>();
-      for (const cred of creds) {
-        try {
-          credMap.set(cred.credentialType, decrypt(cred.encryptedValue));
-        } catch {
-          // skip
-        }
-      }
-
-      const feishuAppId = credMap.get("appId");
-      const feishuAppSecret = credMap.get("appSecret");
-      if (feishuAppId && feishuAppSecret) {
-        tenantToken = await getFeishuTenantToken(feishuAppId, feishuAppSecret);
-      }
-    }
-
-    // Check if the clicker is already registered
-    const [membership] = await db
-      .select({ userId: workspaceMemberships.userId })
-      .from(workspaceMemberships)
-      .where(
-        and(
-          eq(workspaceMemberships.workspaceKey, workspaceKey),
-          eq(workspaceMemberships.imUserId, openId),
-        ),
-      );
-
-    if (membership) {
-      // Update card via PATCH API (fire-and-forget)
-      if (openMessageId && tenantToken) {
-        patchFeishuCardMessage(
-          openMessageId,
-          buildFeishuClaimCardDone(),
-          tenantToken,
-        ).catch(() => {});
-      }
-      return c.json({
-        toast: {
-          type: "success" as const,
-          content: "你的飞书账号已绑定 Nexu，可以正常使用了。",
-        },
-      });
-    }
-
-    // Generate claim token for this specific clicker
-    const { claimUrl } = await generateClaimToken({
-      workspaceKey,
-      imUserId: openId,
-      botId,
-    });
-
-    logger.info({
-      message: "feishu_card_action_claim_token_generated",
-      open_id: openId,
-      workspace_key: workspaceKey,
-      claim_url: claimUrl,
-    });
-
-    // Update card via PATCH API with the claim URL button
-    logger.info({
-      message: "feishu_card_action_patch_attempt",
-      has_message_id: !!openMessageId,
-      has_tenant_token: !!tenantToken,
-      open_message_id: openMessageId,
-    });
-    if (openMessageId && tenantToken) {
-      patchFeishuCardMessage(
-        openMessageId,
-        buildFeishuClaimCardWithUrl(claimUrl),
-        tenantToken,
-      ).then((ok) => {
-        logger.info({
-          message: "feishu_card_action_patch_result",
-          success: ok,
-          open_message_id: openMessageId,
+      if (membership) {
+        return c.json({
+          toast: {
+            type: "success" as const,
+            content: "你的飞书账号已绑定 Nexu，可以正常使用了。",
+          },
         });
-      }).catch((err) => {
-        logger.warn({
-          message: "feishu_card_action_patch_error",
-          error: String(err),
-        });
-      });
+      }
     }
 
-    // Return toast to acknowledge the click
     return c.json({
       toast: {
         type: "info" as const,
-        content: "已生成注册链接，请点击卡片中的按钮完成绑定。",
+        content: "请在 Nexu 网页端完成飞书账号绑定。",
       },
     });
   } catch (err) {

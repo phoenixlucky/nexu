@@ -20,7 +20,7 @@ import {
 } from "../db/schema/index.js";
 import { decrypt } from "../lib/crypto.js";
 import { BaseError, ServiceError } from "../lib/error.js";
-import { buildFeishuClaimCard } from "../lib/feishu-claim-card.js";
+import { buildFeishuBindPromptCard } from "../lib/feishu-claim-card.js";
 import {
   getFeishuTenantToken,
   sendFeishuCardMessage,
@@ -114,15 +114,17 @@ async function checkFeishuClaim(params: {
       return;
     }
 
-    // Not registered — send action-button claim card (token generated on click)
+    // Not registered — send bind prompt card with OAuth link
     const tenantToken = await getFeishuTenantToken(appId, appSecret);
     if (!tenantToken) return;
 
-    const card = buildFeishuClaimCard(workspaceKey, params.botId, appId);
+    const webUrl = process.env.WEB_URL ?? "http://localhost:5173";
+    const bindUrl = `${webUrl}/feishu/bind?ws=${encodeURIComponent(workspaceKey)}&bot=${encodeURIComponent(params.botId)}`;
+    const card = buildFeishuBindPromptCard(bindUrl);
     await sendFeishuCardMessage(card, params.channelId, tenantToken);
 
     logger.info({
-      message: "feishu_claim_card_sent",
+      message: "feishu_bind_prompt_sent",
       scope: "session-routes",
       chat_id: params.channelId,
       workspace_key: workspaceKey,

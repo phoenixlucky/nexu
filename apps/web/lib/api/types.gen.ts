@@ -2572,6 +2572,44 @@ export type GetApiV1SessionsByIdResponses = {
 
 export type GetApiV1SessionsByIdResponse = GetApiV1SessionsByIdResponses[keyof GetApiV1SessionsByIdResponses];
 
+export type GetApiV1FeishuBindOauthUrlData = {
+    body?: never;
+    path?: never;
+    query: {
+        workspaceKey: string;
+        botId: string;
+    };
+    url: '/api/v1/feishu/bind/oauth-url';
+};
+
+export type GetApiV1FeishuBindOauthUrlErrors = {
+    /**
+     * Invalid workspace key
+     */
+    400: {
+        message: string;
+    };
+    /**
+     * Feishu app not found
+     */
+    404: {
+        message: string;
+    };
+};
+
+export type GetApiV1FeishuBindOauthUrlError = GetApiV1FeishuBindOauthUrlErrors[keyof GetApiV1FeishuBindOauthUrlErrors];
+
+export type GetApiV1FeishuBindOauthUrlResponses = {
+    /**
+     * Feishu OAuth authorization URL
+     */
+    200: {
+        url: string;
+    };
+};
+
+export type GetApiV1FeishuBindOauthUrlResponse = GetApiV1FeishuBindOauthUrlResponses[keyof GetApiV1FeishuBindOauthUrlResponses];
+
 export type GetApiV1IntegrationsData = {
     body?: never;
     path?: never;
