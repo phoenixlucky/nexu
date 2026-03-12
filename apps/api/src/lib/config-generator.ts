@@ -255,7 +255,7 @@ export async function generatePoolConfig(
       if (ch.connectionMode === "webhook") {
         feishuAccount.connectionMode = "webhook";
         feishuAccount.webhookPath = `/feishu/events/${ch.accountId}`;
-        feishuAccount.webhookPort = 18789;
+        feishuAccount.webhookPort = 18790;
         if (verificationToken) {
           feishuAccount.verificationToken = verificationToken;
         }

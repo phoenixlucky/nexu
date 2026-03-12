@@ -453,7 +453,7 @@ class FeishuEventsTraceHandler {
         return c.json({ accepted: true }, 202);
       }
 
-      const gatewayUrl = `http://${podIp}:18789/feishu/events/${accountId}`;
+      const gatewayUrl = `http://${podIp}:18790/feishu/events/${accountId}`;
       logger.info({
         message: "feishu_events_forwarding",
         gateway_url: gatewayUrl,
