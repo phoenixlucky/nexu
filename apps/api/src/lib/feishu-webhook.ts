@@ -244,6 +244,49 @@ export async function sendFeishuCardMessage(
   }
 }
 
+export async function patchFeishuCardMessage(
+  messageId: string,
+  card: Record<string, unknown>,
+  tenantToken: string,
+): Promise<boolean> {
+  try {
+    const resp = await fetch(
+      `https://open.feishu.cn/open-apis/im/v1/messages/${messageId}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${tenantToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ content: JSON.stringify(card) }),
+      },
+    );
+
+    if (!resp.ok) {
+      logger.warn({
+        message: "feishu_patch_card_http_error",
+        scope: "feishu-webhook",
+        status: resp.status,
+      });
+      return false;
+    }
+
+    const data = (await resp.json()) as { code: number; msg?: string };
+    if (data.code !== 0) {
+      logger.warn({
+        message: "feishu_patch_card_api_error",
+        scope: "feishu-webhook",
+        code: data.code,
+        msg: data.msg,
+      });
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function sendFeishuImageMessage(
   imageKey: string,
   chatId: string,

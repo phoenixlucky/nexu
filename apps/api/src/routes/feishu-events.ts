@@ -22,6 +22,7 @@ import {
 } from "../lib/feishu-claim-card.js";
 import {
   getFeishuTenantToken,
+  patchFeishuCardMessage,
   sendFeishuCardMessage,
 } from "../lib/feishu-webhook.js";
 import { logger } from "../lib/logger.js";
@@ -522,28 +523,48 @@ async function handleCardAction(c: Context<AppBindings>): Promise<Response> {
   try {
     const payload = (await c.req.json()) as Record<string, unknown>;
 
-    logger.info({
-      message: "feishu_card_action_raw_payload",
-      payload_keys: Object.keys(payload),
-      has_open_id: "open_id" in payload,
-      has_action: "action" in payload,
-    });
-
     // Handle url_verification challenge (sent when configuring the callback URL)
     if (payload.type === "url_verification") {
       return c.json({ challenge: payload.challenge });
     }
 
-    // Extract clicker identity
-    const openId = payload.open_id as string | undefined;
-    const action = payload.action as Record<string, unknown> | undefined;
+    // Feishu card callbacks come in two formats:
+    // v1: { open_id, action: { value, tag }, token, ... }
+    // v2: { schema: "2.0", header: {...}, event: { operator: { open_id }, action: { value, tag } } }
+    const isV2 = payload.schema === "2.0";
+    const event = isV2
+      ? (payload.event as Record<string, unknown> | undefined)
+      : undefined;
+
+    const operator = event?.operator as Record<string, unknown> | undefined;
+    const openId = isV2
+      ? (operator?.open_id as string | undefined)
+      : (payload.open_id as string | undefined);
+
+    const action = isV2
+      ? (event?.action as Record<string, unknown> | undefined)
+      : (payload.action as Record<string, unknown> | undefined);
     const actionValue = action?.value as Record<string, unknown> | undefined;
 
     const workspaceKey = actionValue?.workspaceKey as string | undefined;
     const botId = actionValue?.botId as string | undefined;
     const appId = actionValue?.appId as string | undefined;
 
-    if (!openId || !workspaceKey || !botId) {
+    logger.info({
+      message: "feishu_card_action_parsed",
+      is_v2: isV2,
+      open_id: openId,
+      action_tag: action?.tag,
+      workspace_key: workspaceKey,
+    });
+
+    // v2 callback: open_message_id is in event.context
+    const context = event?.context as Record<string, unknown> | undefined;
+    const openMessageId = isV2
+      ? (context?.open_message_id as string | undefined)
+      : (payload.open_message_id as string | undefined);
+
+    if (!openId || !workspaceKey || !botId || !appId) {
       logger.warn({
         message: "feishu_card_action_missing_fields",
         open_id: openId,
@@ -557,7 +578,45 @@ async function handleCardAction(c: Context<AppBindings>): Promise<Response> {
       open_id: openId,
       workspace_key: workspaceKey,
       app_id: appId,
+      open_message_id: openMessageId,
     });
+
+    // Look up credentials to get tenant token for PATCH API
+    const [route] = await db
+      .select({ botChannelId: webhookRoutes.botChannelId })
+      .from(webhookRoutes)
+      .where(
+        and(
+          eq(webhookRoutes.channelType, "feishu"),
+          eq(webhookRoutes.externalId, appId),
+        ),
+      );
+
+    let tenantToken: string | null = null;
+    if (route) {
+      const creds = await db
+        .select({
+          credentialType: channelCredentials.credentialType,
+          encryptedValue: channelCredentials.encryptedValue,
+        })
+        .from(channelCredentials)
+        .where(eq(channelCredentials.botChannelId, route.botChannelId));
+
+      const credMap = new Map<string, string>();
+      for (const cred of creds) {
+        try {
+          credMap.set(cred.credentialType, decrypt(cred.encryptedValue));
+        } catch {
+          // skip
+        }
+      }
+
+      const feishuAppId = credMap.get("appId");
+      const feishuAppSecret = credMap.get("appSecret");
+      if (feishuAppId && feishuAppSecret) {
+        tenantToken = await getFeishuTenantToken(feishuAppId, feishuAppSecret);
+      }
+    }
 
     // Check if the clicker is already registered
     const [membership] = await db
@@ -571,8 +630,20 @@ async function handleCardAction(c: Context<AppBindings>): Promise<Response> {
       );
 
     if (membership) {
-      // Already registered — return updated card directly (no "card" wrapper)
-      return c.json(buildFeishuClaimCardDone());
+      // Update card via PATCH API (fire-and-forget)
+      if (openMessageId && tenantToken) {
+        patchFeishuCardMessage(
+          openMessageId,
+          buildFeishuClaimCardDone(),
+          tenantToken,
+        ).catch(() => {});
+      }
+      return c.json({
+        toast: {
+          type: "success" as const,
+          content: "你的飞书账号已绑定 Nexu，可以正常使用了。",
+        },
+      });
     }
 
     // Generate claim token for this specific clicker
@@ -586,11 +657,42 @@ async function handleCardAction(c: Context<AppBindings>): Promise<Response> {
       message: "feishu_card_action_claim_token_generated",
       open_id: openId,
       workspace_key: workspaceKey,
+      claim_url: claimUrl,
     });
 
-    // Return updated card directly (no "card" wrapper — Feishu expects
-    // the card content at the top level in callback responses)
-    return c.json(buildFeishuClaimCardWithUrl(claimUrl));
+    // Update card via PATCH API with the claim URL button
+    logger.info({
+      message: "feishu_card_action_patch_attempt",
+      has_message_id: !!openMessageId,
+      has_tenant_token: !!tenantToken,
+      open_message_id: openMessageId,
+    });
+    if (openMessageId && tenantToken) {
+      patchFeishuCardMessage(
+        openMessageId,
+        buildFeishuClaimCardWithUrl(claimUrl),
+        tenantToken,
+      ).then((ok) => {
+        logger.info({
+          message: "feishu_card_action_patch_result",
+          success: ok,
+          open_message_id: openMessageId,
+        });
+      }).catch((err) => {
+        logger.warn({
+          message: "feishu_card_action_patch_error",
+          error: String(err),
+        });
+      });
+    }
+
+    // Return toast to acknowledge the click
+    return c.json({
+      toast: {
+        type: "info" as const,
+        content: "已生成注册链接，请点击卡片中的按钮完成绑定。",
+      },
+    });
   } catch (err) {
     const unknownError = BaseError.from(err);
     logger.warn({
