@@ -80,7 +80,7 @@ Nexu Desktop 是一个 Electron 37 桌面客户端，采用 sidecar 架构，内
 │                                                         │
 │  ┌── 国内: 阿里云 OSS ──────────────────────┐           │
 │  │  Bucket: nexu-releases                   │           │
-│  │  域名: releases.nexu.space (CDN 加速)    │           │
+│  │  域名: releases.nexu.space (OSS 直连)    │           │
 │  │  ├── desktop/{beta,stable}/              │           │
 │  │  │   ├── latest-mac.yml                  │           │
 │  │  │   ├── Nexu-1.2.0-arm64.dmg           │           │
@@ -248,8 +248,8 @@ MAJOR.MINOR.PATCH[-channel.N]
 | | 国内 (阿里云 OSS) | 海外 (GitHub Release) |
 |---|---|---|
 | **用途** | 国内用户下载更新 | 海外用户下载更新 |
-| **优势** | CDN 加速，国内低延迟 | 零运维，天然可用 |
-| **成本** | 存储 ¥0.12/GB/月，流量 ¥0.50/GB (CDN) | 免费 (public repo) |
+| **优势** | 国内直连可用，无需翻墙 | 零运维，天然可用 |
+| **成本** | 存储 ¥0.12/GB/月，外网流量 ¥0.50/GB | 免费 (public repo) |
 | **全量包** | ✅ | ✅ |
 | **组件包** | ✅ | ✅ (作为 release assets) |
 | **元信息** | `latest-mac.yml` 等 | `latest-mac.yml` 作为 asset |
@@ -263,9 +263,9 @@ MAJOR.MINOR.PATCH[-channel.N]
 # 区域: oss-cn-hangzhou
 # 读写权限: 公共读
 
-# 绑定自定义域名 + CDN 加速
+# 绑定自定义域名 (OSS 直连，暂不开 CDN，避免流量被薅)
 # Bucket → 传输管理 → 域名管理 → 绑定 releases.nexu.space
-# 开启 CDN 加速 (阿里云 CDN 自动配置)
+# 后续用户量大了再开 CDN 加速
 ```
 
 OSS 目录结构:
@@ -1130,7 +1130,7 @@ export class ComponentUpdater {
   private localManifestPath: string;
 
   constructor(source: "oss" | "github" = "oss") {
-    // OSS: 直接从 CDN 拉; GitHub: 从 release assets 拉
+    // OSS: 直接从 OSS 拉; GitHub: 从 release assets 拉
     this.baseUrl = source === "oss"
       ? "https://releases.nexu.space"
       : "https://github.com/refly-ai/nexu/releases/latest/download";
@@ -1961,7 +1961,7 @@ desktop/changelogs/
 ### 阶段零: 基础设施搭建
 
 - [ ] 创建阿里云 OSS bucket `nexu-releases` (杭州，公共读)
-- [ ] 绑定 `releases.nexu.space` 域名 + CDN 加速
+- [ ] 绑定 `releases.nexu.space` 域名 (OSS 直连，暂不开 CDN)
 - [ ] 配置 GitHub Secrets (OSS 凭证)
 - [ ] 手动上传测试文件，验证 OSS 和 GitHub Release 均可访问
 
@@ -2003,7 +2003,8 @@ desktop/changelogs/
 
 ### 阶段四: 增强
 
-- [ ] 灰度发布 / 下载统计 (阿里云 CDN 日志分析)
+- [ ] 灰度发布 / 下载统计
+- [ ] (可选) 用户量大后开启 CDN 加速
 - [ ] 数据迁移保护 (PGlite 备份 + 自动 migrate)
 - [ ] 断点续传
 - [ ] Beta/Canary 通道
@@ -2057,8 +2058,8 @@ pnpm add -D electron-builder @electron/notarize
 | 资源 | 名称 | 状态 |
 |------|------|------|
 | 阿里云 OSS Bucket | nexu-releases (oss-cn-hangzhou) | ❌ 需创建 |
-| 阿里云 CDN | releases.nexu.space | ❌ 需配置 |
+| 阿里云 CDN | releases.nexu.space | ⏸️ 暂不开，后续按需 |
 | GitHub Release | refly-ai/nexu | ✅ 已有 (public repo) |
 | Cloudflare Tunnel | nexu-dev | ✅ 已有 |
 | Cloudflare Worker | nexu-router | ✅ 已有 |
-| Domain DNS | releases.nexu.space → 阿里云 CDN | ❌ 需添加 |
+| Domain DNS | releases.nexu.space → OSS CNAME | ❌ 需添加 |
