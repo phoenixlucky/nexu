@@ -98,10 +98,12 @@ export function AuthPage() {
   const [name, setName] = useState("");
   const [desktopConnected, setDesktopConnected] = useState(false);
   const [desktopAuthorizing, setDesktopAuthorizing] = useState(false);
+  const desktopAuthCalled = useRef(false);
 
   /** After login, authorize the desktop device and show success screen. */
   const handleDesktopAuthorize = useCallback(async () => {
-    if (!deviceId) return;
+    if (!deviceId || desktopAuthCalled.current) return;
+    desktopAuthCalled.current = true;
     setDesktopAuthorizing(true);
     try {
       const res = await fetch("/api/v1/auth/desktop-authorize", {
@@ -113,12 +115,14 @@ export function AuthPage() {
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: "Unknown error" }));
         toast.error((body as { error?: string }).error ?? "Failed to connect desktop");
+        // Don't reset desktopAuthCalled — prevent infinite retry loop
         setDesktopAuthorizing(false);
         return;
       }
       setDesktopConnected(true);
     } catch {
       toast.error("Failed to connect desktop app");
+      // Don't reset desktopAuthCalled — prevent infinite retry loop
       setDesktopAuthorizing(false);
     }
   }, [deviceId]);
@@ -186,12 +190,11 @@ export function AuthPage() {
         user_email: email,
         ...(isLogin ? {} : { signup_date: new Date().toISOString() }),
       });
-      if (isDesktopAuth && deviceId) {
-        await handleDesktopAuthorize();
-        setVerifying(false);
-        return;
+      // Desktop auth is handled by the useEffect watching session changes
+      if (!isDesktopAuth) {
+        navigate(returnTo);
       }
-      navigate(returnTo);
+      setVerifying(false);
     } catch {
       toast.error("Verification failed");
       setVerifying(false);
@@ -217,8 +220,10 @@ export function AuthPage() {
       });
     }
 
-    // Desktop auth: authorize the device after OAuth callback
+    // Desktop auth: authorize the device when session becomes available
     if (isDesktopAuth && deviceId && !desktopConnected) {
+      // Reset guard so a fresh session can trigger authorization
+      desktopAuthCalled.current = false;
       handleDesktopAuthorize();
     }
   }, [session?.user, isDesktopAuth, deviceId, desktopConnected, handleDesktopAuthorize]);
@@ -284,12 +289,11 @@ export function AuthPage() {
         }
         track("login_email_success");
         identify({ auth_method: "email", user_email: email });
-        if (isDesktopAuth && deviceId) {
-          await handleDesktopAuthorize();
-          setLoading(null);
-          return;
+        // Desktop auth is handled by the useEffect watching session changes
+        if (!isDesktopAuth) {
+          navigate(returnTo);
         }
-        navigate(returnTo);
+        setLoading(null);
       } else {
         const { error } = await authClient.signUp.email({
           email,
@@ -724,7 +728,15 @@ export function AuthPage() {
                   : "Already have an account?"}
               </span>
               <Link
-                to={isLogin ? "/auth?mode=signup" : "/auth"}
+                to={(() => {
+                  const p = new URLSearchParams(searchParams);
+                  if (isLogin) {
+                    p.set("mode", "signup");
+                  } else {
+                    p.delete("mode");
+                  }
+                  return `/auth?${p.toString()}`;
+                })()}
                 className="text-[13px] text-accent font-medium ml-1 hover:underline underline-offset-2"
               >
                 {isLogin ? "Sign up" : "Log in"}

@@ -135,10 +135,13 @@ export function createRuntimeUnitManifests(
         INTERNAL_API_TOKEN: internalApiToken,
         SKILL_API_TOKEN: skillApiToken,
         NEXU_DESKTOP_MODE: "true",
+        ENCRYPTION_KEY:
+          process.env.ENCRYPTION_KEY ??
+          "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
         OPENCLAW_STATE_DIR: openclawStateDir,
-        ...(process.env.NEXU_LINK_URL
-          ? { NEXU_LINK_URL: process.env.NEXU_LINK_URL }
-          : {}),
+        NEXU_CLOUD_URL: process.env.NEXU_CLOUD_URL ?? webUrl,
+        NEXU_LINK_URL:
+          process.env.NEXU_LINK_URL ?? "https://nexu-link.powerformer.net",
       },
     },
     {

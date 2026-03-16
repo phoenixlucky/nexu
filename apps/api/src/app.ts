@@ -97,8 +97,8 @@ export function createApp() {
     registerDesktopLocalRoutes(app);
   }
 
-  registerAuthRoutes(app);
   registerDesktopDeviceRoutes(app);
+  registerAuthRoutes(app);
   registerSlackOAuthCallback(app);
   registerSlackEvents(app);
   registerArtifactInternalRoutes(app);

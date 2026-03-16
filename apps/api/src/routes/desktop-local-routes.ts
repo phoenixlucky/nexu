@@ -1,6 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { OpenAPIHono } from "@hono/zod-openapi";
+import { eq } from "drizzle-orm";
 import { encrypt } from "../lib/crypto.js";
+import { db } from "../db/index.js";
+import { gatewayPools } from "../db/schema/index.js";
+import { publishPoolConfigSnapshot } from "../services/runtime/pool-config-service.js";
+import { logger } from "../lib/logger.js";
 import type { AppBindings } from "../types.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -263,6 +268,99 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
       connectedAt: null,
       models: [],
     });
+  });
+
+  // Set default model and trigger config regeneration
+  app.put("/api/internal/desktop/default-model", async (c) => {
+    const body = (await c.req.json()) as { modelId?: string };
+    if (!body.modelId) {
+      return c.json({ error: "modelId is required" }, 400);
+    }
+
+    // Write to desktop-config.json
+    const stateDir =
+      process.env.OPENCLAW_STATE_DIR ??
+      path.join(process.cwd(), ".nexu-state");
+    if (!fs.existsSync(stateDir)) fs.mkdirSync(stateDir, { recursive: true });
+    const configPath = path.join(stateDir, "desktop-config.json");
+
+    let cfg: Record<string, unknown> = {};
+    try {
+      if (fs.existsSync(configPath)) {
+        cfg = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      }
+    } catch {
+      /* ignore parse errors */
+    }
+    cfg.selectedModelId = body.modelId;
+    fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2));
+
+    // Trigger config snapshot so gateway picks up the change
+    try {
+      const [pool] = await db
+        .select({ id: gatewayPools.id })
+        .from(gatewayPools)
+        .where(eq(gatewayPools.poolName, "default"));
+      if (pool) {
+        await publishPoolConfigSnapshot(db, pool.id);
+      }
+    } catch (err) {
+      logger.error({ message: "default_model_snapshot_failed", error: err });
+    }
+
+    return c.json({ ok: true, modelId: body.modelId });
+  });
+
+  // Get current default model
+  app.get("/api/internal/desktop/default-model", (c) => {
+    const stateDir =
+      process.env.OPENCLAW_STATE_DIR ??
+      path.join(process.cwd(), ".nexu-state");
+    const configPath = path.join(stateDir, "desktop-config.json");
+    try {
+      if (fs.existsSync(configPath)) {
+        const cfg = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+        return c.json({ modelId: cfg.selectedModelId ?? null });
+      }
+    } catch {
+      /* ignore */
+    }
+    return c.json({ modelId: null });
+  });
+
+  // Update enabled cloud models and trigger config regeneration
+  app.put("/api/internal/desktop/cloud-models", async (c) => {
+    const creds = loadCredentials();
+    if (!creds) {
+      return c.json({ error: "Not connected to cloud" }, 400);
+    }
+
+    const body = (await c.req.json()) as { enabledModelIds?: string[] };
+    const enabledIds = body.enabledModelIds;
+    if (!Array.isArray(enabledIds)) {
+      return c.json({ error: "enabledModelIds must be an array" }, 400);
+    }
+
+    // Filter cloudModels to only include enabled ones
+    const allModels = creds.cloudModels ?? [];
+    const enabledSet = new Set(enabledIds);
+    creds.cloudModels = allModels.filter((m) => enabledSet.has(m.id));
+    saveCredentials(creds);
+
+    // Trigger config snapshot so gateway picks up the change
+    try {
+      const [pool] = await db
+        .select({ id: gatewayPools.id })
+        .from(gatewayPools)
+        .where(eq(gatewayPools.poolName, "default"));
+      if (pool) {
+        await publishPoolConfigSnapshot(db, pool.id);
+      }
+    } catch (err) {
+      logger.error({ message: "cloud_models_snapshot_failed", error: err });
+    }
+
+    return c.json({ ok: true, models: creds.cloudModels });
   });
 
   // Disconnect from cloud: clear credentials, cancel polling

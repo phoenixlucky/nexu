@@ -8,6 +8,7 @@ import {
   Eye,
   EyeOff,
   Loader2,
+  RefreshCw,
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -520,6 +521,37 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
 
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginBusy, setLoginBusy] = useState(false);
+  const [cloudConnected, setCloudConnected] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Check if already connected on mount
+  useEffect(() => {
+    fetch("/api/internal/desktop/cloud-status")
+      .then((res) => res.json())
+      .then((data: { connected: boolean }) => {
+        if (data.connected) setCloudConnected(true);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Poll cloud-status while waiting for browser login
+  useEffect(() => {
+    if (!loginBusy) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/internal/desktop/cloud-status");
+        const data = (await res.json()) as { connected: boolean; userEmail?: string };
+        if (data.connected) {
+          setLoginBusy(false);
+          setCloudConnected(true);
+          // Refresh provider/model data now that cloud is connected
+          queryClient.invalidateQueries({ queryKey: ["link-catalog"] });
+        }
+      } catch { /* ignore */ }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [loginBusy, queryClient]);
+
   const handleLogin = async () => {
     setLoginBusy(true);
     setLoginError(null);
@@ -527,19 +559,35 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
       const res = await fetch("/api/internal/desktop/cloud-connect", {
         method: "POST",
       });
-      const data = (await res.json()) as { browserUrl?: string; error?: string };
+      const data = (await res.json()) as {
+        browserUrl?: string;
+        error?: string;
+      };
       if (!res.ok) {
         setLoginError(data.error ?? "连接失败，请稍后重试");
         setLoginBusy(false);
         return;
       }
       if (data.browserUrl) {
-        window.open(data.browserUrl, "_blank", "noopener,noreferrer");
+        // In Electron, window.open is intercepted by the main process and
+        // opened in the system browser via shell.openExternal().
+        window.open(data.browserUrl, "_blank");
       }
+      // Keep loginBusy=true — polling effect will detect completion.
     } catch {
       setLoginError("无法连接到 Nexu 云端服务");
+      setLoginBusy(false);
+    }
+  };
+
+  const handleCancelLogin = async () => {
+    try {
+      await fetch("/api/internal/desktop/cloud-disconnect", { method: "POST" });
+    } catch {
+      // ignore
     }
     setLoginBusy(false);
+    setLoginError(null);
   };
 
   return (
@@ -559,33 +607,93 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
             </div>
           </div>
         </div>
-        <div className="inline-flex items-center rounded-full border border-accent/20 bg-accent/8 px-3 py-1 text-[11px] font-medium text-accent">
-          登录后可用
+        <div className={cn(
+          "inline-flex items-center rounded-full px-3 py-1 text-[11px] font-medium",
+          cloudConnected
+            ? "border border-emerald-500/20 bg-emerald-500/8 text-emerald-600"
+            : "border border-accent/20 bg-accent/8 text-accent",
+        )}>
+          {cloudConnected ? "已连接" : "登录后可用"}
         </div>
       </div>
 
-      {/* Login prompt card */}
-      <div className="rounded-xl border border-accent/15 bg-accent/5 px-4 py-4 mb-6">
-        <div className="text-[13px] font-semibold text-accent">
-          登录后使用 Nexu 官方模型
+      {/* Login / connected card */}
+      {cloudConnected ? (
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center">
+                <Check size={12} className="text-emerald-500" />
+              </div>
+              <div className="text-[13px] font-semibold text-emerald-600">
+                已连接 Nexu 云端
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: ["link-catalog"] });
+                }}
+                className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors cursor-pointer"
+              >
+                <RefreshCw size={11} />
+                刷新
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await fetch("/api/internal/desktop/cloud-disconnect", { method: "POST" }).catch(() => {});
+                  setCloudConnected(false);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium text-red-500/70 hover:text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer"
+              >
+                断开
+              </button>
+            </div>
+          </div>
+          <div className="text-[12px] text-text-secondary mt-1.5">
+            云端模型已可用，可在下方查看和管理。
+          </div>
         </div>
-        <div className="text-[12px] leading-[1.7] text-text-secondary mt-1.5">
-          登录 Nexu
-          账号后，即可直接使用官方提供的高级模型，无需单独配置 API Key。
+      ) : (
+        <div className="rounded-xl border border-accent/15 bg-accent/5 px-4 py-4 mb-6">
+          <div className="text-[13px] font-semibold text-accent">
+            登录后使用 Nexu 官方模型
+          </div>
+          <div className="text-[12px] leading-[1.7] text-text-secondary mt-1.5">
+            登录 Nexu
+            账号后，即可直接使用官方提供的高级模型，无需单独配置 API Key。
+          </div>
+          {loginBusy ? (
+            <div className="mt-4 flex items-center gap-3">
+              <div className="inline-flex items-center gap-2 rounded-lg bg-accent/80 px-3.5 py-2 text-[12px] font-medium text-white">
+                <Loader2 size={13} className="animate-spin" />
+                等待浏览器登录...
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleCancelLogin()}
+                className="text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+              >
+                取消
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void handleLogin()}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-[12px] font-medium text-white transition-colors hover:bg-accent/90 cursor-pointer"
+            >
+              登录 Nexu 账号
+              <ArrowUpRight size={13} />
+            </button>
+          )}
+          {loginError && (
+            <p className="mt-2 text-[11px] text-red-500">{loginError}</p>
+          )}
         </div>
-        <button
-          type="button"
-          disabled={loginBusy}
-          onClick={() => void handleLogin()}
-          className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-[12px] font-medium text-white transition-colors hover:bg-accent/90 cursor-pointer disabled:opacity-60"
-        >
-          {loginBusy ? "连接中..." : "登录 Nexu 账号"}
-          {!loginBusy && <ArrowUpRight size={13} />}
-        </button>
-        {loginError && (
-          <p className="mt-2 text-[11px] text-red-500">{loginError}</p>
-        )}
-      </div>
+      )}
 
       {/* Connected cloud models (from API) */}
       {provider.models.length > 0 && (
@@ -627,60 +735,141 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
           加载模型目录...
         </div>
       ) : linkProviders.length > 0 ? (
-        <div>
-          <div className="text-[13px] font-semibold text-text-primary mb-1">
-            可用模型目录
-            <span className="ml-2 text-[11px] font-normal text-text-muted">
-              共 {totalModels} 个模型，来自 {linkProviders.length} 个服务商
-            </span>
-          </div>
-          <div className="text-[11px] text-text-muted mb-4">
-            以下模型在登录 Nexu 账号后即可使用
-          </div>
-          <div className="space-y-5">
-            {linkProviders.map((lp) => (
-              <div key={lp.id}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-4 h-4 rounded flex items-center justify-center shrink-0">
-                    <ProviderLogo provider={lp.kind} size={14} />
-                  </span>
-                  <span className="text-[12px] font-medium text-text-primary">
-                    {lp.name}
-                  </span>
-                  <span className="text-[10px] text-text-muted">
-                    {lp.models.length} 个模型
-                  </span>
-                </div>
-                <div className="space-y-1.5">
-                  {lp.models.map((m) => (
-                    <div
-                      key={m.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-0 px-3 py-2.5 opacity-70"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0">
-                          <ProviderLogo provider={lp.kind} size={16} />
-                        </span>
-                        <div className="min-w-0">
-                          <div className="text-[12px] font-medium text-text-primary truncate">
-                            {m.name}
-                          </div>
-                          <div className="text-[10px] text-text-muted">
-                            {m.externalName}
-                          </div>
+        <LinkModelCatalog
+          linkProviders={linkProviders}
+          totalModels={totalModels}
+          cloudConnected={cloudConnected}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// ── Link model catalog with toggles ──────────────────────────
+
+function LinkModelCatalog({
+  linkProviders,
+  totalModels,
+  cloudConnected,
+}: {
+  linkProviders: LinkProvider[];
+  totalModels: number;
+  cloudConnected: boolean;
+}) {
+  // All link model IDs, flattened
+  const allModelIds = useMemo(
+    () => linkProviders.flatMap((lp) => lp.models.map((m) => m.id)),
+    [linkProviders],
+  );
+
+  // Enabled set — defaults to all enabled when connected
+  const [enabledIds, setEnabledIds] = useState<Set<string>>(
+    () => new Set(allModelIds),
+  );
+  const [saving, setSaving] = useState(false);
+
+  // Sync when catalog changes
+  useEffect(() => {
+    setEnabledIds(new Set(allModelIds));
+  }, [allModelIds]);
+
+  // Persist enabled model selection to backend
+  const persistEnabledModels = useCallback(
+    async (ids: Set<string>) => {
+      setSaving(true);
+      try {
+        await fetch("/api/internal/desktop/cloud-models", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enabledModelIds: Array.from(ids) }),
+        });
+      } catch {
+        /* best-effort */
+      } finally {
+        setSaving(false);
+      }
+    },
+    [],
+  );
+
+  const toggleModel = (id: string) => {
+    setEnabledIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      persistEnabledModels(next);
+      return next;
+    });
+  };
+
+  return (
+    <div>
+      <div className="text-[13px] font-semibold text-text-primary mb-1">
+        可用模型目录
+        <span className="ml-2 text-[11px] font-normal text-text-muted">
+          共 {totalModels} 个模型，来自 {linkProviders.length} 个服务商
+        </span>
+      </div>
+      <div className="text-[11px] text-text-muted mb-4">
+        {cloudConnected
+          ? "开启开关后，模型将出现在对话的模型选择列表中"
+          : "以下模型在登录 Nexu 账号后即可使用"}
+      </div>
+      <div className="space-y-5">
+        {linkProviders.map((lp) => (
+          <div key={lp.id}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-4 h-4 rounded flex items-center justify-center shrink-0">
+                <ProviderLogo provider={lp.kind} size={14} />
+              </span>
+              <span className="text-[12px] font-medium text-text-primary">
+                {lp.name}
+              </span>
+              <span className="text-[10px] text-text-muted">
+                {lp.models.length} 个模型
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              {lp.models.map((m) => {
+                const enabled = enabledIds.has(m.id);
+                return (
+                  <div
+                    key={m.id}
+                    className={cn(
+                      "flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-0 px-3 py-2.5",
+                      !cloudConnected && "opacity-70",
+                    )}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0">
+                        <ProviderLogo provider={lp.kind} size={16} />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-[12px] font-medium text-text-primary truncate">
+                          {m.name}
+                        </div>
+                        <div className="text-[10px] text-text-muted">
+                          {m.externalName}
                         </div>
                       </div>
+                    </div>
+                    {cloudConnected ? (
+                      <ToggleSwitch
+                        checked={enabled}
+                        onChange={() => toggleModel(m.id)}
+                      />
+                    ) : (
                       <span className="text-[10px] text-text-muted/60 shrink-0">
                         登录后可用
                       </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ) : null}
+        ))}
+      </div>
     </div>
   );
 }

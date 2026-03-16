@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createId } from "@paralleldrive/cuid2";
 import type { OpenAPIHono } from "@hono/zod-openapi";
-import { eq, and, lt } from "drizzle-orm";
+import bcrypt from "bcryptjs";
+import { eq, lt } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   apiKeys,
@@ -83,6 +84,11 @@ export function registerDesktopDeviceRoutes(app: OpenAPIHono<AppBindings>) {
       return c.json({ status: "pending" });
     }
 
+    // Already consumed — treat as expired (one-time retrieval)
+    if (row.status === "consumed") {
+      return c.json({ status: "expired" });
+    }
+
     if (row.status === "completed" && row.encryptedApiKey && row.userId) {
       // Decrypt the API key
       const apiKey = decrypt(row.encryptedApiKey);
@@ -108,9 +114,10 @@ export function registerDesktopDeviceRoutes(app: OpenAPIHono<AppBindings>) {
         }
       }
 
-      // Delete the row — one-time retrieval
+      // Mark as consumed instead of deleting — prevents race with late authorize calls
       await db
-        .delete(desktopDeviceAuthorizations)
+        .update(desktopDeviceAuthorizations)
+        .set({ status: "consumed" })
         .where(eq(desktopDeviceAuthorizations.pk, row.pk));
 
       return c.json({
@@ -140,42 +147,51 @@ export function registerDesktopAuthorizeRoute(app: OpenAPIHono<AppBindings>) {
       return c.json({ error: "deviceId is required" }, 400);
     }
 
-    // Find the pending device authorization
+    // Find the device authorization (any status)
     const [row] = await db
       .select()
       .from(desktopDeviceAuthorizations)
-      .where(
-        and(
-          eq(desktopDeviceAuthorizations.deviceId, body.deviceId),
-          eq(desktopDeviceAuthorizations.status, "pending"),
-        ),
-      );
+      .where(eq(desktopDeviceAuthorizations.deviceId, body.deviceId));
 
     if (!row) {
-      return c.json({ error: "device not found or already authorized" }, 404);
+      return c.json({ error: "授权链接已失效，请关闭此页面并从客户端重新点击登录" }, 404);
+    }
+
+    // Already completed or consumed — idempotent success
+    if (row.status === "completed" || row.status === "consumed") {
+      return c.json({ ok: true });
     }
 
     if (new Date(row.expiresAt) < new Date()) {
       await db
         .delete(desktopDeviceAuthorizations)
         .where(eq(desktopDeviceAuthorizations.pk, row.pk));
-      return c.json({ error: "device authorization expired" }, 410);
+      return c.json({ error: "授权链接已过期，请关闭此页面并从客户端重新点击登录" }, 410);
     }
 
-    // Look up app user
-    const [appUser] = await db
+    // Look up app user, auto-create if missing (e.g. user skipped onboarding)
+    let [appUser] = await db
       .select({ id: users.id })
       .from(users)
       .where(eq(users.authUserId, authUserId));
 
     if (!appUser) {
-      return c.json({ error: "user not found" }, 404);
+      const now = new Date().toISOString();
+      const newId = createId();
+      await db.insert(users).values({
+        id: newId,
+        authUserId,
+        inviteAcceptedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+      appUser = { id: newId };
     }
 
-    // Generate API key
+    // Generate API key (bcrypt hash for Link gateway compatibility)
     const rawKey = `nxk_${randomBytes(32).toString("base64url")}`;
     const keyPrefix = rawKey.slice(0, 12);
-    const keyHash = createHash("sha256").update(rawKey).digest("hex");
+    const keyHash = bcrypt.hashSync(rawKey, 10);
 
     // Insert into api_keys
     await db.insert(apiKeys).values({

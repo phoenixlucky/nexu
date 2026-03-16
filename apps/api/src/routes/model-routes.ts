@@ -8,7 +8,7 @@ import { modelListResponseSchema } from "@nexu/shared";
 import { eq } from "drizzle-orm";
 import { db, pool } from "../db/index.js";
 import { modelProviders } from "../db/schema/index.js";
-import { encrypt } from "../lib/crypto.js";
+import { decrypt, encrypt } from "../lib/crypto.js";
 import { PLATFORM_MODELS } from "../lib/models.js";
 
 import type { AppBindings } from "../types.js";
@@ -30,9 +30,9 @@ const listModelsRoute = createRoute({
 });
 
 /**
- * In desktop mode, load cloud models from credentials file.
+ * Read cached cloud models from credentials file.
  */
-function getCloudModels(): Model[] {
+function readCachedCloudModels(): { id: string; name: string; provider?: string }[] {
   if (process.env.NEXU_DESKTOP_MODE !== "true") return [];
 
   const stateDir =
@@ -42,18 +42,24 @@ function getCloudModels(): Model[] {
 
   try {
     const creds = JSON.parse(fs.readFileSync(credPath, "utf-8"));
-    if (!Array.isArray(creds.cloudModels)) return [];
-    return creds.cloudModels.map(
-      (m: { id: string; name: string; provider?: string }) => ({
-        id: `link/${m.id}`,
-        name: m.name || m.id,
-        provider: m.provider ?? "nexu",
-        description: "Cloud model via Nexu Link",
-      }),
-    );
+    return Array.isArray(creds.cloudModels) ? creds.cloudModels : [];
   } catch {
     return [];
   }
+}
+
+/**
+ * In desktop mode, load cloud models from credentials file.
+ */
+function getCloudModels(): Model[] {
+  return readCachedCloudModels().map(
+    (m) => ({
+      id: `link/${m.id}`,
+      name: m.name || m.id,
+      provider: m.provider ?? "nexu",
+      description: "Cloud model via Nexu Link",
+    }),
+  );
 }
 
 /**
@@ -284,6 +290,73 @@ export function registerModelRoutes(app: OpenAPIHono<AppBindings>) {
 
   // List Link cloud model catalog (providers + models from link.* schema)
   app.get("/api/v1/link-catalog", async (c) => {
+    // Desktop mode: read cloud models from credentials file, or fetch from Link
+    if (process.env.NEXU_DESKTOP_MODE === "true") {
+      try {
+        const stateDir =
+          process.env.OPENCLAW_STATE_DIR ??
+          path.join(process.cwd(), ".nexu-state");
+        const credPath = path.join(stateDir, "cloud-credentials.json");
+        if (fs.existsSync(credPath)) {
+          const creds = JSON.parse(fs.readFileSync(credPath, "utf-8"));
+          let cloudModels: Array<{ id: string; name: string; provider?: string }> =
+            creds.cloudModels ?? [];
+
+          // If no cached models, try fetching from Link gateway
+          if (cloudModels.length === 0 && creds.encryptedApiKey) {
+            const linkUrl =
+              creds.linkGatewayUrl ??
+              process.env.NEXU_LINK_URL ??
+              null;
+            if (linkUrl) {
+              try {
+                const apiKey = decrypt(creds.encryptedApiKey);
+                const res = await fetch(`${linkUrl}/v1/models`, {
+                  headers: { Authorization: `Bearer ${apiKey}` },
+                  signal: AbortSignal.timeout(10_000),
+                });
+                if (res.ok) {
+                  const data = (await res.json()) as {
+                    data?: Array<{ id: string; owned_by?: string }>;
+                  };
+                  if (Array.isArray(data.data)) {
+                    cloudModels = data.data.map((m) => ({
+                      id: m.id,
+                      name: m.id,
+                      provider: m.owned_by,
+                    }));
+                    // Cache back to credentials file
+                    creds.cloudModels = cloudModels;
+                    if (!creds.linkGatewayUrl) creds.linkGatewayUrl = linkUrl;
+                    fs.writeFileSync(credPath, JSON.stringify(creds, null, 2));
+                  }
+                }
+              } catch { /* fetch failed, return empty */ }
+            }
+          }
+
+          if (cloudModels.length > 0) {
+            const map = new Map<string, { id: string; name: string; kind: string; models: Array<{ id: string; name: string; externalName: string; inputPrice: string | null; outputPrice: string | null }> }>();
+            for (const m of cloudModels) {
+              const provId = m.provider ?? "nexu";
+              if (!map.has(provId)) {
+                map.set(provId, { id: provId, name: provId, kind: "cloud", models: [] });
+              }
+              map.get(provId)!.models.push({
+                id: m.id,
+                name: m.name || m.id,
+                externalName: m.id,
+                inputPrice: null,
+                outputPrice: null,
+              });
+            }
+            return c.json({ providers: Array.from(map.values()) });
+          }
+        }
+      } catch { /* fall through */ }
+      return c.json({ providers: [] });
+    }
+
     try {
       const { rows } = await pool.query(`
         SELECT

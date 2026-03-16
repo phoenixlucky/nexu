@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
 import { createMiddleware } from "hono/factory";
+import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { apiKeys } from "../db/schema/index.js";
@@ -7,7 +7,7 @@ import type { AppBindings } from "../types.js";
 
 /**
  * Middleware that authenticates requests via Bearer API key.
- * Looks up the key hash in the api_keys table and sets userId in context.
+ * Looks up candidate rows by key prefix, then verifies with bcrypt compare.
  */
 export const apiKeyMiddleware = createMiddleware<AppBindings>(
   async (c, next) => {
@@ -17,24 +17,36 @@ export const apiKeyMiddleware = createMiddleware<AppBindings>(
     }
 
     const token = authHeader.slice(7);
-    const keyHash = createHash("sha256").update(token).digest("hex");
+    const keyPrefix = token.slice(0, 12);
 
-    const [row] = await db
-      .select({ userId: apiKeys.userId, status: apiKeys.status })
+    // Find candidate rows by prefix
+    const candidates = await db
+      .select({
+        pk: apiKeys.pk,
+        userId: apiKeys.userId,
+        status: apiKeys.status,
+        keyHash: apiKeys.keyHash,
+      })
       .from(apiKeys)
-      .where(eq(apiKeys.keyHash, keyHash));
+      .where(eq(apiKeys.keyPrefix, keyPrefix));
 
-    if (!row || row.status !== "active") {
+    // Verify with bcrypt
+    const matched = candidates.find(
+      (row) =>
+        row.status === "active" && bcrypt.compareSync(token, row.keyHash),
+    );
+
+    if (!matched) {
       return c.json({ error: "Invalid or revoked API key" }, 401);
     }
 
     // Update last used timestamp (fire-and-forget)
     db.update(apiKeys)
       .set({ lastUsedAt: new Date().toISOString() })
-      .where(eq(apiKeys.keyHash, keyHash))
+      .where(eq(apiKeys.pk, matched.pk))
       .catch(() => {});
 
-    c.set("userId", row.userId);
+    c.set("userId", matched.userId);
     await next();
   },
 );

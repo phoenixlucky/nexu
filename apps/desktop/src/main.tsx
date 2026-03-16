@@ -537,9 +537,9 @@ function DesktopShell() {
 
       <main className="desktop-shell-stage">
         {activeSurface === "web" && desktopWebUrl ? (
-          <webview className="desktop-web-frame" src={desktopWebUrl} />
+          <webview className="desktop-web-frame" src={desktopWebUrl} allowpopups="true" />
         ) : activeSurface === "openclaw" && desktopOpenClawUrl ? (
-          <webview className="desktop-web-frame" src={desktopOpenClawUrl} />
+          <webview className="desktop-web-frame" src={desktopOpenClawUrl} allowpopups="true" />
         ) : (
           <EmbeddedControlPlane />
         )}

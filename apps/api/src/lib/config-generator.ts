@@ -50,6 +50,24 @@ function loadCloudConfig(): {
   }
 }
 
+/**
+ * Read the user-selected default model from desktop state file.
+ * Returns null if not in desktop mode or no selection exists.
+ */
+function loadDesktopSelectedModel(): string | null {
+  if (process.env.NEXU_DESKTOP_MODE !== "true") return null;
+  const stateDir =
+    process.env.OPENCLAW_STATE_DIR ?? path.join(process.cwd(), ".nexu-state");
+  const configPath = path.join(stateDir, "desktop-config.json");
+  if (!fs.existsSync(configPath)) return null;
+  try {
+    const cfg = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    return cfg.selectedModelId || null;
+  } catch {
+    return null;
+  }
+}
+
 interface ChannelCredentialRow {
   credentialType: string;
   encryptedValue: string;
@@ -300,6 +318,7 @@ export async function generatePoolConfig(
   ];
   const defaultModelId = resolveModelId(
     activeBots[0]?.modelId ??
+      loadDesktopSelectedModel() ??
       process.env.DEFAULT_MODEL_ID ??
       "anthropic/claude-sonnet-4",
   );
