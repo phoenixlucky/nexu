@@ -232,7 +232,7 @@ Link 的 `001_init.up.sql` 假设 `public.api_keys` 表已存在（由 Nexu API 
 
 ### 5.2 模型目录配置
 
-Link 的模型通过 `link.providers` + `link.models` 表配置。同事需要：
+Link 的模型通过 `link.providers` + `link.models` 表配置。Link 侧需要：
 1. 配置实际的 Provider（而非 demo Provider）：
    - Bedrock: 配置真实的 AWS credentials
    - Vertex: 配置真实的 GCP credentials
