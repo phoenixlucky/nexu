@@ -815,42 +815,58 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
         ),
       );
 
-    if (existing) {
-      return c.json({ message: "Feishu channel already connected" }, 409);
-    }
-
-    const channelId = createId();
     const now = new Date().toISOString();
+    const channelId = existing?.id ?? createId();
 
-    await db.insert(botChannels).values({
-      id: channelId,
-      botId,
-      channelType: "feishu",
-      accountId,
-      status: "connected",
-      channelConfig: JSON.stringify({
-        appId: input.appId,
-      }),
-      createdAt: now,
-      updatedAt: now,
+    await db.transaction(async (tx) => {
+      if (existing) {
+        await tx
+          .update(botChannels)
+          .set({
+            status: "connected",
+            accountId,
+            channelConfig: JSON.stringify({
+              appId: input.appId,
+            }),
+            updatedAt: now,
+          })
+          .where(eq(botChannels.id, channelId));
+
+        await tx
+          .delete(channelCredentials)
+          .where(eq(channelCredentials.botChannelId, channelId));
+      } else {
+        await tx.insert(botChannels).values({
+          id: channelId,
+          botId,
+          channelType: "feishu",
+          accountId,
+          status: "connected",
+          channelConfig: JSON.stringify({
+            appId: input.appId,
+          }),
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+
+      await tx.insert(channelCredentials).values([
+        {
+          id: createId(),
+          botChannelId: channelId,
+          credentialType: "appId",
+          encryptedValue: encrypt(input.appId),
+          createdAt: now,
+        },
+        {
+          id: createId(),
+          botChannelId: channelId,
+          credentialType: "appSecret",
+          encryptedValue: encrypt(input.appSecret),
+          createdAt: now,
+        },
+      ]);
     });
-
-    await db.insert(channelCredentials).values([
-      {
-        id: createId(),
-        botChannelId: channelId,
-        credentialType: "appId",
-        encryptedValue: encrypt(input.appId),
-        createdAt: now,
-      },
-      {
-        id: createId(),
-        botChannelId: channelId,
-        credentialType: "appSecret",
-        encryptedValue: encrypt(input.appSecret),
-        createdAt: now,
-      },
-    ]);
 
     await publishSnapshotSafely(bot.poolId, bot.id);
 

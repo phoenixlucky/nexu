@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -10,6 +11,18 @@ import type { RuntimeUnitManifest } from "./types";
 function ensureDir(path: string): string {
   mkdirSync(path, { recursive: true });
   return path;
+}
+
+/**
+ * In Electron, process.execPath is the Electron binary, not Node.js.
+ * For spawn-based sidecars we need the real Node.js binary.
+ */
+function resolveNodeBinary(): string {
+  try {
+    return execSync("which node", { encoding: "utf-8" }).trim();
+  } catch {
+    return "node";
+  }
 }
 
 function getBooleanEnv(name: string, fallback: boolean): boolean {
@@ -154,7 +167,7 @@ export function createRuntimeUnitManifests(
       kind: "service",
       launchStrategy: "managed",
       runner: "spawn",
-      command: process.execPath,
+      command: resolveNodeBinary(),
       args: [pgliteModulePath],
       cwd: pgliteSidecarRoot,
       port: pglitePort,
@@ -188,6 +201,7 @@ export function createRuntimeUnitManifests(
         WEB_URL: webUrl,
         INTERNAL_API_TOKEN: internalApiToken,
         SKILL_API_TOKEN: skillApiToken,
+        OPENCLAW_STATE_DIR: openclawStateDir,
       },
     },
     {
@@ -214,6 +228,7 @@ export function createRuntimeUnitManifests(
         OPENCLAW_EXTENSIONS_DIR: resolve(openclawPackageRoot, "extensions"),
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
         RUNTIME_GATEWAY_PROBE_ENABLED: "false",
+        RUNTIME_DEFER_FEISHU_INIT: "false",
       },
     },
     {

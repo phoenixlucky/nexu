@@ -6,19 +6,39 @@ import { DAILY_BOT_LIMIT, todayMidnightCST } from "./bot-quota.js";
 import { ServiceError } from "./error.js";
 
 export async function findDefaultPool(): Promise<string> {
-  // Find an active pool — prefer one with a registered gateway (pod_ip set)
+  // Find a usable pool — prefer healthy pools with a registered gateway.
   const rows = await db
     .select()
     .from(gatewayPools)
-    .where(eq(gatewayPools.status, "active"));
+    .where(
+      or(
+        eq(gatewayPools.status, "active"),
+        eq(gatewayPools.status, "degraded"),
+      ),
+    );
 
-  const withGateway = rows.find((r) => r.podIp);
-  if (withGateway) {
-    return withGateway.id;
+  const activeWithGateway = rows.find((r) => r.status === "active" && r.podIp);
+  if (activeWithGateway) {
+    return activeWithGateway.id;
   }
-  const firstPool = rows[0];
-  if (firstPool) {
-    return firstPool.id;
+
+  const activePool = rows.find((r) => r.status === "active");
+  if (activePool) {
+    return activePool.id;
+  }
+
+  // TODO: Remove degraded-pool fallback once desktop/local startup no longer
+  // depends on bot creation succeeding before the gateway health state settles.
+  const degradedWithGateway = rows.find(
+    (r) => r.status === "degraded" && r.podIp,
+  );
+  if (degradedWithGateway) {
+    return degradedWithGateway.id;
+  }
+
+  const degradedPool = rows.find((r) => r.status === "degraded");
+  if (degradedPool) {
+    return degradedPool.id;
   }
 
   throw ServiceError.from("bot-helpers", { code: "default_pool_not_found" });

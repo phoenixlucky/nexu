@@ -32,6 +32,7 @@ import {
   registerSessionInternalRoutes,
   registerSessionRoutes,
 } from "./routes/session-routes.js";
+import { registerFilesystemSkillRoutes } from "./routes/skill-filesystem-routes.js";
 import {
   registerSkillCatalogRoutes,
   registerSkillRoutes,
@@ -105,6 +106,7 @@ export function createApp() {
   registerSessionRoutes(app);
   registerIntegrationRoutes(app);
   registerSkillCatalogRoutes(app);
+  registerFilesystemSkillRoutes(app);
 
   app.doc("/openapi.json", {
     openapi: "3.1.0",

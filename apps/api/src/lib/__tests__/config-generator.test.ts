@@ -402,4 +402,30 @@ describe("Config Generator", () => {
     const stateDir = process.env.OPENCLAW_STATE_DIR ?? "/data/openclaw";
     expect(extraDirs?.[0]).toBe(`${stateDir}/skills`);
   });
+
+  it("should use OPENCLAW_STATE_DIR for agent workspaces when provided", async () => {
+    await seedData();
+    const previousStateDir = process.env.OPENCLAW_STATE_DIR;
+    process.env.OPENCLAW_STATE_DIR = "/tmp/nexu-desktop/openclaw/state";
+
+    try {
+      const config = await generatePoolConfig(db, "pool-1");
+
+      expect(config.agents.list[0]?.workspace).toBe(
+        "/tmp/nexu-desktop/openclaw/state/agents/acme-bot",
+      );
+      expect(config.agents.list[1]?.workspace).toBe(
+        "/tmp/nexu-desktop/openclaw/state/agents/globex-bot",
+      );
+      expect(config.skills?.load?.extraDirs?.[0]).toBe(
+        "/tmp/nexu-desktop/openclaw/state/skills",
+      );
+    } finally {
+      if (previousStateDir === undefined) {
+        process.env.OPENCLAW_STATE_DIR = undefined as unknown as string;
+      } else {
+        process.env.OPENCLAW_STATE_DIR = previousStateDir;
+      }
+    }
+  });
 });

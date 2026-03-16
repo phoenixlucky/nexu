@@ -1,4 +1,5 @@
 import { DiscordSetupView } from "@/components/channel-setup/discord-setup-view";
+import { FeishuSetupView } from "@/components/channel-setup/feishu-setup-view";
 import { SlackOAuthView } from "@/components/channel-setup/slack-oauth-view";
 import { useBotQuota } from "@/hooks/use-bot-quota";
 import { useCountdown } from "@/hooks/use-countdown";
@@ -28,16 +29,18 @@ import {
   getApiV1Channels,
 } from "../../lib/api/sdk.gen";
 
-type Platform = "slack" | "discord";
+type Platform = "slack" | "discord" | "feishu";
 
 const PLATFORMS: { id: Platform; emoji: string; desc: string }[] = [
   { id: "slack", emoji: "#", desc: "Workspace Bot" },
   { id: "discord", emoji: "\u{1F3AE}", desc: "Server Bot" },
+  { id: "feishu", emoji: "\u{1F426}", desc: "Lark/Feishu Bot" },
 ];
 
 const PLATFORM_LABELS: Record<Platform, string> = {
   slack: "Slack",
   discord: "Discord",
+  feishu: "Feishu",
 };
 
 // ─── Main page ───────────────────────────────────────────────
@@ -145,7 +148,7 @@ export function ChannelsPage() {
       {/* Coming soon */}
       <div className="flex gap-1.5 items-center mb-4 text-[11px] text-text-muted flex-wrap">
         <Zap size={10} className="text-accent" />
-        Telegram, Microsoft Teams, Line and more coming soon
+        Telegram, Microsoft Teams, LINE and more coming soon
       </div>
 
       {quotaLimited && !isConfigured && <QuotaBanner resetsAt={resetsAt} />}
@@ -168,6 +171,11 @@ export function ChannelsPage() {
             onConnected={handleConnected}
             initialManual={slackManual}
             oauthError={slackError}
+            disabled={quotaLimited}
+          />
+        ) : platform === "feishu" ? (
+          <FeishuSetupView
+            onConnected={handleConnected}
             disabled={quotaLimited}
           />
         ) : (

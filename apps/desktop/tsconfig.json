@@ -31,5 +31,6 @@
     "vite.config.ts",
     "../web/src",
     "../web/lib"
-  ]
+  ],
+  "exclude": ["**/*.test.ts"]
 }

@@ -1,6 +1,9 @@
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BrowserWindow, app, shell } from "electron";
+import { waitForDesktopRendererReady } from "../shared/renderer-ready";
+import { resolveDesktopRendererUrl } from "../shared/renderer-url";
 import { getDesktopAppRoot } from "../shared/workspace-paths";
 import { bootstrapDesktopAuthSession } from "./desktop-bootstrap";
 import { registerIpcHandlers } from "./ipc";
@@ -10,6 +13,23 @@ import { createRuntimeUnitManifests } from "./runtime/manifests";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const electronRoot = getDesktopAppRoot();
+const rendererUrl = resolveDesktopRendererUrl(process.env);
+
+// Load .env from the desktop app root into process.env (no-override).
+const dotenvPath = resolve(electronRoot, ".env");
+if (existsSync(dotenvPath)) {
+  for (const line of readFileSync(dotenvPath, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const value = trimmed.slice(eqIdx + 1).trim();
+    if (!(key in process.env)) {
+      process.env[key] = value;
+    }
+  }
+}
 const orchestrator = new RuntimeOrchestrator(
   createRuntimeUnitManifests(electronRoot, app.getPath("userData")),
 );
@@ -127,27 +147,32 @@ function createMainWindow(): BrowserWindow {
     }
   });
 
-  void window.loadFile(resolve(__dirname, "../../dist/index.html"));
   mainWindow = window;
   return window;
 }
 
 app.whenReady().then(async () => {
   registerIpcHandlers(orchestrator);
-  createMainWindow();
+  const window = createMainWindow();
 
   void (async () => {
     try {
       await orchestrator.startAutoStartManagedUnits();
+      await waitForDesktopRendererReady(rendererUrl);
+      await window.loadURL(rendererUrl);
     } catch (error) {
       safeWrite(
         process.stderr,
         `[runtime:start-all] ${error instanceof Error ? error.message : String(error)}\n`,
       );
+      return;
     }
 
     try {
       await bootstrapDesktopAuthSession();
+      // Reload the window so it picks up the session cookies set by bootstrap.
+      // Without this, the page loads before auth completes and shows the login form.
+      mainWindow?.webContents.reload();
     } catch (error) {
       safeWrite(
         process.stderr,

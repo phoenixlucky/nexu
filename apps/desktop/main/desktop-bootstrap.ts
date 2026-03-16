@@ -3,9 +3,6 @@ import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { parseSetCookieHeader } from "./cookies";
 
 type PgPoolConstructor = typeof import("pg").Pool;
-const runtimeConfig = getDesktopRuntimeConfig(process.env);
-export const desktopApiUrl = runtimeConfig.apiBaseUrl;
-export const desktopWebUrl = runtimeConfig.webUrl;
 
 const desktopAuthBootstrap = {
   name: "NexU Desktop",
@@ -16,6 +13,9 @@ const desktopAuthBootstrap = {
 };
 
 export async function bootstrapDesktopAuthSession(): Promise<void> {
+  const runtimeConfig = getDesktopRuntimeConfig(process.env);
+  const desktopApiUrl = runtimeConfig.apiBaseUrl;
+  const desktopWebUrl = runtimeConfig.webUrl;
   const { Pool } = (await import("pg")) as { Pool: PgPoolConstructor };
 
   const authHeaders = {
@@ -69,6 +69,7 @@ export async function bootstrapDesktopAuthSession(): Promise<void> {
   }
 
   const signInPayload = (await signInResponse.json()) as {
+    token?: string;
     user?: {
       id: string;
     };
@@ -80,15 +81,31 @@ export async function bootstrapDesktopAuthSession(): Promise<void> {
     throw new Error("Desktop auth bootstrap did not return a user id.");
   }
 
-  const setCookieHeader = signInResponse.headers.get("set-cookie");
+  const setCookieHeaders =
+    typeof signInResponse.headers.getSetCookie === "function"
+      ? signInResponse.headers.getSetCookie()
+      : [];
+  const cookies = new Map(
+    setCookieHeaders.flatMap((headerValue) =>
+      Array.from(parseSetCookieHeader(headerValue).entries()),
+    ),
+  );
+  const fallbackToken = signInPayload.token?.trim();
 
-  if (!setCookieHeader) {
+  if (cookies.size === 0 && fallbackToken) {
+    cookies.set("better-auth.session_token", {
+      value: fallbackToken,
+      path: "/",
+      httponly: true,
+      samesite: "lax",
+    });
+  }
+
+  if (cookies.size === 0) {
     throw new Error(
       "Desktop auth bootstrap did not receive Set-Cookie header.",
     );
   }
-
-  const cookies = parseSetCookieHeader(setCookieHeader);
 
   const pool2 = new Pool({
     connectionString:
@@ -159,5 +176,16 @@ export async function bootstrapDesktopAuthSession(): Promise<void> {
             ? "no_restriction"
             : "lax",
     });
+  }
+
+  const persistedCookies = await session.defaultSession.cookies.get({
+    url: desktopWebUrl,
+    name: "better-auth.session_token",
+  });
+
+  if (persistedCookies.length === 0) {
+    throw new Error(
+      "Desktop auth bootstrap did not persist the Better Auth session cookie.",
+    );
   }
 }
