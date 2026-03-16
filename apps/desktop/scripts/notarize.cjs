@@ -1,27 +1,7 @@
-const { access, mkdtemp, rm, writeFile } = require("node:fs/promises");
+const { access } = require("node:fs/promises");
 const { constants } = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
-const { spawn } = require("node:child_process");
-
-function run(command, args) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: "inherit" });
-    child.once("error", reject);
-    child.once("exit", (code) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-
-      reject(
-        new Error(
-          `${command} ${args.join(" ")} exited with code ${code ?? "null"}.`,
-        ),
-      );
-    });
-  });
-}
+const { notarize: notarizeApp } = require("@electron/notarize");
 
 module.exports = async function notarize(context) {
   if (context.electronPlatformName !== "darwin") {
@@ -37,16 +17,15 @@ module.exports = async function notarize(context) {
     return;
   }
 
-  const apiKey = process.env.NEXU_APPLE_API_KEY ?? process.env.APPLE_API_KEY;
-  const apiKeyId =
-    process.env.NEXU_APPLE_API_KEY_ID ?? process.env.APPLE_API_KEY_ID;
-  const apiIssuer =
-    process.env.NEXU_APPLE_API_ISSUER ?? process.env.APPLE_API_ISSUER;
+  const appleId = process.env.NEXU_APPLE_ID ?? process.env.APPLE_ID;
+  const appleIdPassword =
+    process.env.NEXU_APPLE_APP_SPECIFIC_PASSWORD ??
+    process.env.APPLE_APP_SPECIFIC_PASSWORD;
   const teamId = process.env.NEXU_APPLE_TEAM_ID ?? process.env.APPLE_TEAM_ID;
   const missingEnv = [
-    ["NEXU_APPLE_API_KEY", apiKey],
-    ["NEXU_APPLE_API_KEY_ID", apiKeyId],
-    ["NEXU_APPLE_API_ISSUER", apiIssuer],
+    ["NEXU_APPLE_ID", appleId],
+    ["NEXU_APPLE_APP_SPECIFIC_PASSWORD", appleIdPassword],
+    ["NEXU_APPLE_TEAM_ID", teamId],
   ]
     .filter(([, value]) => !value)
     .map(([name]) => name);
@@ -70,42 +49,10 @@ module.exports = async function notarize(context) {
     return;
   }
 
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), "nexu-notary-"));
-  const apiKeyPath = path.join(tempDir, "AuthKey.p8");
-  const zipPath = path.join(tempDir, `${productFilename}.zip`);
-
-  try {
-    await writeFile(apiKeyPath, apiKey.replace(/\\n/g, "\n"));
-
-    await run("ditto", [
-      "-c",
-      "-k",
-      "--sequesterRsrc",
-      "--keepParent",
-      appPath,
-      zipPath,
-    ]);
-
-    const submitArgs = [
-      "notarytool",
-      "submit",
-      zipPath,
-      "--wait",
-      "--issuer",
-      apiIssuer,
-      "--key-id",
-      apiKeyId,
-      "--key",
-      apiKeyPath,
-    ];
-
-    if (teamId) {
-      submitArgs.push("--team-id", teamId);
-    }
-
-    await run("xcrun", submitArgs);
-    await run("xcrun", ["stapler", "staple", appPath]);
-  } finally {
-    await rm(tempDir, { recursive: true, force: true });
-  }
+  await notarizeApp({
+    appPath,
+    appleId,
+    appleIdPassword,
+    teamId,
+  });
 };

@@ -156,23 +156,18 @@ async function main() {
     NEXU_WORKSPACE_ROOT: repoRoot,
   };
   const {
-    APPLE_API_KEY: appleApiKey,
-    APPLE_API_KEY_ID: appleApiKeyId,
-    APPLE_API_ISSUER: appleApiIssuer,
+    APPLE_ID: appleId,
+    APPLE_APP_SPECIFIC_PASSWORD: appleAppSpecificPassword,
     APPLE_TEAM_ID: appleTeamId,
     ...notarizeEnv
   } = env;
 
-  if (appleApiKey) {
-    notarizeEnv.NEXU_APPLE_API_KEY = appleApiKey;
+  if (appleId) {
+    notarizeEnv.NEXU_APPLE_ID = appleId;
   }
 
-  if (appleApiKeyId) {
-    notarizeEnv.NEXU_APPLE_API_KEY_ID = appleApiKeyId;
-  }
-
-  if (appleApiIssuer) {
-    notarizeEnv.NEXU_APPLE_API_ISSUER = appleApiIssuer;
+  if (appleAppSpecificPassword) {
+    notarizeEnv.NEXU_APPLE_APP_SPECIFIC_PASSWORD = appleAppSpecificPassword;
   }
 
   if (appleTeamId) {
