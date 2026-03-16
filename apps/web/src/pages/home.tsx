@@ -95,6 +95,7 @@ export function HomePage() {
                 poster="/nexu-alpha-poster.jpg"
                 preload="auto"
                 autoPlay
+                loop
                 playsInline
                 muted
                 className="w-full h-full object-cover"
