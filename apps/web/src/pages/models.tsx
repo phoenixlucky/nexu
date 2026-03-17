@@ -757,7 +757,9 @@ export function ModelsPage() {
                 activeProvider.managed ? (
                   modelsLoading ? (
                     <div className="flex items-center justify-center h-full">
-                      <div className="text-[13px] text-text-muted">{t("models.loading")}</div>
+                      <div className="text-[13px] text-text-muted">
+                        {t("models.loading")}
+                      </div>
                     </div>
                   ) : modelsError ? (
                     <div className="flex items-center justify-center h-full">
@@ -770,7 +772,11 @@ export function ModelsPage() {
                         </p>
                         <button
                           type="button"
-                          onClick={() => queryClient.invalidateQueries({ queryKey: ["models"] })}
+                          onClick={() =>
+                            queryClient.invalidateQueries({
+                              queryKey: ["models"],
+                            })
+                          }
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium bg-surface-2 hover:bg-surface-3 text-text-primary transition-colors"
                         >
                           <RefreshCw size={12} />
