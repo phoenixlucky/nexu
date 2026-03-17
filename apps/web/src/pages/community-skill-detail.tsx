@@ -16,7 +16,6 @@ import {
 import type React from "react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { getApiV1SkillhubSkillsBySlug } from "../../lib/api/sdk.gen";
 
 type SkillDetail = {
   slug: string;
@@ -291,16 +290,10 @@ export function CommunitySkillDetailPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["skillhub", "detail", slug],
     queryFn: async (): Promise<SkillDetail> => {
-      const { data, error } = await getApiV1SkillhubSkillsBySlug({
-        path: { slug: slug ?? "" },
-      });
-      if (error) {
-        throw new Error("Skill not found");
-      }
-      if (!data) {
-        throw new Error("Failed to load skill");
-      }
-      return data;
+      const res = await fetch(`/api/v1/skillhub/skills/${slug}`);
+      if (res.status === 404) throw new Error("Skill not found");
+      if (!res.ok) throw new Error(`Failed to load skill: ${res.status}`);
+      return res.json();
     },
     enabled: !!slug,
   });
