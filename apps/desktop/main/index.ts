@@ -255,6 +255,8 @@ function createMainWindow(): BrowserWindow {
     minHeight: 760,
     backgroundColor: "#0B1020",
     title: "Nexu Desktop",
+    titleBarStyle: "hiddenInset",
+    trafficLightPosition: { x: 18, y: 18 },
     show: false,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),

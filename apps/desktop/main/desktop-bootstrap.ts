@@ -223,6 +223,35 @@ async function ensureDesktopAppUser(authUserId: string): Promise<void> {
         legacyPoolId,
       ]);
     }
+
+    // Ensure at least one bot exists so the /api/internal/desktop/ready
+    // endpoint returns 200 and the webview can mount.
+    const botResult = (await pool.query(
+      `SELECT id FROM bots WHERE user_id = $1 LIMIT 1`,
+      [runtimeConfig.desktopAuth.appUserId],
+    )) as { rows: Array<{ id: string }> };
+    if (botResult.rows.length === 0) {
+      const botId = `bot_desktop_${Date.now()}`;
+      await pool.query(
+        `INSERT INTO bots (id, user_id, name, slug, model_id, pool_id, created_at, updated_at)
+         VALUES ($1, $2, 'My Bot', 'my-bot', $3, $4, $5, $6)
+         ON CONFLICT DO NOTHING`,
+        [
+          botId,
+          runtimeConfig.desktopAuth.appUserId,
+          process.env.DEFAULT_MODEL_ID ?? "anthropic/claude-sonnet-4",
+          gatewayPoolId,
+          now,
+          now,
+        ],
+      );
+      await pool.query(
+        `INSERT INTO gateway_assignments (id, bot_id, pool_id, assigned_at)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT DO NOTHING`,
+        [`ga_desktop_${Date.now()}`, botId, gatewayPoolId, now],
+      );
+    }
   } finally {
     await pool.end();
   }

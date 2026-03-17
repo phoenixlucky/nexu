@@ -15,6 +15,7 @@ import { ModelsPage } from "./pages/models";
 import { SkillsPage } from "./pages/skills";
 import { SlackClaimPage } from "./pages/slack-claim";
 import { SlackOAuthCallbackPage } from "./pages/slack-oauth-callback";
+import { WelcomePage } from "./pages/welcome";
 
 function DocumentTitleSync() {
   const location = useLocation();
@@ -47,7 +48,7 @@ export function App() {
     <>
       <DocumentTitleSync />
       <Routes>
-        <Route path="/" element={<Navigate to="/workspace" replace />} />
+        <Route path="/" element={<WelcomePage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/claim" element={<SlackClaimPage />} />
         <Route path="/feishu/bind" element={<FeishuBindPage />} />

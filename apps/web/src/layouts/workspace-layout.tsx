@@ -16,8 +16,8 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import "@/lib/api";
 import { getApiV1Sessions } from "../../lib/api/sdk.gen";
 
@@ -107,7 +107,23 @@ function EmptyState({ onGoConfig }: { onGoConfig: () => void }) {
   );
 }
 
+const SETUP_COMPLETE_KEY = "nexu_setup_complete";
+
 export function WorkspaceLayout() {
+  if (localStorage.getItem(SETUP_COMPLETE_KEY) !== "1") {
+    return <Navigate to="/" replace />;
+  }
+
+  return <WorkspaceLayoutInner />;
+}
+
+function WorkspaceLayoutInner() {
+  const isDesktopClient = useMemo(
+    () =>
+      typeof navigator !== "undefined" &&
+      navigator.userAgent.includes("Electron"),
+    [],
+  );
   const [collapsed, setCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -217,6 +233,7 @@ export function WorkspaceLayout() {
           className={cn(
             "flex items-center border-b border-border",
             collapsed ? "px-2 py-3 justify-center" : "px-4 py-3 gap-2.5",
+            isDesktopClient && "pt-10",
           )}
         >
           {collapsed ? (

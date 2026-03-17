@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { ArrowRight, ChevronLeft, Key, Eye, EyeOff, Infinity, Check, Zap } from 'lucide-react';
 import { usePageTitle } from '../hooks/use-page-title';
@@ -69,6 +69,25 @@ export function WelcomePage() {
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState(false);
   const [cloudConnecting, setCloudConnecting] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  // Poll cloud-status while waiting for browser login
+  useEffect(() => {
+    if (!cloudConnecting) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/internal/desktop/cloud-status");
+        const data = (await res.json()) as { connected: boolean };
+        if (data.connected) {
+          setCloudConnecting(false);
+          setLoginError(null);
+          markSetupComplete();
+          navigate('/workspace');
+        }
+      } catch { /* ignore */ }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [cloudConnecting, navigate]);
 
   const activePreset = PROVIDER_OPTIONS.find(p => p.id === selectedProvider) ?? PROVIDER_OPTIONS[0];
   const chooseOptions = [
@@ -104,22 +123,34 @@ export function WelcomePage() {
 
   const handleAccountLogin = async () => {
     setCloudConnecting(true);
+    setLoginError(null);
     try {
-      // Try desktop cloud-connect flow
       const res = await fetch("/api/internal/desktop/cloud-connect", {
         method: "POST",
       });
-      if (res.ok) {
-        const data = (await res.json()) as { browserUrl?: string };
-        if (data.browserUrl) {
-          window.open(data.browserUrl, "_blank", "noopener,noreferrer");
-        }
+      const data = (await res.json()) as { browserUrl?: string; error?: string };
+      if (!res.ok) {
+        setLoginError(data.error ?? "连接失败，请稍后重试");
+        setCloudConnecting(false);
+        return;
       }
+      if (data.browserUrl) {
+        // In Electron, window.open is intercepted by main process → shell.openExternal()
+        window.open(data.browserUrl, "_blank");
+      }
+      // Keep cloudConnecting=true — polling effect will detect completion.
     } catch {
-      // Not in desktop mode or API unavailable — fall back to web auth
-      window.open("/auth", "_blank", "noopener,noreferrer");
+      setLoginError("无法连接到 Nexu 云端服务");
+      setCloudConnecting(false);
     }
+  };
+
+  const handleCancelLogin = async () => {
+    try {
+      await fetch("/api/internal/desktop/cloud-disconnect", { method: "POST" });
+    } catch { /* ignore */ }
     setCloudConnecting(false);
+    setLoginError(null);
   };
 
   const handleVerifyKey = () => {
@@ -134,6 +165,7 @@ export function WelcomePage() {
   };
 
   const handleByokEntry = () => {
+    markSetupComplete();
     navigate('/workspace/models?setup=1');
   };
 
@@ -174,19 +206,49 @@ export function WelcomePage() {
                   <div className="mt-5 space-y-3">
                     {chooseOptions.map((option, index) => (
                       <FadeIn key={option.id} delay={180 + index * 90}>
+                        {/* Login card: show waiting overlay when polling */}
+                        {option.id === 'login' && cloudConnecting ? (
+                          <div className="relative w-full rounded-[28px] border border-black/12 bg-[linear-gradient(135deg,#18181b_0%,#232327_100%)] p-5 text-white">
+                            <div className="flex flex-col items-center gap-4 py-4">
+                              <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+                              <div className="text-center">
+                                <div className="text-[15px] font-semibold">等待浏览器登录完成…</div>
+                                <p className="mt-2 text-[12px] text-white/50">请在浏览器中完成登录，此页面会自动跳转</p>
+                              </div>
+                              {loginError && (
+                                <p className="text-[12px] text-red-400">{loginError}</p>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => void handleCancelLogin()}
+                                className="mt-1 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-[12px] text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white cursor-pointer"
+                              >
+                                取消
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
                         <button
                           onClick={() => {
                             if (option.id === 'login') {
-                              handleAccountLogin();
+                              void handleAccountLogin();
                               return;
                             }
                             handleByokEntry();
                           }}
-                          disabled={option.id === 'login' && cloudConnecting}
-                          className={`group w-full rounded-[28px] border p-5 text-left transition-all duration-300 cursor-pointer ${
+                          disabled={cloudConnecting}
+                          className={`group w-full rounded-[28px] border p-5 text-left transition-all duration-300 ${
+                            cloudConnecting
+                              ? 'opacity-40 cursor-not-allowed'
+                              : `cursor-pointer ${
+                                option.tone === 'primary'
+                                  ? 'hover:-translate-y-0.5 hover:shadow-[0_14px_32px_rgba(0,0,0,0.16)]'
+                                  : 'hover:-translate-y-0.5 hover:border-black/18 hover:shadow-[0_12px_26px_rgba(0,0,0,0.06)]'
+                              }`
+                          } ${
                             option.tone === 'primary'
-                              ? 'border-black/12 bg-[linear-gradient(135deg,#18181b_0%,#232327_100%)] text-white hover:-translate-y-0.5 hover:shadow-[0_14px_32px_rgba(0,0,0,0.16)]'
-                              : 'border-black/10 bg-[#f5f2ea] text-text-primary hover:-translate-y-0.5 hover:border-black/18 hover:shadow-[0_12px_26px_rgba(0,0,0,0.06)]'
+                              ? 'border-black/12 bg-[linear-gradient(135deg,#18181b_0%,#232327_100%)] text-white'
+                              : 'border-black/10 bg-[#f5f2ea] text-text-primary'
                           }`}
                         >
                           <div className="flex items-start justify-between gap-4">
@@ -242,6 +304,7 @@ export function WelcomePage() {
                             {option.meta.map(item => <span key={item}>{item}</span>)}
                           </div>
                         </button>
+                        )}
                       </FadeIn>
                     ))}
                   </div>
