@@ -247,3 +247,38 @@ This note should track:
 - Prefer `./openclaw-wrapper` over global `openclaw` in local development; it executes `openclaw-runtime/node_modules/openclaw/openclaw.mjs`
 - When OpenClaw is started manually, set `RUNTIME_MANAGE_OPENCLAW_PROCESS=false` for `@nexu/gateway` to avoid launching a second OpenClaw process
 - If behavior differs, verify effective `OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH` used by running gateway processes.
+
+## Cloud Connection (Test Environment)
+
+本地桌面端可以连接测试环境的 Cloud + Link 服务，获取云端模型（Bedrock/Vertex/Azure）。
+
+### 配置步骤
+
+1. 在 `apps/api/.env` 中添加：
+
+```bash
+# Cloud Connection (test environment)
+NEXU_CLOUD_URL=https://nexu.powerformer.net
+
+# Link Gateway (cloud model proxy)
+NEXU_LINK_URL=https://nexu-link.powerformer.net
+```
+
+2. 重启桌面端：`pnpm desktop:restart`
+
+3. 在桌面端设置页面点击「连接云端」，会跳转到测试环境登录页面
+
+4. 登录后返回桌面端，即可在模型选择器中看到 "Nexu Official" 云端模型
+
+### 验证
+
+```bash
+# 检查 Link Gateway 是否可达
+curl https://nexu-link.powerformer.net/v1/models -H 'Authorization: Bearer <your-api-key>'
+```
+
+### 架构说明
+
+- **Nexu Cloud** (`nexu.powerformer.net`): 用户认证、API Key 生成
+- **Nexu Link** (`nexu-link.powerformer.net`): 云端模型代理，验证 API Key 并转发请求到 Bedrock/Vertex/Azure
+- 两者共享同一个 PostgreSQL 数据库（`api_keys` 表）
