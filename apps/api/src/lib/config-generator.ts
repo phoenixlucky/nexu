@@ -211,7 +211,10 @@ export async function generatePoolConfig(
       agent.default = true;
     }
 
-    if (bot.modelId) {
+    // In desktop mode, skip per-agent model — use agents.defaults.model.primary
+    // instead.  OpenClaw hot-reloads defaults but NOT agents.list, so setting
+    // per-agent model would require a full gateway restart on model change.
+    if (!isDesktop && bot.modelId) {
       agent.model = { primary: resolveModelId(bot.modelId) };
     }
 

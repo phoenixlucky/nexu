@@ -434,11 +434,17 @@ export function HomePage() {
 
   const updateModel = useMutation({
     mutationFn: async (modelId: string) => {
-      await fetch("/api/internal/desktop/default-model", {
+      const toastId = toast.loading("正在切换模型…");
+      const res = await fetch("/api/internal/desktop/default-model", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ modelId }),
       });
+      if (!res.ok) {
+        toast.error("模型切换失败", { id: toastId });
+        throw new Error("Failed to update model");
+      }
+      toast.success("模型已切换", { id: toastId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["desktop-default-model"] });
