@@ -250,7 +250,8 @@ function SurfaceFrame({
           className="desktop-web-frame"
           key={`${src}:${version}`}
           src={src}
-          allowpopups={true}
+          // @ts-expect-error Electron webview boolean attribute — must be empty string, not boolean
+          allowpopups=""
         />
       ) : (
         <div className="surface-frame-empty">
