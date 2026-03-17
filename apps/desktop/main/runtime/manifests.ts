@@ -8,7 +8,8 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
+import { app } from "electron";
 import {
   type DesktopRuntimeConfig,
   getDesktopRuntimeConfig,
@@ -29,6 +30,22 @@ function getBooleanEnv(name: string, fallback: boolean): boolean {
   }
 
   return value === "1" || value.toLowerCase() === "true";
+}
+
+function resolveElectronNodeRunner(): string {
+  if (!app.isPackaged || process.platform !== "darwin") {
+    return process.execPath;
+  }
+
+  const macOsDir = dirname(process.execPath);
+  const executableName = basename(process.execPath);
+  const helperCandidate = resolve(
+    macOsDir,
+    "../Frameworks",
+    `${executableName} Helper.app/Contents/MacOS/${executableName} Helper`,
+  );
+
+  return existsSync(helperCandidate) ? helperCandidate : process.execPath;
 }
 
 /**
@@ -146,6 +163,7 @@ export function createRuntimeUnitManifests(
   const gatewayPoolId = runtimeConfig.gateway.poolId;
   const webUrl = runtimeConfig.urls.web;
   const authUrl = runtimeConfig.urls.auth;
+  const electronNodeRunner = resolveElectronNodeRunner();
   const node22Path = buildNode22Path();
 
   // Keep all default ports and local URLs defined from this one manifest factory. Other desktop
@@ -247,7 +265,7 @@ export function createRuntimeUnitManifests(
         OPENCLAW_CONFIG_PATH: resolve(openclawConfigDir, "openclaw.json"),
         OPENCLAW_SKILLS_DIR: resolve(openclawStateDir, "skills"),
         OPENCLAW_BIN: runtimeConfig.paths.openclawBin,
-        OPENCLAW_ELECTRON_EXECUTABLE: process.execPath,
+        OPENCLAW_ELECTRON_EXECUTABLE: electronNodeRunner,
         OPENCLAW_EXTENSIONS_DIR: resolve(openclawPackageRoot, "extensions"),
         TMPDIR: openclawTempDir,
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
