@@ -160,7 +160,7 @@ export type HostBridge = {
   onDesktopCommand(listener: (command: HostDesktopCommand) => void): () => void;
 };
 
-export type UpdateSource = "oss" | "github";
+export type UpdateSource = "r2" | "github";
 export type UpdateChannelName = "stable" | "beta";
 
 export const updaterEvents = [
