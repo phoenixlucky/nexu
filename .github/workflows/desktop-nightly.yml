@@ -2,6 +2,15 @@ name: Desktop Nightly
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (test or prod)"
+        required: false
+        default: "test"
+        type: choice
+        options:
+          - test
+          - prod
   schedule:
     - cron: "0 17 * * *"
 
@@ -10,7 +19,7 @@ permissions:
   actions: write
 
 concurrency:
-  group: desktop-nightly
+  group: desktop-nightly-${{ inputs.environment || 'test' }}
   cancel-in-progress: false
 
 jobs:
@@ -36,6 +45,8 @@ jobs:
       - name: Resolve nightly metadata
         id: meta
         shell: bash
+        env:
+          TARGET_ENV: ${{ inputs.environment || 'test' }}
         run: |
           set -euo pipefail
 
@@ -43,11 +54,25 @@ jobs:
           build_date=$(date +"%Y%m%d")
           short_sha="${GITHUB_SHA::7}"
 
+          if [ "$TARGET_ENV" = "prod" ]; then
+            env_suffix=""
+            release_tag="desktop-nightly"
+            release_name="Nexu Desktop Nightly"
+          else
+            env_suffix="-test"
+            release_tag="desktop-nightly-test"
+            release_name="Nexu Desktop Nightly (Test)"
+          fi
+
           {
             echo "desktop_version=$desktop_version"
             echo "build_date=$build_date"
             echo "short_sha=$short_sha"
-            echo "artifact_name=desktop-nightly-${build_date}-${short_sha}"
+            echo "artifact_name=desktop-nightly${env_suffix}-${build_date}-${short_sha}"
+            echo "env_suffix=$env_suffix"
+            echo "release_tag=$release_tag"
+            echo "release_name=$release_name"
+            echo "target_env=$TARGET_ENV"
           } >> "$GITHUB_OUTPUT"
 
       - name: Prepare Apple signing certificate
@@ -76,6 +101,30 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate build config
+        shell: bash
+        env:
+          TARGET_ENV: ${{ steps.meta.outputs.target_env }}
+        run: |
+          if [ "$TARGET_ENV" = "prod" ]; then
+            cat > apps/desktop/build-config.json << 'EOF'
+          {
+            "NEXU_CLOUD_URL": "https://nexu.io",
+            "NEXU_LINK_URL": null
+          }
+          EOF
+          else
+            cat > apps/desktop/build-config.json << 'EOF'
+          {
+            "NEXU_CLOUD_URL": "https://nexu.powerformer.net",
+            "NEXU_LINK_URL": "https://nexu-link.powerformer.net"
+          }
+          EOF
+          fi
+
+          echo "[build] Generated build-config.json for $TARGET_ENV environment:"
+          cat apps/desktop/build-config.json
+
       - name: Build signed nightly desktop app
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -85,6 +134,8 @@ jobs:
 
       - name: Prepare nightly artifacts
         shell: bash
+        env:
+          ENV_SUFFIX: ${{ steps.meta.outputs.env_suffix }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -100,12 +151,12 @@ jobs:
             exit 1
           fi
 
-          cp "${dmg_files[0]}" apps/desktop/nightly-artifacts/Nexu-nightly-arm64.dmg
-          cp "${zip_files[0]}" apps/desktop/nightly-artifacts/Nexu-nightly-arm64.zip
+          cp "${dmg_files[0]}" "apps/desktop/nightly-artifacts/Nexu-nightly${ENV_SUFFIX}-arm64.dmg"
+          cp "${zip_files[0]}" "apps/desktop/nightly-artifacts/Nexu-nightly${ENV_SUFFIX}-arm64.zip"
 
           shasum -a 256 \
-            apps/desktop/nightly-artifacts/Nexu-nightly-arm64.dmg \
-            apps/desktop/nightly-artifacts/Nexu-nightly-arm64.zip \
+            "apps/desktop/nightly-artifacts/Nexu-nightly${ENV_SUFFIX}-arm64.dmg" \
+            "apps/desktop/nightly-artifacts/Nexu-nightly${ENV_SUFFIX}-arm64.zip" \
             > apps/desktop/nightly-artifacts/desktop-sha256.txt
 
       - name: Upload nightly workflow artifacts
@@ -113,8 +164,8 @@ jobs:
         with:
           name: ${{ steps.meta.outputs.artifact_name }}
           path: |
-            apps/desktop/nightly-artifacts/Nexu-nightly-arm64.dmg
-            apps/desktop/nightly-artifacts/Nexu-nightly-arm64.zip
+            apps/desktop/nightly-artifacts/Nexu-nightly${{ steps.meta.outputs.env_suffix }}-arm64.dmg
+            apps/desktop/nightly-artifacts/Nexu-nightly${{ steps.meta.outputs.env_suffix }}-arm64.zip
             apps/desktop/nightly-artifacts/desktop-sha256.txt
           retention-days: 7
           if-no-files-found: error
@@ -122,9 +173,9 @@ jobs:
       - name: Publish nightly prerelease
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: desktop-nightly
+          tag_name: ${{ steps.meta.outputs.release_tag }}
           target_commitish: ${{ github.sha }}
-          name: Nexu Desktop Nightly
+          name: ${{ steps.meta.outputs.release_name }}
           prerelease: true
           draft: false
           overwrite_files: true
@@ -133,6 +184,7 @@ jobs:
             Automated nightly desktop build.
 
             - Version: `${{ steps.meta.outputs.desktop_version }}`
+            - Environment: `${{ steps.meta.outputs.target_env }}`
             - Commit: `${{ github.sha }}`
             - Built: `${{ steps.meta.outputs.build_date }}`
 
@@ -140,8 +192,8 @@ jobs:
 
             This build is intended for testing and may be unstable.
           files: |
-            apps/desktop/nightly-artifacts/Nexu-nightly-arm64.dmg
-            apps/desktop/nightly-artifacts/Nexu-nightly-arm64.zip
+            apps/desktop/nightly-artifacts/Nexu-nightly${{ steps.meta.outputs.env_suffix }}-arm64.dmg
+            apps/desktop/nightly-artifacts/Nexu-nightly${{ steps.meta.outputs.env_suffix }}-arm64.zip
             apps/desktop/nightly-artifacts/desktop-sha256.txt
 
   cleanup-artifacts:
@@ -159,7 +211,7 @@ jobs:
           cutoff_date=$(date -d "14 days ago" +%Y-%m-%d)
 
           gh api "repos/$REPO/actions/artifacts" --paginate | \
-            jq -r '.artifacts[] | select(.name | startswith("desktop-nightly-")) | select(.created_at < "'"$cutoff_date"'") | .id' | \
+            jq -r '.artifacts[] | select(.name | startswith("desktop-nightly")) | select(.created_at < "'"$cutoff_date"'") | .id' | \
             while read -r artifact_id; do
               if [ -n "$artifact_id" ]; then
                 gh api "repos/$REPO/actions/artifacts/$artifact_id" -X DELETE
