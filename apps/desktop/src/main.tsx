@@ -1061,6 +1061,7 @@ function DesktopShell() {
             onClick={() => setActiveSurface("diagnostics")}
           />
         </nav>
+
       </aside>
 
       <main className="desktop-shell-stage">

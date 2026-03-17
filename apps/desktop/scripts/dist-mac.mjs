@@ -60,7 +60,7 @@ function parseEnvFile(content) {
 }
 
 async function loadDesktopEnv() {
-  const envPath = resolve(electronRoot, ".env.local");
+  const envPath = resolve(electronRoot, ".env");
 
   try {
     const content = await readFile(envPath, "utf8");
@@ -200,12 +200,12 @@ async function ensureBuildConfig() {
   // Always regenerate build-config.json from environment variables so that
   // secrets (cloud/link URLs) are never committed to the repo.
   // Falls back to sensible defaults when env vars are not set.
-  const envPath = resolve(electronRoot, ".env.local");
+  const envPath = resolve(electronRoot, ".env");
   let fileEnv = {};
   try {
     fileEnv = parseEnvFile(await readFile(envPath, "utf8"));
   } catch {
-    // .env.local is optional
+    // .env is optional
   }
   const merged = { ...fileEnv, ...process.env };
 
