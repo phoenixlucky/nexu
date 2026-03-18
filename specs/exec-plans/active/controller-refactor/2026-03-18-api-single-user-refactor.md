@@ -85,7 +85,7 @@
 
 #### Nexu 本地文件存储负责
 
-- 一个统一的 Nexu JSON 配置文件，承载全部 Nexu 特有配置
+- 一个由 lowdb 管理的统一 Nexu JSON 配置文件，承载全部 Nexu 特有配置
 - 少量非配置型本地数据（例如 artifacts 索引）如确有必要再单独存放
 
 #### `apps/controller` 负责
@@ -107,7 +107,7 @@
 2. `src/routes/`：HTTP / OpenAPI route 定义、请求校验、响应 schema
 3. `src/services/`：面向业务能力的用例编排层
 4. `src/runtime/`：OpenClaw runtime 访问、config/skills/template 下发、健康探测、进程管理
-5. `src/store/`：`~/.nexu/` 文件存储、schema 校验、原子写入
+5. `src/store/`：`~/.nexu/` lowdb 存储、schema 校验、原子写入
 6. `src/lib/`：纯函数、schema 转换、编译器、共享工具
 
 约束：
@@ -159,7 +159,7 @@ apps/controller/
       openclaw-watch-trigger.ts
       openclaw-process.ts
     store/
-      file-store.ts
+      lowdb-store.ts
       schemas.ts
       nexu-config-store.ts
       artifacts-store.ts
@@ -209,7 +209,7 @@ apps/controller/
 | `src/runtime/workspace-template-writer.ts` | template 文件同步                              | `apps/gateway/src/workspace-templates.ts`   |
 | `src/runtime/openclaw-watch-trigger.ts`    | watcher 感知触发、热更新辅助                   | `apps/gateway/src/bootstrap.ts`             |
 | `src/runtime/openclaw-process.ts`          | OpenClaw 进程拉起、停止、探活                  | `apps/gateway/src/openclaw-process.ts`      |
-| `src/store/file-store.ts`                  | 原子读写、锁/临时文件、错误恢复                | 新建                                        |
+| `src/store/lowdb-store.ts`                 | lowdb 装配、原子落盘、错误恢复                 | 新建                                        |
 | `src/store/nexu-config-store.ts`           | `~/.nexu/config.json` 聚合读写                 | 新建                                        |
 | `src/store/artifacts-store.ts`             | `~/.nexu/artifacts/index.json` 管理            | 新建                                        |
 | `src/store/compiled-openclaw-store.ts`     | 可选的编译产物快照/诊断缓存                    | 新建                                        |
@@ -230,7 +230,7 @@ apps/controller/
 重构后的推荐进程模型：
 
 - `apps/controller` 作为唯一的 Nexu 本地服务进程
-- `apps/controller` 直接读写 `~/.nexu/config.json`
+- `apps/controller` 通过 lowdb 管理 `~/.nexu/config.json`
 - `apps/controller` 直接写入 `OPENCLAW_CONFIG_PATH` 与 OpenClaw skills 目录
 - `apps/controller` 直接调用 OpenClaw Gateway RPC / health 接口读取运行态信息
 - 删除当前 `apps/gateway -> apps/api` 的内部 HTTP 拉取与回写链路
@@ -262,15 +262,15 @@ apps/controller/
 
 ## 本地持久化设计
 
-建议优先使用“单一 JSON 配置文件 + 原生文件读写 + Zod 校验”，并将配置放在用户 home 目录下，而不是放进 `OPENCLAW_STATE_DIR`。
+建议优先使用“单一 JSON 配置文件 + lowdb + Zod 校验”，并将配置放在用户 home 目录下，而不是放进 `OPENCLAW_STATE_DIR`。
 
-### 为什么优先单一 JSON 配置文件方案
+### 为什么优先 lowdb 管理的单文件方案
 
-- 不需要新增依赖
+- 仍然保持单文件 JSON 的可读性与可备份性
+- lowdb 适合单用户、本地优先、低并发的配置场景
+- 可以把默认值注入、读写封装、局部更新统一收口到 store 层
 - 与 OpenClaw 当前的文件型 runtime 模型更一致
-- 单用户场景下足够简单直接
-- 用户更容易查看、备份、比较和手工修改
-- 更容易控制 schema、原子写入和恢复逻辑
+- 用户依然可以查看、比较和在必要时手工修改底层文件
 
 ### 配置文件原则
 
@@ -295,15 +295,35 @@ apps/controller/
 - OpenClaw 自己已经管理的数据
 - 体积明显更大、更新频率更高、天然更像“记录/索引”而不是“配置”的数据，例如 artifact 索引
 
-### 写入约束
+### lowdb 使用约束
 
-`~/.nexu/config.json` 的读写应满足：
+`~/.nexu/config.json` 仍然是底层落盘文件，但应通过 lowdb 统一读写，并满足：
 
-- 写入前使用 Zod 校验
-- 使用临时文件写入后 `rename` 的原子写入方式
+- 启动时先加载 lowdb，再将数据映射为受 Zod 约束的领域对象
+- 每次写入前使用 Zod 校验
+- lowdb adapter 需要保证临时文件写入后 `rename` 的原子落盘语义
 - 文件包含显式 schema 标识，便于编辑器提示与未来版本演进
 - 文件内包含 `schemaVersion`
 - 对坏数据和历史格式具备恢复或降级读取能力
+
+### store 分层建议
+
+- `lowdb-store.ts`：负责 adapter、初始化、原子落盘、坏文件恢复
+- `nexu-config-store.ts`：负责面向业务的读写接口、默认值补齐、版本迁移
+- `schemas.ts`：负责 lowdb 数据与 Zod schema 的收口
+- 业务层不直接操作 lowdb collection 或原始 JSON 结构，只通过 store 暴露的方法访问
+
+### lowdb adapter 实现建议
+
+- 优先封装一个 Nexu 自己的 lowdb adapter，而不是让业务代码直接依赖默认 adapter 细节
+- 写入流程建议固定为：内存态更新 -> Zod 校验 -> 写临时文件 -> `fsync` -> `rename` 替换目标文件
+- 如果 lowdb 默认 adapter 无法完整满足原子落盘要求，可以在 `lowdb-store.ts` 外包一层持久化实现
+- 启动加载时先尝试读取主文件；若解析失败，可回退到最近一次备份文件并产出诊断事件
+- 建议维护 `config.json.bak` 或按时间戳保留最近 1-2 份快照，用于坏文件恢复
+- 并发模型建议保持单进程串行写；同进程内通过 store 队列化写入，避免多个 service 同时 `db.write()`
+- 如果后续存在多进程同时写 `~/.nexu/config.json` 的风险，再补充文件锁；第一阶段不要把锁设计做重
+- 版本迁移建议在启动时执行：读取旧数据 -> 按 `schemaVersion` 迁移 -> Zod 校验 -> 回写新版本
+- 对外暴露的 store API 应尽量是语义化方法，如 `updateBots()`、`setRuntimeConfig()`、`upsertSkill()`，不要泄露 lowdb 的集合更新细节
 
 ### 建议配置结构
 
@@ -348,8 +368,8 @@ apps/controller/
 
 本方案采用“`~/.nexu/config.json` -> OpenClaw config”的单向控制模型：
 
-- 用户修改 `~/.nexu/config.json`
-- Nexu 读取并校验配置
+- 用户修改 `~/.nexu/config.json`，或经由 API 写入 lowdb store
+- Nexu 通过 lowdb 读取并校验配置
 - Nexu 生成 OpenClaw 所需 config
 - Nexu 将生成结果写入 `OPENCLAW_CONFIG_PATH` 或通过 Gateway config 接口下发
 - OpenClaw 按生成结果运行
@@ -363,7 +383,7 @@ apps/controller/
 
 ### `config.json.skills` 详细设计
 
-`~/.nexu/config.json.skills` 建议采用“声明式 catalog”结构，而不是直接把 OpenClaw 目录结构原样塞进配置文件。
+`~/.nexu/config.json.skills` 建议采用“声明式 catalog”结构，由 lowdb 负责读写，而不是直接把 OpenClaw 目录结构原样塞进配置文件。
 
 建议顶层结构：
 
@@ -426,7 +446,7 @@ apps/controller/
 
 ### Skills 物化规则
 
-Nexu 应负责把 `~/.nexu/config.json.skills` 物化为 OpenClaw 可消费的 skills 目录。
+Nexu 应负责把 lowdb 中的 `~/.nexu/config.json.skills` 视图物化为 OpenClaw 可消费的 skills 目录。
 
 建议目标目录：
 
@@ -435,7 +455,7 @@ Nexu 应负责把 `~/.nexu/config.json.skills` 物化为 OpenClaw 可消费的 s
 
 建议物化流程：
 
-1. 读取并校验 `~/.nexu/config.json.skills`
+1. 从 lowdb 读取并校验 `~/.nexu/config.json.skills`
 2. 对每个 `enabled=true` 的 skill 生成目标目录 `${skillsDir}/${skillSlug}/`
 3. 将 `content` 写入 `${skillsDir}/${skillSlug}/SKILL.md`
 4. 将 `files` 中的附加文件写入对应相对路径
@@ -457,7 +477,7 @@ Nexu 应负责把 `~/.nexu/config.json.skills` 物化为 OpenClaw 可消费的 s
 
 建议一致性规则：
 
-- `~/.nexu/config.json.skills` 永远是唯一事实来源
+- lowdb 管理下的 `~/.nexu/config.json.skills` 永远是唯一事实来源
 - OpenClaw skills 目录永远是物化产物，不允许手工修改后反向覆盖配置
 - 每次物化后生成 manifest 或 hash，用于检测目录是否与配置一致
 

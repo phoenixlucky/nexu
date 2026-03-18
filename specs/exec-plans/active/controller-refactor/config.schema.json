@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://nexu.io/config.schema.json",
   "title": "Nexu Config",
-  "description": "Draft schema for ~/.nexu/config.json in single-user mode.",
+  "description": "Draft schema for the lowdb-managed ~/.nexu/config.json in single-user mode.",
   "type": "object",
   "additionalProperties": false,
   "required": [

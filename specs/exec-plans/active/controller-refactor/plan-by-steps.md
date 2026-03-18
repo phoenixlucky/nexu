@@ -71,7 +71,7 @@
 
 ### 需要封装的 skills 下发能力
 
-- 根据 `~/.nexu/config.json.skills` 物化 OpenClaw skills 目录
+- 根据 lowdb 管理的 `~/.nexu/config.json.skills` 物化 OpenClaw skills 目录
 - 对 skills 做原子写入、更新、删除和启停同步
 - 必要时触发 watcher 感知
 
@@ -92,7 +92,7 @@
 
 ### 目标
 
-先把 bots、channels、runtime config 从 DB 迁移到 `~/.nexu/config.json`，并保持 Nexu 为唯一配置真源。
+先把 bots、channels、runtime config 从 DB 迁移到由 lowdb 管理的 `~/.nexu/config.json`，并保持 Nexu 为唯一配置真源。
 
 ### Bot / Agent 配置改造
 
@@ -103,7 +103,7 @@
 
 替换为：
 
-- 读取 `~/.nexu/config.json.bots`
+- 读取 lowdb 中的 `~/.nexu/config.json.bots`
 - 由 Nexu service 映射为 OpenClaw `agents.list`
 
 ### Channels 配置改造
@@ -115,8 +115,8 @@
 
 替换为：
 
-- 读取/写入 `~/.nexu/config.json.channels`
-- 读取/写入 `~/.nexu/config.json.secrets`
+- 读取/写入 lowdb 中的 `~/.nexu/config.json.channels`
+- 读取/写入 lowdb 中的 `~/.nexu/config.json.secrets`
 - 由 Nexu service 编译为 OpenClaw channels 配置与 bindings
 
 ### Runtime Config 改造
@@ -128,7 +128,7 @@
 
 替换为：
 
-- 读取 `~/.nexu/config.json.runtime`
+- 读取 lowdb 中的 `~/.nexu/config.json.runtime`
 - 组合 `bots`、`channels`、`providers` 等配置
 - 生成最终 OpenClaw config
 
@@ -152,7 +152,7 @@
 
 替换为：
 
-- 读取/写入 `~/.nexu/config.json.skills`
+- 读取/写入 lowdb 中的 `~/.nexu/config.json.skills`
 - 由 Nexu 负责物化到 OpenClaw skills 目录
 
 ### 完成标准
@@ -160,25 +160,25 @@
 - 在禁用数据库读权限后，bots、channels、runtime config 仍然可读可改
 - OpenClaw config 由 Nexu 配置成功单向生成
 
-## 第五阶段：引入文件存储，接管 Nexu 自有状态
+## 第五阶段：引入 lowdb 文件存储，接管 Nexu 自有状态
 
 ### 目标
 
-把 OpenClaw 不负责的数据从 DB 迁移到本地文件存储。
+把 OpenClaw 不负责的数据从 DB 迁移到基于 lowdb 的本地文件存储。
 
 ### Provider 配置
 
 替换 `apps/api/src/routes/model-routes.ts` 中对 `modelProviders` 的依赖：
 
-- provider 元数据写入 `~/.nexu/config.json.providers`
-- API key 等敏感值写入 `~/.nexu/config.json.secrets`
+- provider 元数据写入 lowdb 管理的 `~/.nexu/config.json.providers`
+- API key 等敏感值写入 lowdb 管理的 `~/.nexu/config.json.secrets`
 
 ### Integrations 配置
 
 替换 `apps/api/src/routes/integration-routes.ts` 中对 `userIntegrations`、`integrationCredentials` 的依赖：
 
-- integrations 元数据写入 `~/.nexu/config.json.integrations`
-- 敏感值写入 `~/.nexu/config.json.secrets`
+- integrations 元数据写入 lowdb 管理的 `~/.nexu/config.json.integrations`
+- 敏感值写入 lowdb 管理的 `~/.nexu/config.json.secrets`
 
 ### Artifacts
 
@@ -190,30 +190,30 @@
 
 替换 `workspaceTemplates` 与 `workspaceTemplateSnapshots`：
 
-- 写入 `~/.nexu/config.json.templates`
+- 写入 lowdb 管理的 `~/.nexu/config.json.templates`
 - 如仍需要版本或 hash，可对 templates section 做本地派生计算
 
 ### Desktop / App 本地状态
 
-用 `~/.nexu/config.json.app` 与 `~/.nexu/config.json.desktop` 替换仍然需要保留的本地状态表。
+用 lowdb 管理的 `~/.nexu/config.json.app` 与 `~/.nexu/config.json.desktop` 替换仍然需要保留的本地状态表。
 
 ### 完成标准
 
 - provider、integration、template、desktop bootstrap 不再依赖 DB
-- 所有 Nexu 特有配置都集中到 `~/.nexu/config.json`
+- 所有 Nexu 特有配置都集中到 lowdb 管理的 `~/.nexu/config.json`
 - artifact 仅在需要时保留为独立索引文件
 
 ## 第六阶段：建立单向 OpenClaw 配置同步链路
 
 ### 目标
 
-让所有 Nexu 配置变更都先写入 `~/.nexu/config.json`，再由 Nexu 单向编译并同步到 OpenClaw。
+让所有 Nexu 配置变更都先写入 lowdb 管理的 `~/.nexu/config.json`，再由 Nexu 单向编译并同步到 OpenClaw。
 
 ### 同步链路设计
 
 建议采用统一链路：
 
-1. 用户或 API 修改 `~/.nexu/config.json`
+1. 用户或 API 修改 lowdb 管理的 `~/.nexu/config.json`
 2. Nexu 对配置做 schema 校验
 3. Nexu 生成 OpenClaw config
 4. Nexu 写入 `OPENCLAW_CONFIG_PATH` 或调用 `config.apply` / `config.patch`
@@ -241,7 +241,7 @@
 
 替换为：
 
-- 更新 `~/.nexu/config.json.bots`
+- 更新 lowdb 中的 `~/.nexu/config.json.bots`
 - 由同步链路生成并下发新的 OpenClaw config
 - 如果最终只保留默认 agent，则可以顺势收缩 API 能力
 
@@ -249,21 +249,21 @@
 
 重构 channel 配置与凭证流程为：
 
-- 写 `~/.nexu/config.json.channels` 与 `~/.nexu/config.json.secrets`
+- 写 lowdb 中的 `~/.nexu/config.json.channels` 与 `~/.nexu/config.json.secrets`
 - 由同步链路重新生成并下发 OpenClaw channels config
 
 ### Runtime Config 写入改造
 
 重构 runtime 配置更新流程为：
 
-- 写 `~/.nexu/config.json.runtime`
+- 写 lowdb 中的 `~/.nexu/config.json.runtime`
 - 由同步链路重新生成并下发 OpenClaw runtime config
 
 ### Skill 写入改造
 
 把 internal skill upsert 改为：
 
-- 更新 `~/.nexu/config.json.skills`
+- 更新 lowdb 中的 `~/.nexu/config.json.skills`
 - 由同步链路将 skills 物化到 OpenClaw skills 目录
 - 依赖 OpenClaw hot reload 机制生效
 
@@ -284,7 +284,7 @@
 ### 完成标准
 
 - 支持的写操作路径不再以 DB 作为主要落点
-- bots、channels、runtime config、skills 的唯一写入源是 `~/.nexu/config.json`
+- bots、channels、runtime config、skills 的唯一写入源是 lowdb 管理的 `~/.nexu/config.json`
 - OpenClaw 只接收由 Nexu 编译后的配置结果与 skills 目录物化结果
 
 ## 第七阶段：删除多用户和租户模型
@@ -343,7 +343,7 @@
 ### 替代方式
 
 - `apps/controller` 只保留一个 runtime target
-- 不再保留 pool 级配置快照，而是直接从 `~/.nexu/config.json` 生成 current OpenClaw config
+- 不再保留 pool 级配置快照，而是直接从 lowdb 管理的 `~/.nexu/config.json` 生成 current OpenClaw config
 - health 改为单 runtime health
 - 不再保留 assignment / heartbeat / snapshot 语义
 
@@ -427,13 +427,13 @@
 
 ### 需要迁移的数据
 
-- `bots` + `botChannels` + `channelCredentials` -> `~/.nexu/config.json.bots` + `~/.nexu/config.json.channels` + `~/.nexu/config.json.secrets`
-- 与 pool config 相关但仍有产品意义的运行配置 -> `~/.nexu/config.json.runtime`
-- `modelProviders` -> `~/.nexu/config.json.providers`
-- `userIntegrations` + `integrationCredentials` -> `~/.nexu/config.json.integrations` + `~/.nexu/config.json.secrets`
-- `workspaceTemplates` -> `~/.nexu/config.json.templates`
-- `deviceAuthorizations` / 本地 bootstrap 状态 -> `~/.nexu/config.json.app` / `~/.nexu/config.json.desktop`
-- `skills` -> `~/.nexu/config.json.skills`
+- `bots` + `botChannels` + `channelCredentials` -> lowdb 中的 `~/.nexu/config.json.bots` + `~/.nexu/config.json.channels` + `~/.nexu/config.json.secrets`
+- 与 pool config 相关但仍有产品意义的运行配置 -> lowdb 中的 `~/.nexu/config.json.runtime`
+- `modelProviders` -> lowdb 中的 `~/.nexu/config.json.providers`
+- `userIntegrations` + `integrationCredentials` -> lowdb 中的 `~/.nexu/config.json.integrations` + `~/.nexu/config.json.secrets`
+- `workspaceTemplates` -> lowdb 中的 `~/.nexu/config.json.templates`
+- `deviceAuthorizations` / 本地 bootstrap 状态 -> lowdb 中的 `~/.nexu/config.json.app` / `~/.nexu/config.json.desktop`
+- `skills` -> lowdb 中的 `~/.nexu/config.json.skills`
 - `artifacts` -> `~/.nexu/artifacts/index.json`
 
 ### 不迁移的数据
@@ -449,10 +449,10 @@
 做一个一次性导出脚本，负责：
 
 - 读取当前 DB 数据
-- 聚合生成单个 `~/.nexu/config.json`
+- 聚合生成单个由 lowdb 管理的 `~/.nexu/config.json`
 - 对 artifacts 单独生成 `~/.nexu/artifacts/index.json`
 - 使用 Zod 校验
-- 原子写入目标文件
+- 通过 lowdb adapter 原子写入目标文件
 - 支持 dry-run
 
 ### 迁移校验
