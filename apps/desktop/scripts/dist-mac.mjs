@@ -286,7 +286,8 @@ async function main() {
   await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/web", "build"], {
     env: {
       ...env,
-      VITE_AUTH_BASE_URL: `http://127.0.0.1:${webPort}`,
+      VITE_API_BASE_URL: `http://127.0.0.1:${apiPort}`,
+      VITE_AUTH_BASE_URL: `http://127.0.0.1:${apiPort}`,
     },
   });
   await run("pnpm", ["run", "build"], { cwd: electronRoot, env });
