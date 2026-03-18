@@ -20,6 +20,7 @@ let db: ReturnType<typeof drizzle<typeof schema>>;
 
 async function createTables(client: pg.Pool) {
   await client.query(`
+    DROP TABLE IF EXISTS model_providers CASCADE;
     DROP TABLE IF EXISTS webhook_routes CASCADE;
     DROP TABLE IF EXISTS gateway_assignments CASCADE;
     DROP TABLE IF EXISTS pool_config_snapshots CASCADE;
@@ -56,6 +57,7 @@ async function createTables(client: pg.Pool) {
       account_id TEXT NOT NULL,
       status TEXT DEFAULT 'pending',
       channel_config TEXT DEFAULT '{}',
+      connection_mode TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -120,12 +122,26 @@ async function createTables(client: pg.Pool) {
     );
     CREATE UNIQUE INDEX pool_config_snapshots_pool_version_idx ON pool_config_snapshots(pool_id, version);
     CREATE UNIQUE INDEX pool_config_snapshots_pool_hash_idx ON pool_config_snapshots(pool_id, config_hash);
+
+    CREATE TABLE model_providers (
+      pk SERIAL PRIMARY KEY,
+      id TEXT NOT NULL UNIQUE,
+      provider_id TEXT NOT NULL UNIQUE,
+      display_name TEXT NOT NULL,
+      encrypted_api_key TEXT NOT NULL,
+      base_url TEXT,
+      enabled BOOLEAN NOT NULL DEFAULT TRUE,
+      models_json TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX model_providers_provider_id_idx ON model_providers(provider_id);
   `);
 }
 
 async function truncateAll(client: pg.Pool) {
   await client.query(
-    "TRUNCATE bots, bot_channels, channel_credentials, gateway_pools, gateway_assignments, webhook_routes, pool_config_snapshots CASCADE",
+    "TRUNCATE bots, bot_channels, channel_credentials, gateway_pools, gateway_assignments, webhook_routes, pool_config_snapshots, model_providers CASCADE",
   );
 }
 
@@ -217,6 +233,29 @@ async function seedData() {
     credentialType: "signingSecret",
     encryptedValue: encrypt("globex-signing-secret"),
     createdAt: now,
+  });
+}
+
+async function insertByokProvider(input: {
+  id: string;
+  providerId: string;
+  displayName: string;
+  encryptedApiKey?: string;
+  baseUrl?: string | null;
+  modelsJson: string;
+}) {
+  const now = new Date().toISOString();
+
+  await db.insert(schema.modelProviders).values({
+    id: input.id,
+    providerId: input.providerId,
+    displayName: input.displayName,
+    encryptedApiKey: input.encryptedApiKey ?? encrypt("test-api-key"),
+    baseUrl: input.baseUrl ?? null,
+    enabled: true,
+    modelsJson: input.modelsJson,
+    createdAt: now,
+    updatedAt: now,
   });
 }
 
@@ -427,5 +466,53 @@ describe("Config Generator", () => {
         process.env.OPENCLAW_STATE_DIR = previousStateDir;
       }
     }
+  });
+
+  it("should publish proxied BYOK model ids with provider prefixes", async () => {
+    await seedData();
+    await insertByokProvider({
+      id: "mp-anthropic-proxy",
+      providerId: "anthropic",
+      displayName: "Anthropic via Proxy",
+      baseUrl: "https://litellm.example.com/v1",
+      modelsJson: JSON.stringify(["claude-sonnet-4"]),
+    });
+
+    const config = await generatePoolConfig(db, "pool-1");
+    const anthropicProvider = config.models?.providers.byok_anthropic;
+
+    expect(config.agents.list[0]?.model).toEqual({
+      primary: "byok_anthropic/anthropic/claude-sonnet-4",
+    });
+    expect(anthropicProvider).toBeDefined();
+    expect(anthropicProvider?.baseUrl).toBe("https://litellm.example.com/v1");
+    expect(anthropicProvider?.models[0]?.id).toBe("anthropic/claude-sonnet-4");
+  });
+
+  it("should treat direct BYOK URLs with trailing slashes as non-proxied", async () => {
+    await seedData();
+    await db
+      .update(schema.bots)
+      .set({ modelId: "openai/gpt-4.1-mini" })
+      .where(eq(schema.bots.id, "bot-1"));
+
+    await insertByokProvider({
+      id: "mp-openai-direct",
+      providerId: "openai",
+      displayName: "OpenAI Direct",
+      baseUrl: "https://api.openai.com/v1/",
+      modelsJson: JSON.stringify(["gpt-4.1-mini"]),
+    });
+
+    const config = await generatePoolConfig(db, "pool-1");
+
+    expect(config.agents.list[0]?.model).toEqual({
+      primary: "openai/gpt-4.1-mini",
+    });
+    expect(config.models?.providers.byok_openai).toBeUndefined();
+    expect(config.models?.providers.openai?.baseUrl).toBe(
+      "https://api.openai.com/v1",
+    );
+    expect(config.models?.providers.openai?.models[0]?.id).toBe("gpt-4.1-mini");
   });
 });

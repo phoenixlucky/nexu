@@ -86,6 +86,69 @@ interface ChannelWithBot {
   credentials: ChannelCredentialRow[];
 }
 
+const byokDefaultBaseUrls: Record<string, string> = {
+  anthropic: "https://api.anthropic.com/v1",
+  openai: "https://api.openai.com/v1",
+  google: "https://generativelanguage.googleapis.com/v1beta/openai",
+};
+
+function normalizeByokBaseUrl(
+  baseUrl: string | null | undefined,
+): string | null {
+  if (!baseUrl) {
+    return null;
+  }
+
+  const trimmed = baseUrl.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  try {
+    const url = new URL(trimmed);
+    url.hash = "";
+    return url.toString().replace(/\/+$/u, "");
+  } catch {
+    return trimmed.replace(/\/+$/u, "");
+  }
+}
+
+function isByokProviderProxied(
+  providerId: string,
+  baseUrl: string | null,
+): boolean {
+  const defaultBaseUrl = normalizeByokBaseUrl(byokDefaultBaseUrls[providerId]);
+  const normalizedBaseUrl = normalizeByokBaseUrl(baseUrl);
+
+  return Boolean(
+    defaultBaseUrl && normalizedBaseUrl && normalizedBaseUrl !== defaultBaseUrl,
+  );
+}
+
+function getByokProviderKey(input: {
+  id: string;
+  providerId: string;
+  baseUrl: string | null;
+}): string {
+  if (input.providerId === "custom") {
+    return `custom_${input.id}`;
+  }
+
+  return isByokProviderProxied(input.providerId, input.baseUrl)
+    ? `byok_${input.providerId}`
+    : input.providerId;
+}
+
+function getByokProviderModelId(
+  providerKey: string,
+  providerId: string,
+  modelId: string,
+): string {
+  return providerKey === `byok_${providerId}`
+    ? `${providerId}/${modelId}`
+    : modelId;
+}
+
 export async function generatePoolConfig(
   db: Database,
   poolIdOrName: string,
@@ -173,24 +236,15 @@ export async function generatePoolConfig(
     .from(modelProviders)
     .where(eq(modelProviders.enabled, true));
 
-  const byokDefaultBaseUrls: Record<string, string> = {
-    anthropic: "https://api.anthropic.com/v1",
-    openai: "https://api.openai.com/v1",
-    google: "https://generativelanguage.googleapis.com/v1beta/openai",
-  };
-
   // Map provider ID prefix (e.g. "anthropic") → OpenClaw provider key
   // For proxied providers the key is "byok_anthropic", for direct it's "anthropic"
   const byokPrefixToKey = new Map<string, string>();
   for (const bp of byokProviders) {
-    const defaultUrl = byokDefaultBaseUrls[bp.providerId];
-    const isProxied = bp.baseUrl != null && bp.baseUrl !== defaultUrl;
-    const key =
-      bp.providerId === "custom"
-        ? `custom_${bp.id}`
-        : isProxied
-          ? `byok_${bp.providerId}`
-          : bp.providerId;
+    const key = getByokProviderKey({
+      id: bp.id,
+      providerId: bp.providerId,
+      baseUrl: bp.baseUrl,
+    });
     byokPrefixToKey.set(bp.providerId, key);
   }
 
@@ -574,17 +628,13 @@ export async function generatePoolConfig(
   // Add BYOK (user-provided) providers (already loaded above for resolveModelId)
   for (const bp of byokProviders) {
     const defaultBaseUrl = byokDefaultBaseUrls[bp.providerId];
-    const baseUrl = bp.baseUrl ?? defaultBaseUrl;
-    // When routing through a proxy (non-default baseUrl like LiteLLM), use a
-    // prefixed provider key so OpenClaw preserves the full model ID including
-    // the provider name (e.g. "anthropic/claude-sonnet-4") instead of stripping it.
-    const isProxied = bp.baseUrl != null && bp.baseUrl !== defaultBaseUrl;
-    const providerKey =
-      bp.providerId === "custom"
-        ? `custom_${bp.id}`
-        : isProxied
-          ? `byok_${bp.providerId}`
-          : bp.providerId;
+    const baseUrl =
+      normalizeByokBaseUrl(bp.baseUrl) ?? normalizeByokBaseUrl(defaultBaseUrl);
+    const providerKey = getByokProviderKey({
+      id: bp.id,
+      providerId: bp.providerId,
+      baseUrl: bp.baseUrl,
+    });
     if (!baseUrl) continue;
 
     const modelIds: string[] = JSON.parse(bp.modelsJson || "[]");
@@ -593,7 +643,7 @@ export async function generatePoolConfig(
       apiKey: decrypt(bp.encryptedApiKey),
       api: "openai-completions",
       models: modelIds.map((id) => ({
-        id,
+        id: getByokProviderModelId(providerKey, bp.providerId, id),
         name: id,
         reasoning: false,
         input: ["text", "image"],
