@@ -180,7 +180,7 @@ function formatBot(
     modelId:
       bot.modelId ??
       process.env.DEFAULT_MODEL_ID ??
-      "anthropic/claude-sonnet-4",
+      "link/claude-sonnet-4-5",
     systemPrompt: bot.systemPrompt,
     createdAt: bot.createdAt,
     updatedAt: bot.updatedAt,

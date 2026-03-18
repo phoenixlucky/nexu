@@ -104,9 +104,7 @@ export function createApp() {
 
   // Desktop internal endpoints: always register (for OpenAPI spec), but
   // guard at runtime so non-desktop deployments reject with 404.
-  if (isDesktopMode()) {
-    app.use("/api/internal/desktop/*", cors({ origin: "*" }));
-  } else {
+  if (!isDesktopMode()) {
     app.use("/api/internal/desktop/*", async (c) => {
       return c.json({ error: "Not available" }, 404);
     });
