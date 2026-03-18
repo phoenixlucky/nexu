@@ -54,10 +54,12 @@ function readCachedCloudModels(): {
 
 /**
  * In desktop mode, load cloud models from credentials file.
+ * Model IDs are passed through as-is (no prefix) since gateway routes them
+ * to Link gateway based on cloud-credentials.json configuration.
  */
 function getCloudModels(): Model[] {
   return readCachedCloudModels().map((m) => ({
-    id: `link/${m.id}`,
+    id: m.id,
     name: m.name || m.id,
     provider: m.provider ?? "nexu",
     description: "Cloud model via Nexu Link",
