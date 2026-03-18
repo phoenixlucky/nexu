@@ -231,8 +231,7 @@ const zhCN = {
   "models.catalog.title": "可用模型目录",
   "models.catalog.summary":
     "共 {{totalModels}} 个模型，来自 {{providerCount}} 个服务商",
-  "models.catalog.connectedHint":
-    "登录后即可在上方模型选择器中选用这些模型",
+  "models.catalog.connectedHint": "登录后即可在上方模型选择器中选用这些模型",
   "models.catalog.loginHint": "以下模型在登录 Nexu 账号后即可使用",
   "models.catalog.modelsCount": "{{count}} 个模型",
   "models.catalog.loginToUse": "登录后可用",

@@ -625,7 +625,8 @@ function CurrentModelSelector({
               <Cpu size={16} className="text-accent shrink-0" />
             )}
             <span className="text-[13px] font-medium text-text-primary truncate">
-              {currentModel?.name ?? (currentModelId || t("models.noModelConfigured"))}
+              {currentModel?.name ??
+                (currentModelId || t("models.noModelConfigured"))}
             </span>
             {currentGroupKey && (
               <span className="text-[10px] text-text-muted/60 shrink-0">
@@ -836,10 +837,7 @@ export function ModelsPage() {
     }
   }, [defaultModelData, currentModelId, models, updateModel]);
 
-  const providers = useMemo(
-    () => buildProviders(models),
-    [models],
-  );
+  const providers = useMemo(() => buildProviders(models), [models]);
 
   // Build sidebar items: Nexu first, then BYOK providers
   const sidebarItems = useMemo(() => {
@@ -1045,8 +1043,8 @@ export function ModelsPage() {
                             id: activeProvider.id,
                             name: activeProvider.name,
                             description:
-                              PROVIDER_META[activeProvider.id]?.descriptionKey ??
-                              "",
+                              PROVIDER_META[activeProvider.id]
+                                ?.descriptionKey ?? "",
                             managed: true,
                             models: [],
                           }
