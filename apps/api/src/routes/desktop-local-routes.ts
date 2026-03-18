@@ -382,7 +382,9 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
         body: JSON.stringify({ deviceId, deviceSecretHash }),
       });
     } catch (err) {
-      return c.json({ error: `Cloud unreachable: ${err instanceof Error ? err.message : String(err)}` });
+      return c.json({
+        error: `Cloud unreachable: ${err instanceof Error ? err.message : String(err)}`,
+      });
     }
 
     if (!res.ok) {
