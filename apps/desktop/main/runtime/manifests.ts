@@ -309,7 +309,7 @@ export function createRuntimeUnitManifests(
         OPENCLAW_DISABLE_BONJOUR: "1",
         TMPDIR: openclawTempDir,
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
-        RUNTIME_GATEWAY_PROBE_ENABLED: "false",
+        RUNTIME_GATEWAY_PROBE_ENABLED: "true",
         // OpenClaw needs Node 22.12+; ensure it's on PATH when gateway
         // spawns the openclaw binary (which runs `exec node ...`).
         ...(node22Path ? { PATH: node22Path } : {}),
