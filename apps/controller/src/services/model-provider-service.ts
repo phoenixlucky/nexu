@@ -1,4 +1,5 @@
 import type {
+  Model,
   verifyProviderBodySchema,
   verifyProviderResponseSchema,
 } from "@nexu/shared";
@@ -9,20 +10,27 @@ const PROVIDER_BASE_URLS: Record<string, string> = {
   anthropic: "https://api.anthropic.com/v1",
   openai: "https://api.openai.com/v1",
   google: "https://generativelanguage.googleapis.com/v1beta/openai",
+  siliconflow: "https://api.siliconflow.com/v1",
+  ppio: "https://api.ppinfra.com/v3/openai",
+  openrouter: "https://openrouter.ai/api/v1",
+  minimax: "https://api.minimaxi.com/anthropic",
+  kimi: "https://api.moonshot.cn/v1",
+  glm: "https://open.bigmodel.cn/api/paas/v4",
+  moonshot: "https://api.moonshot.cn/v1",
+  zai: "https://open.bigmodel.cn/api/paas/v4",
 };
 
 function buildProviderUrl(
   baseUrl: string | null | undefined,
-  pathname: string,
+  path: string,
 ): string | null {
   if (!baseUrl || baseUrl.trim().length === 0) {
     return null;
   }
 
-  return new URL(
-    pathname,
-    baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`,
-  ).toString();
+  const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${normalizedBaseUrl}${normalizedPath}`;
 }
 
 type VerifyProviderBody = z.infer<typeof verifyProviderBodySchema>;
@@ -33,8 +41,16 @@ export class ModelProviderService {
 
   async listModels() {
     const config = await this.configStore.getConfig();
+    const desktopCloud = await this.configStore.getDesktopCloudStatus();
+    const cloudModels: Model[] = (desktopCloud.models ?? []).map((model) => ({
+      id: model.id,
+      name: model.name || model.id,
+      provider: "nexu",
+      description: "Cloud model via Nexu Link",
+    }));
+
     const providers = config.providers.filter((provider) => provider.enabled);
-    const models = providers.flatMap((provider) =>
+    const byokModels: Model[] = providers.flatMap((provider) =>
       provider.models.map((modelId) => ({
         id: `${provider.providerId}/${modelId}`,
         name: modelId,
@@ -43,7 +59,7 @@ export class ModelProviderService {
     );
 
     return {
-      models,
+      models: [...cloudModels, ...byokModels],
     };
   }
 
