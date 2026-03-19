@@ -50,7 +50,7 @@ const orchestrator = new RuntimeOrchestrator(
   ),
 );
 
-app.setName("Nexu Desktop");
+app.setName("Nexu");
 
 // Info.plist declares LSUIElement=true so that child processes (spawned with
 // ELECTRON_RUN_AS_NODE) don't create extra Dock icons.  Restore the main
@@ -364,7 +364,7 @@ function createMainWindow(): BrowserWindow {
     minWidth: 1120,
     minHeight: 760,
     backgroundColor: "#0B1020",
-    title: "Nexu Desktop",
+    title: "Nexu",
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 18, y: 18 },
     show: false,
