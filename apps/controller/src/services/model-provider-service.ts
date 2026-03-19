@@ -1,4 +1,5 @@
 import type {
+  Model,
   verifyProviderBodySchema,
   verifyProviderResponseSchema,
 } from "@nexu/shared";
@@ -33,27 +34,16 @@ export class ModelProviderService {
 
   async listModels() {
     const config = await this.configStore.getConfig();
-    const cloud =
-      config.desktop &&
-      typeof config.desktop === "object" &&
-      "cloud" in config.desktop &&
-      typeof config.desktop.cloud === "object" &&
-      config.desktop.cloud !== null
-        ? (config.desktop.cloud as {
-            connected?: boolean;
-            models?: Array<{ id: string; name: string; provider?: string }>;
-          })
-        : null;
+    const desktopCloud = await this.configStore.getDesktopCloudStatus();
+    const cloudModels: Model[] = (desktopCloud.models ?? []).map((model) => ({
+      id: model.id,
+      name: model.name || model.id,
+      provider: "nexu",
+      description: "Cloud model via Nexu Link",
+    }));
+
     const providers = config.providers.filter((provider) => provider.enabled);
-    const cloudModels =
-      cloud?.connected === true && Array.isArray(cloud.models)
-        ? cloud.models.map((model) => ({
-            id: model.id,
-            name: model.name,
-            provider: model.provider ?? "nexu",
-          }))
-        : [];
-    const models = providers.flatMap((provider) =>
+    const byokModels: Model[] = providers.flatMap((provider) =>
       provider.models.map((modelId) => ({
         id: `${provider.providerId}/${modelId}`,
         name: modelId,
@@ -62,7 +52,7 @@ export class ModelProviderService {
     );
 
     return {
-      models: [...cloudModels, ...models],
+      models: [...cloudModels, ...byokModels],
     };
   }
 

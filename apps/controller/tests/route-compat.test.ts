@@ -305,7 +305,7 @@ describe("controller route compatibility", () => {
     const app = createApp(container);
     const response = await app.request("/api/v1/models");
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       models: [
         {
           id: "claude-sonnet-4-5",

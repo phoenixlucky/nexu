@@ -118,14 +118,13 @@ export function registerDesktopCompatRoutes(
         },
       },
     }),
-    async (c) => {
-      return c.json(
+    async (c) =>
+      c.json(
         {
-          modelId: await container.modelProviderService.getSelectedModelId(),
+          modelId: await container.desktopLocalService.getDefaultModel(),
         },
         200,
-      );
-    },
+      ),
   );
 
   app.openapi(
@@ -149,8 +148,10 @@ export function registerDesktopCompatRoutes(
     }),
     async (c) => {
       const body = c.req.valid("json");
-      await container.modelProviderService.setSelectedModelId(body.modelId);
-      return c.json({ ok: true, modelId: body.modelId }, 200);
+      return c.json(
+        await container.desktopLocalService.setDefaultModel(body.modelId),
+        200,
+      );
     },
   );
 }
