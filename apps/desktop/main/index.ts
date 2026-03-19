@@ -193,6 +193,18 @@ function logColdStart(message: string): void {
   });
 }
 
+function logLaunchTimeline(message: string): void {
+  const launchId = process.env.NEXU_DESKTOP_LAUNCH_ID ?? "unknown";
+  writeDesktopMainLog({
+    source: "launch-timeline",
+    stream: "system",
+    kind: "lifecycle",
+    message: `${message} launchId=${launchId}`,
+    logFilePath: getDesktopLogFilePath("desktop-main.log"),
+    windowId: getMainWindowId(),
+  });
+}
+
 function logAuthRecovery(message: string, stream: "stdout" | "stderr"): void {
   writeDesktopMainLog({
     source: "auth-recovery",
@@ -358,6 +370,7 @@ app.on("second-instance", () => {
 });
 
 function createMainWindow(): BrowserWindow {
+  logLaunchTimeline("main window creation requested");
   const window = new BrowserWindow({
     width: 1400,
     height: 920,
@@ -441,6 +454,7 @@ function createMainWindow(): BrowserWindow {
   });
 
   window.once("ready-to-show", () => {
+    logLaunchTimeline("main window ready-to-show");
     window.show();
     focusMainWindow();
   });
@@ -452,6 +466,7 @@ function createMainWindow(): BrowserWindow {
   });
 
   void window.loadFile(resolve(__dirname, "../../dist/index.html"));
+  logLaunchTimeline("main window loadFile dispatched");
   mainWindow = window;
   return window;
 }
@@ -527,12 +542,16 @@ app.on("web-contents-created", (_event, contents) => {
   });
 });
 
+logLaunchTimeline("electron main module evaluated");
+
 app.whenReady().then(async () => {
+  logLaunchTimeline("app.whenReady resolved");
   installApplicationMenu();
   installDesktopAuthRecoveryHooks();
   registerIpcHandlers(orchestrator, runtimeConfig);
   diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
   const unsubscribeDiagnostics = diagnosticsReporter.start();
+  const win = createMainWindow();
 
   void (async () => {
     const healthCheck = new StartupHealthCheck();
@@ -577,14 +596,14 @@ app.whenReady().then(async () => {
     setCatalogManager(catalogMgr);
     catalogMgr.start();
 
-    const win = createMainWindow();
-
-    if (app.isPackaged) {
+    if (app.isPackaged && runtimeConfig.updates.autoUpdateEnabled) {
       const updateMgr = new UpdateManager(win, orchestrator, {
         feedUrl: runtimeConfig.urls.updateFeed,
       });
       setUpdateManager(updateMgr);
       updateMgr.startPeriodicCheck();
+    } else {
+      setUpdateManager(null);
     }
 
     const compUpdater = new ComponentUpdater();
