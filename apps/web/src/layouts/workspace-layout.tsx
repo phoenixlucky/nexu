@@ -256,7 +256,25 @@ function WorkspaceLayoutInner() {
           : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen relative">
+      {/* Fixed sidebar toggle — next to traffic lights (desktop client only) */}
+      {isDesktopClient && (
+        <button
+          type="button"
+          onClick={() => setCollapsed(!collapsed)}
+          className="fixed top-[6px] left-[80px] z-50 p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-black/5 transition-colors hidden md:flex"
+          title={
+            collapsed ? t("layout.expandSidebar") : t("layout.collapseSidebar")
+          }
+        >
+          {collapsed ? (
+            <PanelLeftOpen size={16} />
+          ) : (
+            <PanelLeftClose size={16} />
+          )}
+        </button>
+      )}
+
       {/* Desktop sidebar */}
       <div
         className={cn(
@@ -264,26 +282,23 @@ function WorkspaceLayoutInner() {
           collapsed ? "w-14" : "w-56",
         )}
       >
-        {/* Header */}
+        {/* Header / Brand */}
         <div
           className={cn(
-            "flex items-center border-b border-border",
-            collapsed ? "px-2 py-3 justify-center" : "px-4 py-3 gap-2.5",
-            isDesktopClient && "pt-10",
+            "flex items-center",
+            collapsed ? "px-2 py-3 justify-center" : "px-3 pb-2",
+            isDesktopClient && "pt-14",
+            !isDesktopClient && "border-b border-border py-3 px-4 gap-2.5",
           )}
         >
           {collapsed ? (
-            <div className="relative group">
-              <BrandMark className="w-7 h-7 transition-opacity group-hover:opacity-0" />
-              <button
-                type="button"
-                onClick={() => setCollapsed(false)}
-                className="absolute inset-0 flex justify-center items-center w-7 h-7 rounded-lg opacity-0 transition-opacity bg-surface-3 text-text-primary group-hover:opacity-100"
-                title={t("layout.expandSidebar")}
-              >
-                <PanelLeftOpen size={14} />
-              </button>
-            </div>
+            <BrandMark className="w-7 h-7" />
+          ) : isDesktopClient ? (
+            <img
+              src="/brand/logo-black-1.svg"
+              alt="Nexu"
+              className="h-6 object-contain"
+            />
           ) : (
             <>
               <BrandMark className="w-7 h-7 shrink-0" />
@@ -336,11 +351,6 @@ function WorkspaceLayoutInner() {
             >
               <Sparkles size={16} />
               {!collapsed && t("layout.nav.skills")}
-              {!collapsed && sessions.length > 0 && (
-                <span className="ml-auto text-[10px] text-text-tertiary font-normal tabular-nums">
-                  {sessions.length}
-                </span>
-              )}
             </Link>
             <Link
               to="/workspace/settings"
@@ -355,24 +365,10 @@ function WorkspaceLayoutInner() {
               <Settings size={16} />
               {!collapsed && t("layout.nav.settings")}
             </Link>
-            <Link
-              to="/workspace/sessions"
-              title={collapsed ? t("layout.conversations") : undefined}
-              onClick={() => track("workspace_conversations_click")}
-              className={cn(
-                "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer mt-0.5",
-                collapsed ? "justify-center p-2" : "px-3 py-2",
-                location.pathname === "/workspace/sessions" &&
-                  "nav-item-active",
-              )}
-            >
-              <MessageSquare size={16} />
-              {!collapsed && t("layout.conversations")}
-            </Link>
           </div>
 
           {/* Conversations section */}
-          <div className={cn(collapsed ? "px-2" : "px-3", "pt-4")}>
+          <div className={cn(collapsed ? "px-2" : "px-2", "pt-6")}>
             {!collapsed && (
               <div className="sidebar-section-label">
                 {t("layout.conversations")}
@@ -580,9 +576,6 @@ function WorkspaceLayoutInner() {
                     <span className="flex items-center gap-2">
                       <Sparkles size={14} />
                       {t("layout.nav.skills")}
-                    </span>
-                    <span className="text-[10px] font-medium text-text-muted/60 tabular-nums">
-                      {sessions.length > 0 ? sessions.length : ""}
                     </span>
                   </Link>
                   <Link
