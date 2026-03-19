@@ -244,6 +244,11 @@ export async function generatePoolConfig(
       const prefix = rawModelId.substring(0, slashIdx);
       const byokKey = byokPrefixToKey.get(prefix);
       if (byokKey) {
+        if (prefix === "custom") {
+          const upstreamModelId = rawModelId.substring("custom/".length);
+          return `${byokKey}/${upstreamModelId}`;
+        }
+
         // Proxied: "anthropic/claude-sonnet-4" → "byok_anthropic/anthropic/claude-sonnet-4"
         // Direct:  "anthropic/claude-sonnet-4" → "anthropic/claude-sonnet-4" (unchanged)
         return byokKey === prefix ? rawModelId : `${byokKey}/${rawModelId}`;
@@ -737,7 +742,7 @@ export async function generatePoolConfig(
     load: {
       watch: true,
       watchDebounceMs: 250,
-      extraDirs: [`${stateDir}/skills`],
+      extraDirs: [`${stateDir}/bundled-skills`, `${stateDir}/skills`],
     },
   };
 

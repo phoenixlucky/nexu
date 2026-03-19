@@ -73,7 +73,7 @@ function getChannelConfigs(t: (key: string) => string): Record<
           style={{ objectFit: "contain" }}
         />
       ),
-      docUrl: "https://docs.nexu.ai/channels/feishu",
+      docUrl: "https://docs.nexu.io/guide/channels/feishu",
       fields: [
         {
           id: "appId",
@@ -92,7 +92,7 @@ function getChannelConfigs(t: (key: string) => string): Record<
     slack: {
       name: "Slack",
       icon: <SlackIcon />,
-      docUrl: "https://docs.nexu.ai/channels/slack",
+      docUrl: "https://docs.nexu.io/guide/channels/slack",
       fields: [
         {
           id: "botToken",
@@ -111,7 +111,7 @@ function getChannelConfigs(t: (key: string) => string): Record<
     discord: {
       name: "Discord",
       icon: <DiscordIcon />,
-      docUrl: "https://docs.nexu.ai/channels/discord",
+      docUrl: "https://docs.nexu.io/guide/channels/discord",
       fields: [
         {
           id: "botToken",
