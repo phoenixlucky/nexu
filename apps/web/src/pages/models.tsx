@@ -1180,7 +1180,6 @@ export function ModelsPage() {
                         }
                       }
                       currentModelId={currentModelId}
-                      onAutoSelectModel={handleAutoSelectModel}
                     />
                   )
                 ) : (
@@ -1234,11 +1233,9 @@ async function fetchLinkCatalog(): Promise<LinkProvider[]> {
 function ManagedProviderDetail({
   provider,
   currentModelId,
-  onAutoSelectModel,
 }: {
   provider: ProviderConfig;
   currentModelId: string;
-  onAutoSelectModel: (modelId: string) => void;
 }) {
   const { t } = useTranslation();
   const { data: linkProviders = [], isLoading: catalogLoading } = useQuery({

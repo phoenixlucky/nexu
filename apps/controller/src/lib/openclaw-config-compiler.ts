@@ -238,7 +238,7 @@ function resolveModelId(config: NexuConfig, rawModelId: string): string {
     }
     // Model not found in Link — pick the first available Link model
     if (cloudModels.length > 0) {
-      return `link/${cloudModels[0]!.id}`;
+      return `link/${cloudModels[0]?.id}`;
     }
   }
 
