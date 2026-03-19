@@ -583,7 +583,21 @@ app.whenReady().then(async () => {
     const legacyCuratedDir = getOpenclawCuratedSkillsDir(
       app.getPath("userData"),
     );
-    const skillDb = new SkillDb(skillDbPath, legacyCuratedDir);
+    let skillDb: SkillDb | undefined;
+    try {
+      skillDb = new SkillDb(skillDbPath, legacyCuratedDir);
+    } catch (err) {
+      // better-sqlite3 native addon may fail to load in dev mode due to ABI
+      // mismatch between system Node.js and Electron. CatalogManager works
+      // without SkillDb — it just loses cross-restart uninstall persistence.
+      writeDesktopMainLog({
+        source: "skillhub",
+        stream: "stderr",
+        kind: "app",
+        message: `SkillDb init failed (falling back to no-db mode): ${err instanceof Error ? err.message : String(err)}`,
+        logFilePath: getDesktopLogFilePath("desktop-main.log"),
+      });
+    }
 
     catalogMgr = new CatalogManager(app.getPath("userData"), {
       staticSkillsDir,
