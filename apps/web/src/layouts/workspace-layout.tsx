@@ -5,14 +5,18 @@ import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
+  BookOpen,
   ChevronUp,
+  CircleHelp,
   Globe,
   Home,
   LogOut,
+  Mail,
   Menu,
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
+  ScrollText,
   Settings,
   Sparkles,
   X,
@@ -138,6 +142,14 @@ function LanguageToggle({ collapsed }: { collapsed: boolean }) {
 }
 
 const SETUP_COMPLETE_KEY = "nexu_setup_complete";
+const GITHUB_URL = "https://github.com/nexu-io/nexu";
+
+const GitHubIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+    <title>GitHub</title>
+    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+  </svg>
+);
 
 export function WorkspaceLayout() {
   if (localStorage.getItem(SETUP_COMPLETE_KEY) !== "1") {
@@ -158,7 +170,9 @@ function WorkspaceLayoutInner() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showHelpMenu, setShowHelpMenu] = useState(false);
   const logoutRef = useRef<HTMLDivElement>(null);
+  const helpRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { data: session } = authClient.useSession();
@@ -177,6 +191,17 @@ function WorkspaceLayoutInner() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [showLogoutConfirm]);
+
+  useEffect(() => {
+    if (!showHelpMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (helpRef.current && !helpRef.current.contains(e.target as Node)) {
+        setShowHelpMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showHelpMenu]);
 
   useEffect(() => {
     if (!mobileDrawerOpen) return;
@@ -256,7 +281,28 @@ function WorkspaceLayoutInner() {
           : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen relative">
+      {/* Fixed sidebar toggle — next to traffic lights (desktop client only) */}
+      {isDesktopClient && (
+        <button
+          type="button"
+          onClick={() => setCollapsed(!collapsed)}
+          className="fixed top-[8px] left-[76px] p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-black/5 transition-colors hidden md:flex items-center justify-center"
+          style={
+            { WebkitAppRegion: "no-drag", zIndex: 10000 } as React.CSSProperties
+          }
+          title={
+            collapsed ? t("layout.expandSidebar") : t("layout.collapseSidebar")
+          }
+        >
+          {collapsed ? (
+            <PanelLeftOpen size={16} />
+          ) : (
+            <PanelLeftClose size={16} />
+          )}
+        </button>
+      )}
+
       {/* Desktop sidebar */}
       <div
         className={cn(
@@ -264,26 +310,23 @@ function WorkspaceLayoutInner() {
           collapsed ? "w-14" : "w-56",
         )}
       >
-        {/* Header */}
+        {/* Header / Brand */}
         <div
           className={cn(
-            "flex items-center border-b border-border",
-            collapsed ? "px-2 py-3 justify-center" : "px-4 py-3 gap-2.5",
-            isDesktopClient && "pt-10",
+            "flex items-center",
+            collapsed ? "px-2 py-3 justify-center" : "px-3 pb-2",
+            isDesktopClient && "pt-14",
+            !isDesktopClient && "border-b border-border py-3 px-4 gap-2.5",
           )}
         >
           {collapsed ? (
-            <div className="relative group">
-              <BrandMark className="w-7 h-7 transition-opacity group-hover:opacity-0" />
-              <button
-                type="button"
-                onClick={() => setCollapsed(false)}
-                className="absolute inset-0 flex justify-center items-center w-7 h-7 rounded-lg opacity-0 transition-opacity bg-surface-3 text-text-primary group-hover:opacity-100"
-                title={t("layout.expandSidebar")}
-              >
-                <PanelLeftOpen size={14} />
-              </button>
-            </div>
+            <BrandMark className="w-7 h-7" />
+          ) : isDesktopClient ? (
+            <img
+              src="/brand/logo-black-1.svg"
+              alt="Nexu"
+              className="h-6 object-contain"
+            />
           ) : (
             <>
               <BrandMark className="w-7 h-7 shrink-0" />
@@ -316,14 +359,12 @@ function WorkspaceLayoutInner() {
               title={collapsed ? t("layout.nav.home") : undefined}
               onClick={() => track("workspace_home_click")}
               className={cn(
-                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
+                "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer mt-0.5",
                 collapsed ? "justify-center p-2" : "px-3 py-2",
-                isHomePage
-                  ? "bg-accent/10 text-accent"
-                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                isHomePage && "nav-item-active",
               )}
             >
-              <Home size={14} />
+              <Home size={16} />
               {!collapsed && t("layout.nav.home")}
             </Link>
             <Link
@@ -331,40 +372,33 @@ function WorkspaceLayoutInner() {
               title={collapsed ? t("layout.nav.skills") : undefined}
               onClick={() => track("workspace_skills_click")}
               className={cn(
-                "flex items-center justify-between w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
+                "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer mt-0.5",
                 collapsed ? "justify-center p-2" : "px-3 py-2",
-                isSkillsPage
-                  ? "bg-accent/10 text-accent"
-                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                isSkillsPage && "nav-item-active",
               )}
             >
-              <span className="flex items-center gap-2">
-                <Sparkles size={14} />
-                {!collapsed && t("layout.nav.skills")}
-              </span>
+              <Sparkles size={16} />
+              {!collapsed && t("layout.nav.skills")}
             </Link>
             <Link
               to="/workspace/settings"
               title={collapsed ? t("layout.nav.settings") : undefined}
               onClick={() => track("workspace_settings_click")}
               className={cn(
-                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
+                "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer mt-0.5",
                 collapsed ? "justify-center p-2" : "px-3 py-2",
-                isModelsPage
-                  ? "bg-accent/10 text-accent"
-                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                isModelsPage && "nav-item-active",
               )}
             >
-              <Settings size={14} />
+              <Settings size={16} />
               {!collapsed && t("layout.nav.settings")}
             </Link>
           </div>
 
           {/* Conversations section */}
-          <div className={cn(collapsed ? "px-2" : "px-3", "pt-2")}>
-            <div className="border-t border-border pt-2 mb-1.5" />
+          <div className={cn(collapsed ? "px-2" : "px-2", "pt-6")}>
             {!collapsed && (
-              <div className="px-3 mb-1.5 text-[10px] font-medium text-text-muted uppercase tracking-wider">
+              <div className="sidebar-section-label">
                 {t("layout.conversations")}
               </div>
             )}
@@ -383,40 +417,14 @@ function WorkspaceLayoutInner() {
                     }}
                     title={collapsed ? (s.title ?? undefined) : undefined}
                     className={cn(
-                      "flex items-center gap-2.5 w-full rounded-lg transition-colors cursor-pointer",
-                      collapsed
-                        ? "justify-center p-2"
-                        : "px-2.5 py-2 text-left",
-                      isActive
-                        ? "bg-accent/10 text-accent"
-                        : "text-text-secondary hover:text-text-primary hover:bg-surface-3",
+                      "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer",
+                      collapsed ? "justify-center p-2" : "px-3 py-1.5",
+                      isActive && "nav-item-active",
                     )}
                   >
-                    {collapsed ? (
-                      <SidebarPlatformIcon platform={s.channelType ?? "web"} />
-                    ) : (
-                      <>
-                        <SidebarPlatformIcon
-                          platform={s.channelType ?? "web"}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[13px] truncate font-medium">
-                            {s.title}
-                          </div>
-                          <div className="text-[10px] text-text-muted truncate">
-                            {formatTime(s.lastMessageAt || s.updatedAt)}
-                            {s.channelType && ` · ${s.channelType}`}
-                          </div>
-                        </div>
-                        <div
-                          className={cn(
-                            "w-1.5 h-1.5 rounded-full shrink-0",
-                            s.status === "active"
-                              ? "bg-emerald-500"
-                              : "bg-text-muted/30",
-                          )}
-                        />
-                      </>
+                    <SidebarPlatformIcon platform={s.channelType ?? "web"} />
+                    {!collapsed && (
+                      <span className="truncate text-[12px]">{s.title}</span>
                     )}
                   </button>
                 );
@@ -424,6 +432,71 @@ function WorkspaceLayoutInner() {
             </div>
           </div>
         </div>
+
+        {/* Icon row — Help & GitHub */}
+        {!collapsed && (
+          <div className="px-3 pb-1.5 flex items-center gap-1">
+            <div className="relative" ref={helpRef}>
+              {showHelpMenu && (
+                <div className="absolute z-20 bottom-full left-0 mb-2 w-44">
+                  <div className="rounded-xl border bg-surface-1 border-border shadow-xl shadow-black/10 overflow-hidden">
+                    <div className="p-1.5">
+                      <a
+                        href="https://docs.nexu.ai"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
+                      >
+                        <BookOpen size={14} />
+                        {t("layout.help.docs")}
+                      </a>
+                      <a
+                        href="mailto:hi@nexu.ai"
+                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
+                      >
+                        <Mail size={14} />
+                        {t("layout.help.contact")}
+                      </a>
+                    </div>
+                    <div className="border-t border-border p-1.5">
+                      <a
+                        href="https://nexu.ai/changelog"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
+                      >
+                        <ScrollText size={14} />
+                        {t("layout.help.changelog")}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowHelpMenu(!showHelpMenu)}
+                className={cn(
+                  "w-7 h-7 flex items-center justify-center rounded-md transition-colors cursor-pointer",
+                  showHelpMenu
+                    ? "text-text-primary bg-black/5"
+                    : "text-text-secondary hover:text-text-primary hover:bg-black/5",
+                )}
+                title={t("layout.help.title")}
+              >
+                <CircleHelp size={16} />
+              </button>
+            </div>
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-black/5 transition-colors"
+              title="GitHub"
+            >
+              <GitHubIcon />
+            </a>
+          </div>
+        )}
 
         {/* Language toggle */}
         <LanguageToggle collapsed={collapsed} />
@@ -596,9 +669,6 @@ function WorkspaceLayoutInner() {
                     <span className="flex items-center gap-2">
                       <Sparkles size={14} />
                       {t("layout.nav.skills")}
-                    </span>
-                    <span className="text-[10px] font-medium text-text-muted/60 tabular-nums">
-                      {sessions.length > 0 ? sessions.length : ""}
                     </span>
                   </Link>
                   <Link

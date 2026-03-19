@@ -329,7 +329,7 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 // ── Component ──────────────────────────────────────────────────
 
-function GeneralSettings() {
+function _GeneralSettings() {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
@@ -599,7 +599,7 @@ function GeneralSettings() {
 
 // ── Current Model Selector ────────────────────────────────────
 
-function CurrentModelSelector({
+function _CurrentModelSelector({
   models,
   currentModelId,
   onSelectModel,
@@ -864,7 +864,7 @@ export function ModelsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const isSetupMode = searchParams.get("setup") === "1";
   const tabParam = searchParams.get("tab");
-  const settingsTab = isSettingsTab(tabParam)
+  const _settingsTab = isSettingsTab(tabParam)
     ? tabParam
     : isSetupMode
       ? "providers"
@@ -993,7 +993,7 @@ export function ModelsPage() {
     }
   }, [isSetupMode, searchParams, setSearchParams]);
 
-  const changeSettingsTab = useCallback(
+  const _changeSettingsTab = useCallback(
     (tab: SettingsTab) => {
       const next = new URLSearchParams(searchParams);
       next.set("tab", tab);
@@ -1015,164 +1015,185 @@ export function ModelsPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <h2 className="text-[18px] font-semibold text-text-primary mb-1">
-          {t("models.pageTitle")}
-        </h2>
-        <p className="text-[12px] text-text-muted mb-5">
-          {t("settings.pageSubtitle")}
-        </p>
-        <div className="mb-6 flex items-center gap-5 border-b border-border">
-          {[
-            { id: "general", label: t("settings.tabGeneral") },
-            { id: "providers", label: t("settings.tabProviders") },
-          ].map((item) => {
-            const active = settingsTab === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => changeSettingsTab(item.id as SettingsTab)}
-                className={cn(
-                  "relative shrink-0 px-1 pb-2 text-[13px] transition-colors",
-                  active
-                    ? "font-semibold text-text-primary"
-                    : "font-medium text-text-secondary hover:text-text-primary",
-                )}
-              >
-                {item.label}
-                {active && (
-                  <div className="absolute bottom-0 left-1 right-1 h-[2px] rounded-full bg-text-primary" />
-                )}
-              </button>
-            );
-          })}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-2 pb-6 sm:pb-8">
+        <div className="flex items-center justify-between mb-10">
+          <div>
+            <h2 className="heading-page">{t("models.pageTitle")}</h2>
+            <p className="heading-page-desc">{t("settings.pageSubtitle")}</p>
+          </div>
         </div>
 
-        {settingsTab === "general" ? (
-          <GeneralSettings />
-        ) : (
-          <div>
-            {/* Current Model Selector */}
-            <CurrentModelSelector
-              models={models}
-              currentModelId={currentModelId}
-              onSelectModel={(modelId) => updateModel.mutate(modelId)}
-            />
-
-            {/* Provider sidebar + detail */}
-            <div
-              className="flex gap-0 rounded-xl border border-border bg-surface-1 overflow-hidden"
-              style={{ minHeight: 520 }}
-            >
-              <div className="w-56 shrink-0 border-r border-border bg-surface-0 overflow-y-auto">
-                <div className="p-2">
-                  <div className="space-y-0.5">
-                    {sidebarItems.map((item) => {
-                      const isActive = activeProvider?.id === item.id;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedProviderId(item.id);
-                            clearSetupParam();
-                          }}
-                          className={cn(
-                            "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors",
-                            isActive ? "bg-accent/10" : "hover:bg-surface-2",
-                          )}
-                        >
-                          <span className="w-5 h-5 shrink-0 flex items-center justify-center">
-                            <ProviderLogo provider={item.id} size={16} />
-                          </span>
-                          <span
-                            className={cn(
-                              "flex-1 text-[12px] font-medium truncate",
-                              isActive ? "text-accent" : "text-text-primary",
-                            )}
-                          >
-                            {item.name}
-                          </span>
-                          {item.configured && (
-                            <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-emerald-500" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+        <div>
+          {/* Provider sidebar + detail */}
+          <div
+            className="flex gap-0 rounded-xl border border-border bg-surface-1 overflow-hidden"
+            style={{ minHeight: 520 }}
+          >
+            {/* Left: Provider list with Enabled / Providers grouping */}
+            <div className="w-56 shrink-0 bg-surface-0 overflow-y-auto">
+              <div className="p-2">
+                {/* Enabled providers */}
+                {sidebarItems.filter((p) => p.configured).length > 0 && (
+                  <>
+                    <div className="px-3 pt-1 pb-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">
+                      Enabled
+                    </div>
+                    <div className="space-y-0.5 mb-3">
+                      {sidebarItems
+                        .filter((p) => p.configured)
+                        .map((item) => {
+                          const isActive = activeProvider?.id === item.id;
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedProviderId(item.id);
+                                clearSetupParam();
+                              }}
+                              className={cn(
+                                "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors",
+                                isActive
+                                  ? "bg-surface-3"
+                                  : "hover:bg-surface-2",
+                              )}
+                            >
+                              <span className="w-5 h-5 shrink-0 flex items-center justify-center">
+                                <ProviderLogo provider={item.id} size={16} />
+                              </span>
+                              <span
+                                className={cn(
+                                  "flex-1 text-[12px] font-medium truncate",
+                                  isActive
+                                    ? "text-accent"
+                                    : "text-text-primary",
+                                )}
+                              >
+                                {item.name}
+                              </span>
+                              <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-[var(--color-success)] ml-auto" />
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </>
+                )}
+                {/* Other providers */}
+                {sidebarItems.filter((p) => !p.configured).length > 0 && (
+                  <>
+                    <div className="px-3 pt-1 pb-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">
+                      Providers
+                    </div>
+                    <div className="space-y-0.5">
+                      {sidebarItems
+                        .filter((p) => !p.configured)
+                        .map((item) => {
+                          const isActive = activeProvider?.id === item.id;
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedProviderId(item.id);
+                                clearSetupParam();
+                              }}
+                              className={cn(
+                                "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors",
+                                isActive
+                                  ? "bg-surface-3"
+                                  : "hover:bg-surface-2",
+                              )}
+                            >
+                              <span className="w-5 h-5 shrink-0 flex items-center justify-center">
+                                <ProviderLogo provider={item.id} size={16} />
+                              </span>
+                              <span
+                                className={cn(
+                                  "flex-1 text-[12px] font-medium truncate",
+                                  isActive
+                                    ? "text-accent"
+                                    : "text-text-primary",
+                                )}
+                              >
+                                {item.name}
+                              </span>
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </>
+                )}
               </div>
+            </div>
 
-              <div className="flex-1 overflow-y-auto p-5">
-                {activeProvider ? (
-                  activeProvider.managed ? (
-                    modelsLoading ? (
-                      <div className="flex items-center justify-center h-full">
-                        <div className="text-[13px] text-text-muted">
-                          {t("models.loading")}
-                        </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              {activeProvider ? (
+                activeProvider.managed ? (
+                  modelsLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-[13px] text-text-muted">
+                        {t("models.loading")}
                       </div>
-                    ) : modelsError ? (
-                      <div className="flex items-center justify-center h-full">
-                        <div className="text-center">
-                          <div className="text-[13px] text-red-500 mb-2">
-                            {t("models.loadFailed")}
-                          </div>
-                          <p className="text-[12px] text-text-muted mb-3">
-                            {t("models.loadFailedHint")}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              queryClient.invalidateQueries({
-                                queryKey: ["models"],
-                              })
-                            }
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium bg-surface-2 hover:bg-surface-3 text-text-primary transition-colors"
-                          >
-                            <RefreshCw size={12} />
-                            {t("models.retry")}
-                          </button>
+                    </div>
+                  ) : modelsError ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <div className="text-[13px] text-red-500 mb-2">
+                          {t("models.loadFailed")}
                         </div>
-                      </div>
-                    ) : (
-                      <ManagedProviderDetail
-                        provider={
-                          providers.find((p) => p.id === activeProvider.id) ?? {
-                            id: activeProvider.id,
-                            name: activeProvider.name,
-                            description:
-                              PROVIDER_META[activeProvider.id]
-                                ?.descriptionKey ?? "",
-                            managed: true,
-                            models: [],
+                        <p className="text-[12px] text-text-muted mb-3">
+                          {t("models.loadFailedHint")}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            queryClient.invalidateQueries({
+                              queryKey: ["models"],
+                            })
                           }
-                        }
-                        currentModelId={currentModelId}
-                        onAutoSelectModel={handleAutoSelectModel}
-                      />
-                    )
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium bg-surface-2 hover:bg-surface-3 text-text-primary transition-colors"
+                        >
+                          <RefreshCw size={12} />
+                          {t("models.retry")}
+                        </button>
+                      </div>
+                    </div>
                   ) : (
-                    <ByokProviderDetail
-                      providerId={activeProvider.id}
-                      dbProvider={dbProviders.find(
-                        (p) => p.providerId === activeProvider.id,
-                      )}
-                      queryClient={queryClient}
+                    <ManagedProviderDetail
+                      provider={
+                        providers.find((p) => p.id === activeProvider.id) ?? {
+                          id: activeProvider.id,
+                          name: activeProvider.name,
+                          description:
+                            PROVIDER_META[activeProvider.id]?.descriptionKey ??
+                            "",
+                          managed: true,
+                          models: [],
+                        }
+                      }
                       currentModelId={currentModelId}
                       onAutoSelectModel={handleAutoSelectModel}
                     />
                   )
                 ) : (
-                  <div className="flex items-center justify-center h-full text-[13px] text-text-muted">
-                    {t("models.selectProvider")}
-                  </div>
-                )}
-              </div>
+                  <ByokProviderDetail
+                    providerId={activeProvider.id}
+                    dbProvider={dbProviders.find(
+                      (p) => p.providerId === activeProvider.id,
+                    )}
+                    queryClient={queryClient}
+                    currentModelId={currentModelId}
+                    onAutoSelectModel={handleAutoSelectModel}
+                  />
+                )
+              ) : (
+                <div className="flex items-center justify-center h-full text-[13px] text-text-muted">
+                  {t("models.selectProvider")}
+                </div>
+              )}
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -1786,6 +1807,61 @@ function ByokProviderDetail({
         </div>
       </div>
 
+      {/* Action buttons — moved before model list for visibility */}
+      <div className="flex items-center gap-3 mb-6">
+        <button
+          type="button"
+          disabled={
+            saveMutation.isPending || (!apiKey && !dbProvider?.hasApiKey)
+          }
+          onClick={() => saveMutation.mutate()}
+          className={cn(
+            "flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
+            !saveMutation.isPending && (apiKey || dbProvider?.hasApiKey)
+              ? "bg-accent text-white hover:bg-accent/90"
+              : "bg-surface-2 text-text-muted cursor-not-allowed",
+          )}
+        >
+          {saveMutation.isPending && (
+            <Loader2 size={13} className="animate-spin" />
+          )}
+          {dbProvider?.hasApiKey
+            ? t("models.byok.updateConfig")
+            : t("models.byok.saveAndEnable")}
+        </button>
+
+        {dbProvider?.hasApiKey && (
+          <button
+            type="button"
+            disabled={deleteMutation.isPending}
+            onClick={() => {
+              if (confirm(t("models.byok.confirmRemove"))) {
+                deleteMutation.mutate();
+              }
+            }}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-medium text-red-500 hover:bg-red-500/5 transition-colors"
+          >
+            {deleteMutation.isPending ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Trash2 size={13} />
+            )}
+            {t("models.byok.remove")}
+          </button>
+        )}
+      </div>
+
+      {saveMutation.isSuccess && (
+        <div className="mb-4 text-[11px] text-emerald-600">
+          {t("models.byok.saveSuccess")}
+        </div>
+      )}
+      {saveMutation.isError && (
+        <div className="mb-4 text-[11px] text-red-500">
+          {t("models.byok.saveFailed")}
+        </div>
+      )}
+
       {/* Model list — read-only */}
       <div>
         <div className="text-[13px] font-semibold text-text-primary mb-3">
@@ -1833,61 +1909,6 @@ function ByokProviderDetail({
           })}
         </div>
       </div>
-
-      {/* Action buttons */}
-      <div className="flex items-center gap-3 mt-6">
-        <button
-          type="button"
-          disabled={
-            saveMutation.isPending || (!apiKey && !dbProvider?.hasApiKey)
-          }
-          onClick={() => saveMutation.mutate()}
-          className={cn(
-            "flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
-            !saveMutation.isPending && (apiKey || dbProvider?.hasApiKey)
-              ? "bg-accent text-white hover:bg-accent/90"
-              : "bg-surface-2 text-text-muted cursor-not-allowed",
-          )}
-        >
-          {saveMutation.isPending && (
-            <Loader2 size={13} className="animate-spin" />
-          )}
-          {dbProvider?.hasApiKey
-            ? t("models.byok.updateConfig")
-            : t("models.byok.saveAndEnable")}
-        </button>
-
-        {dbProvider?.hasApiKey && (
-          <button
-            type="button"
-            disabled={deleteMutation.isPending}
-            onClick={() => {
-              if (confirm(t("models.byok.confirmRemove"))) {
-                deleteMutation.mutate();
-              }
-            }}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-medium text-red-500 hover:bg-red-500/5 transition-colors"
-          >
-            {deleteMutation.isPending ? (
-              <Loader2 size={13} className="animate-spin" />
-            ) : (
-              <Trash2 size={13} />
-            )}
-            {t("models.byok.remove")}
-          </button>
-        )}
-      </div>
-
-      {saveMutation.isSuccess && (
-        <div className="mt-3 text-[11px] text-emerald-600">
-          {t("models.byok.saveSuccess")}
-        </div>
-      )}
-      {saveMutation.isError && (
-        <div className="mt-3 text-[11px] text-red-500">
-          {t("models.byok.saveFailed")}
-        </div>
-      )}
     </div>
   );
 }
