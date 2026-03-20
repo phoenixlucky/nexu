@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/electron/renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { DesktopShell } from "./components/desktop-shell";
 import "./runtime-page.css";
 

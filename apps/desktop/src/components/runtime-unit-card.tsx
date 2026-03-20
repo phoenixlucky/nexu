@@ -67,7 +67,9 @@ export function RuntimeUnitCard({
       toast.success(`Revealed log file for ${unit.label}.`);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to open runtime log file.",
+        error instanceof Error
+          ? error.message
+          : "Failed to open runtime log file.",
       );
     }
   }
@@ -136,7 +138,9 @@ export function RuntimeUnitCard({
         </div>
       </dl>
 
-      {unit.lastError ? <p className="runtime-error">{unit.lastError}</p> : null}
+      {unit.lastError ? (
+        <p className="runtime-error">{unit.lastError}</p>
+      ) : null}
 
       {unit.binaryPath ? (
         <div className="runtime-binary-path">

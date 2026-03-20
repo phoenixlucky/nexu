@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { Toaster } from "sonner";
 import type { DesktopChromeMode, DesktopSurface } from "../../shared/host";
-import { useDesktopRuntimeConfig } from "../hooks/use-desktop-runtime-config";
 import { useAutoUpdate } from "../hooks/use-auto-update";
+import { useDesktopRuntimeConfig } from "../hooks/use-desktop-runtime-config";
 import { onDesktopCommand } from "../lib/host-api";
-import { formatBuildCommit, formatBuildTimestamp } from "../lib/runtime-formatters";
+import {
+  formatBuildCommit,
+  formatBuildTimestamp,
+} from "../lib/runtime-formatters";
 import { DiagnosticsPage } from "../pages/diagnostics-page";
 import { RuntimePage } from "../pages/runtime-page";
 import { SurfaceButton } from "./surface-button";
@@ -130,7 +133,9 @@ export function DesktopShell() {
       </aside>
 
       <main className="desktop-shell-stage">
-        <div style={{ display: activeSurface === "control" ? "contents" : "none" }}>
+        <div
+          style={{ display: activeSurface === "control" ? "contents" : "none" }}
+        >
           <>
             <RuntimePage />
             <Toaster position="top-right" />

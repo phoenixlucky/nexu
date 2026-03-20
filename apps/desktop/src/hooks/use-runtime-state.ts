@@ -15,7 +15,9 @@ export function useRuntimeState() {
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to load runtime state.",
+        error instanceof Error
+          ? error.message
+          : "Failed to load runtime state.",
       );
     }
   }, []);

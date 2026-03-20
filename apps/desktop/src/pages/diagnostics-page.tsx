@@ -19,7 +19,9 @@ export function DiagnosticsPage() {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [diagnosticsInfo, setDiagnosticsInfo] =
     useState<DiagnosticsInfo | null>(null);
-  const [busyAction, setBusyAction] = useState<DiagnosticsActionId | null>(null);
+  const [busyAction, setBusyAction] = useState<DiagnosticsActionId | null>(
+    null,
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState<string>(
     "Ready for diagnostics.",
@@ -71,7 +73,9 @@ export function DiagnosticsPage() {
   }, []);
 
   const triggerRendererCrash = useCallback(() => {
-    setLastAction(`Renderer crash requested at ${new Date().toLocaleTimeString()}.`);
+    setLastAction(
+      `Renderer crash requested at ${new Date().toLocaleTimeString()}.`,
+    );
 
     void runAction("renderer-crash", async () => {
       await triggerRendererProcessCrash();
@@ -79,7 +83,9 @@ export function DiagnosticsPage() {
   }, [runAction]);
 
   const triggerMainCrash = useCallback(() => {
-    setLastAction(`Main crash requested at ${new Date().toLocaleTimeString()}.`);
+    setLastAction(
+      `Main crash requested at ${new Date().toLocaleTimeString()}.`,
+    );
 
     void runAction("main-crash", async () => {
       await triggerMainProcessCrash();
@@ -93,8 +99,9 @@ export function DiagnosticsPage() {
           <span className="runtime-eyebrow">Crash Diagnostics</span>
           <h1>Exercise the Electron failure paths on demand</h1>
           <p>
-            Use one page to validate renderer exceptions, renderer process exits,
-            and main process crashes through the local desktop observability stack.
+            Use one page to validate renderer exceptions, renderer process
+            exits, and main process crashes through the local desktop
+            observability stack.
           </p>
         </div>
       </header>
@@ -127,7 +134,9 @@ export function DiagnosticsPage() {
         <SummaryCard
           label="Sentry DSN"
           className="diagnostics-summary-wide"
-          value={diagnosticsInfo ? maskSentryDsn(diagnosticsInfo.sentryDsn) : "-"}
+          value={
+            diagnosticsInfo ? maskSentryDsn(diagnosticsInfo.sentryDsn) : "-"
+          }
         />
       </section>
 
@@ -137,7 +146,9 @@ export function DiagnosticsPage() {
         terminate a process and are meant for native crash capture.
       </p>
 
-      {errorMessage ? <p className="runtime-error-banner">{errorMessage}</p> : null}
+      {errorMessage ? (
+        <p className="runtime-error-banner">{errorMessage}</p>
+      ) : null}
 
       <section className="diagnostics-grid">
         <DiagnosticsActionCard
@@ -166,9 +177,9 @@ export function DiagnosticsPage() {
           <h2>{lastAction}</h2>
           <p>
             Renderer process type: {diagnosticsInfo?.processType ?? "unknown"}.
-            JavaScript exceptions should stay visible in the renderer and in Sentry
-            when configured. Process crashes should leave Crashpad dumps and, with
-            Sentry enabled, upload native crash events.
+            JavaScript exceptions should stay visible in the renderer and in
+            Sentry when configured. Process crashes should leave Crashpad dumps
+            and, with Sentry enabled, upload native crash events.
           </p>
         </div>
       </section>

@@ -2,9 +2,14 @@ import { useState } from "react";
 import type { RuntimeState } from "../../shared/host";
 import { RuntimeUnitCard } from "../components/runtime-unit-card";
 import { SummaryCard } from "../components/summary-card";
-import { checkComponentUpdates, installComponent, startUnit, stopUnit } from "../lib/host-api";
-import { phaseTone } from "../lib/runtime-formatters";
 import { useRuntimeState } from "../hooks/use-runtime-state";
+import {
+  checkComponentUpdates,
+  installComponent,
+  startUnit,
+  stopUnit,
+} from "../lib/host-api";
+import { phaseTone } from "../lib/runtime-formatters";
 
 type ComponentUpdateInfo = {
   id: string;
@@ -60,7 +65,10 @@ export function RuntimePage() {
       </header>
 
       <section className="runtime-summary">
-        <SummaryCard label="Started at" value={runtimeState?.startedAt ?? "-"} />
+        <SummaryCard
+          label="Started at"
+          value={runtimeState?.startedAt ?? "-"}
+        />
         <SummaryCard label="Running" value={summary.running} />
         <SummaryCard label="Managed" value={summary.managed} />
         <SummaryCard label="Failed" value={summary.failed} />
@@ -105,7 +113,8 @@ export function RuntimePage() {
             {componentUpdates.map((u) => (
               <li key={u.id}>
                 <span>
-                  {u.id}: {u.currentVersion ?? "none"} → {u.newVersion} ({u.size} bytes)
+                  {u.id}: {u.currentVersion ?? "none"} → {u.newVersion} (
+                  {u.size} bytes)
                 </span>
                 <button
                   disabled={componentBusy}
@@ -120,7 +129,8 @@ export function RuntimePage() {
                         );
                         if (result.ok) {
                           setComponentUpdates(
-                            (prev) => prev?.filter((item) => item.id !== u.id) ?? null,
+                            (prev) =>
+                              prev?.filter((item) => item.id !== u.id) ?? null,
                           );
                         }
                       })
@@ -148,7 +158,9 @@ export function RuntimePage() {
         logs from the local orchestrator.
       </p>
 
-      {errorMessage ? <p className="runtime-error-banner">{errorMessage}</p> : null}
+      {errorMessage ? (
+        <p className="runtime-error-banner">{errorMessage}</p>
+      ) : null}
 
       <section className="runtime-pane-layout">
         <aside className="runtime-sidebar" aria-label="Runtime units">
@@ -182,7 +194,9 @@ export function RuntimePage() {
               unit={activeUnit}
             />
           ) : (
-            <section className="runtime-empty-state">No runtime units available.</section>
+            <section className="runtime-empty-state">
+              No runtime units available.
+            </section>
           )}
         </div>
       </section>

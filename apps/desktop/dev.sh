@@ -11,6 +11,7 @@ LOG_DIR="$TMP_DIR/logs"
 LOG_FILE="$LOG_DIR/desktop-dev.log"
 STARTUP_TIMELINE_FILE="$LOG_DIR/desktop-startup-timeline.log"
 SESSION_NAME="nexu-desktop"
+ELECTRON_MAIN_MATCH="$ROOT_DIR/node_modules/.pnpm/electron@.*/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron \."
 
 mkdir -p "$TMP_DIR/locks" "$LOG_DIR"
 
