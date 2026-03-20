@@ -15,10 +15,9 @@
 
 <p align="center">
   <a href="https://nexu.io" target="_blank" rel="noopener"><strong>🌐 Website</strong></a> &nbsp;·&nbsp;
-  <a href="https://github.com/nexu-io/nexu/releases/latest" target="_blank" rel="noopener"><strong>⬇️ Download</strong></a> &nbsp;·&nbsp;
   <a href="https://docs.nexu.io" target="_blank" rel="noopener"><strong>📖 Docs</strong></a> &nbsp;·&nbsp;
   <a href="https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913" target="_blank" rel="noopener"><strong>💬 Feishu</strong></a> &nbsp;·&nbsp;
-  <a href="https://discord.gg/nexu" target="_blank" rel="noopener"><strong>🎮 Discord</strong></a> &nbsp;·&nbsp;
+  <a href="https://discord.gg/Q6AxCUuMNU" target="_blank" rel="noopener"><strong>🎮 Discord</strong></a> &nbsp;·&nbsp;
   <a href="https://x.com/Nexu06" target="_blank" rel="noopener"><strong>𝕏 Twitter</strong></a>
 </p>
 
@@ -28,13 +27,19 @@
 
 ---
 
+> 🎉 **Beta Perk**: During the beta period, top-tier models like Claude, GPT, Gemini, Kimi, GLM, and more are **completely free with unlimited usage**. [Download and try now →](https://nexu.io)
+
+---
+
 ## 📋 Overview
 
-**nexu** (next to you) is an open-source desktop client (Electron) that connects **OpenClaw 🦞** agents to Feishu, Slack, Discord, and other IM channels.
+**nexu** (next to you) is an open-source desktop client that runs your **OpenClaw 🦞** Agent directly inside Feishu, Slack, Discord, and other IM channels.
 
-It offers graphical setup, built-in Feishu Skills, multi-model support, and BYOK.
+Download and go — graphical setup, built-in Feishu Skills, multi-model support (Claude / GPT / Gemini and more), and bring your own API Key.
 
-Configuration and runtime state stay primarily on your machine.
+Once connected to IM, your Agent is online 24/7 — chat from your phone anytime, anywhere.
+
+All data stays on your machine. Your privacy, fully in your control.
 
 <p align="center">
   <img src="site/media/readme-screenshot.png" width="660" alt="nexu screenshot" />
@@ -206,7 +211,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 | Feishu Group | Discord |
 |:---:|:---:|
 | <img src="site/media/feishu-qr.png" width="200" /> | <img src="site/media/discord-qr.png" width="200" /> |
-| [Join Feishu Group](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913) | [Join Discord](https://discord.gg/nexu) |
+| [Join Feishu Group](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913) | [Join Discord](https://discord.gg/Q6AxCUuMNU) |
 
 - [GitHub Discussions](https://github.com/nexu-io/nexu/discussions)
 - [GitHub Issues](https://github.com/nexu-io/nexu/issues)
