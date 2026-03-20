@@ -7,6 +7,7 @@ import {
   type MenuItemConstructorOptions,
   app,
   crashReporter,
+  powerSaveBlocker,
   session,
   shell,
 } from "electron";
@@ -53,6 +54,8 @@ const runtimeConfig = getDesktopRuntimeConfig(process.env, {
   resourcesPath: app.isPackaged ? electronRoot : undefined,
   useBuildConfig: app.isPackaged,
 });
+let powerSaveId: number | null = null;
+
 const orchestrator = new RuntimeOrchestrator(
   createRuntimeUnitManifests(
     electronRoot,
@@ -637,6 +640,7 @@ app.whenReady().then(async () => {
   diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
   const unsubscribeDiagnostics = diagnosticsReporter.start();
   const win = createMainWindow();
+  powerSaveId = powerSaveBlocker.start("prevent-app-suspension");
 
   void (async () => {
     const healthCheck = new StartupHealthCheck();
@@ -701,6 +705,9 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  if (powerSaveId !== null && powerSaveBlocker.isStarted(powerSaveId)) {
+    powerSaveBlocker.stop(powerSaveId);
+  }
   void diagnosticsReporter?.flushNow().catch(() => undefined);
   flushRuntimeLoggers();
   void orchestrator.dispose();
