@@ -26,6 +26,7 @@ function shouldUseCard(text: string): boolean {
  * Messages older than this are likely replays after context compaction (#30418). */
 const TYPING_INDICATOR_MAX_AGE_MS = 2 * 60_000;
 const MS_EPOCH_MIN = 1_000_000_000_000;
+const SYNTHETIC_FAILURE_TRIGGER_PREFIX = "__fail_reply__";
 
 function normalizeEpochMs(timestamp: number | undefined): number | undefined {
   if (!Number.isFinite(timestamp) || timestamp === undefined || timestamp <= 0) {
@@ -50,6 +51,7 @@ export type CreateFeishuReplyDispatcherParams = {
   rootId?: string;
   mentionTargets?: MentionTarget[];
   accountId?: string;
+  syntheticFailureTriggerText?: string;
   /** Epoch ms when the inbound message was created. Used to suppress typing
    *  indicators on old/replayed messages after context compaction (#30418). */
   messageCreateTimeMs?: number;
@@ -142,6 +144,59 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
 
   const runtimeLog = (message: string) => {
     params.runtime.log?.(`feishu[${account.accountId}]: nexu runtime patch ${message}`);
+  };
+
+  const emitReplyOutcome = (payload: {
+    status: "failed" | "silent" | "sent";
+    reasonCode: string;
+    error?: string;
+  }) => {
+    params.runtime.log?.(
+      `NEXU_EVENT channel.reply_outcome ${JSON.stringify({
+        channel: "feishu",
+        status: payload.status,
+        reasonCode: payload.reasonCode,
+        accountId: account.accountId,
+        chatId,
+        replyToMessageId,
+        threadId: rootId,
+        error: payload.error,
+        ts: new Date().toISOString(),
+      })}`,
+    );
+  };
+
+  const syntheticFailureAccountId =
+    process.env.NEXU_FEISHU_TEST_FAIL_REPLY_FOR_ACCOUNT?.trim() ?? "";
+  const syntheticFailureTriggerPrefix =
+    process.env.NEXU_FEISHU_TEST_TRIGGER_PREFIX?.trim() ??
+    SYNTHETIC_FAILURE_TRIGGER_PREFIX;
+  const syntheticFailureKind =
+    process.env.NEXU_FEISHU_TEST_FAIL_KIND?.trim().toLowerCase() ?? "final";
+  const syntheticFailureRepeat =
+    process.env.NEXU_FEISHU_TEST_FAIL_ONCE?.trim().toLowerCase() === "0";
+  let syntheticFailureTriggered = false;
+
+  const maybeTriggerSyntheticFailure = (deliveryKind: "block" | "final" | "media") => {
+    const accountMatched =
+      syntheticFailureAccountId && syntheticFailureAccountId === account.accountId;
+    const prefixMatched =
+      syntheticFailureTriggerPrefix.length > 0 &&
+      params.syntheticFailureTriggerText?.includes(syntheticFailureTriggerPrefix) === true;
+    if (!accountMatched && !prefixMatched) {
+      return;
+    }
+    if (syntheticFailureTriggered && !syntheticFailureRepeat) {
+      return;
+    }
+    if (syntheticFailureKind !== "any" && syntheticFailureKind !== deliveryKind) {
+      return;
+    }
+    syntheticFailureTriggered = true;
+    runtimeLog(
+      `synthetic reply failure triggered kind=${deliveryKind} mode=${prefixMatched ? "prefix" : "account"}`,
+    );
+    throw new Error(`nexu synthetic feishu reply failure (${deliveryKind})`);
   };
 
   let streaming: FeishuStreamingSession | null = null;
@@ -290,12 +345,14 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
             }
             if (info?.kind === "final") {
               streamText = mergeStreamingText(streamText, text);
+              maybeTriggerSyntheticFailure("final");
               await closeStreaming();
               hasDeliveredTextFinal = true;
             }
             // Send media even when streaming handled the text
             if (hasMedia) {
               for (const mediaUrl of mediaList) {
+                maybeTriggerSyntheticFailure("media");
                 await sendMediaFeishu({
                   cfg,
                   to: chatId,
@@ -316,6 +373,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
               textChunkLimit,
               chunkMode,
             )) {
+              maybeTriggerSyntheticFailure(info?.kind === "block" ? "block" : "final");
               await sendMarkdownCardFeishu({
                 cfg,
                 to: chatId,
@@ -337,6 +395,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
               textChunkLimit,
               chunkMode,
             )) {
+              maybeTriggerSyntheticFailure(info?.kind === "block" ? "block" : "final");
               await sendMessageFeishu({
                 cfg,
                 to: chatId,
@@ -356,6 +415,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
 
         if (hasMedia) {
           for (const mediaUrl of mediaList) {
+            maybeTriggerSyntheticFailure("media");
             await sendMediaFeishu({
               cfg,
               to: chatId,
@@ -371,6 +431,11 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
         params.runtime.error?.(
           `feishu[${account.accountId}] ${info.kind} reply failed: ${String(error)}`,
         );
+        emitReplyOutcome({
+          status: "failed",
+          reasonCode: `${info.kind}_reply_failed`,
+          error: error instanceof Error ? error.message : String(error),
+        });
         await closeStreaming();
         typingCallbacks.onIdle?.();
       },

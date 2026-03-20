@@ -14,6 +14,7 @@ import {
 import { WorkspaceTemplateWriter } from "../runtime/workspace-template-writer.js";
 import { AgentService } from "../services/agent-service.js";
 import { ArtifactService } from "../services/artifact-service.js";
+import { ChannelFallbackService } from "../services/channel-fallback-service.js";
 import { ChannelService } from "../services/channel-service.js";
 import { DesktopLocalService } from "../services/desktop-local-service.js";
 import { IntegrationService } from "../services/integration-service.js";
@@ -38,6 +39,7 @@ export interface ControllerContainer {
   openclawProcess: OpenClawProcessManager;
   agentService: AgentService;
   channelService: ChannelService;
+  channelFallbackService: ChannelFallbackService;
   sessionService: SessionService;
   skillService: SkillService;
   runtimeConfigService: RuntimeConfigService;
@@ -70,6 +72,10 @@ export function createContainer(): ControllerContainer {
   const openclawProcess = new OpenClawProcessManager(env);
   const wsClient = new OpenClawWsClient(env);
   const gatewayService = new OpenClawGatewayService(wsClient);
+  const channelFallbackService = new ChannelFallbackService(
+    openclawProcess,
+    gatewayService,
+  );
   const openclawSyncService = new OpenClawSyncService(
     env,
     configStore,
@@ -96,6 +102,7 @@ export function createContainer(): ControllerContainer {
     openclawProcess,
     agentService: new AgentService(configStore, openclawSyncService),
     channelService: new ChannelService(configStore, openclawSyncService),
+    channelFallbackService,
     sessionService: new SessionService(sessionsRuntime),
     skillService: new SkillService(configStore, openclawSyncService),
     runtimeConfigService: new RuntimeConfigService(
@@ -125,6 +132,7 @@ export function createContainer(): ControllerContainer {
       return () => {
         stopHealthLoop();
         skillhubService.dispose();
+        channelFallbackService.stop();
         wsClient.stop();
       };
     },
