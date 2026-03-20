@@ -141,9 +141,15 @@ function readDesktopCloud(config: NexuConfig): {
   };
 }
 
-function readDesktopLocale(config: NexuConfig): "en" | "zh-CN" {
+function readDesktopLocale(config: NexuConfig): "en" | "zh-CN" | null {
   const desktop = config.desktop as Record<string, unknown>;
-  return desktop.locale === "zh-CN" ? "zh-CN" : "en";
+  if (desktop.locale === "zh-CN") {
+    return "zh-CN";
+  }
+  if (desktop.locale === "en") {
+    return "en";
+  }
+  return null;
 }
 
 function now(): string {
@@ -853,9 +859,13 @@ export class NexuConfigStore {
     };
   }
 
-  async getDesktopLocale(): Promise<"en" | "zh-CN"> {
+  async getStoredDesktopLocale(): Promise<"en" | "zh-CN" | null> {
     const config = await this.getConfig();
     return readDesktopLocale(config);
+  }
+
+  async getDesktopLocale(): Promise<"en" | "zh-CN"> {
+    return (await this.getStoredDesktopLocale()) ?? "en";
   }
 
   async setDesktopLocale(locale: "en" | "zh-CN"): Promise<"en" | "zh-CN"> {

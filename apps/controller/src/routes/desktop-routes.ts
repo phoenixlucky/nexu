@@ -44,7 +44,11 @@ const fallbackEventsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
-const desktopPreferencesSchema = z.object({
+const desktopPreferencesResponseSchema = z.object({
+  locale: z.enum(["en", "zh-CN"]).nullable(),
+});
+
+const desktopPreferencesUpdateSchema = z.object({
   locale: z.enum(["en", "zh-CN"]),
 });
 
@@ -117,7 +121,7 @@ export function registerDesktopRoutes(
       responses: {
         200: {
           content: {
-            "application/json": { schema: desktopPreferencesSchema },
+            "application/json": { schema: desktopPreferencesResponseSchema },
           },
           description: "Desktop preferences",
         },
@@ -126,7 +130,7 @@ export function registerDesktopRoutes(
     async (c) => {
       return c.json(
         {
-          locale: await container.configStore.getDesktopLocale(),
+          locale: await container.configStore.getStoredDesktopLocale(),
         },
         200,
       );
@@ -141,7 +145,7 @@ export function registerDesktopRoutes(
       request: {
         body: {
           content: {
-            "application/json": { schema: desktopPreferencesSchema },
+            "application/json": { schema: desktopPreferencesUpdateSchema },
           },
           required: true,
         },
@@ -149,7 +153,7 @@ export function registerDesktopRoutes(
       responses: {
         200: {
           content: {
-            "application/json": { schema: desktopPreferencesSchema },
+            "application/json": { schema: desktopPreferencesResponseSchema },
           },
           description: "Updated desktop preferences",
         },

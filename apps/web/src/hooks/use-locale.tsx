@@ -5,9 +5,13 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
-import { patchApiInternalDesktopPreferences } from "../../lib/api/sdk.gen";
+import {
+  getApiInternalDesktopPreferences,
+  patchApiInternalDesktopPreferences,
+} from "../../lib/api/sdk.gen";
 
 export type Locale = "en" | "zh";
 
@@ -38,11 +42,19 @@ const LocaleContext = createContext<LocaleCtx>({
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(detectDefault);
+  const didBootstrapRef = useRef(false);
 
   useEffect(() => {
     i18n.changeLanguage(locale);
-    void syncDesktopLocale(locale);
   }, [locale]);
+
+  useEffect(() => {
+    if (didBootstrapRef.current) {
+      return;
+    }
+    didBootstrapRef.current = true;
+    void bootstrapLocale(setLocaleState);
+  }, []);
 
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l);
@@ -51,6 +63,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
+    void syncDesktopLocale(l);
   }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: locale dependency forces re-render on language change
@@ -80,4 +93,35 @@ async function syncDesktopLocale(locale: Locale): Promise<void> {
   }).catch(() => {
     // Best-effort sync only; local UI language should still work offline.
   });
+}
+
+async function bootstrapLocale(
+  setLocaleState: (locale: Locale) => void,
+): Promise<void> {
+  const localCandidate = detectDefault();
+
+  const response = await getApiInternalDesktopPreferences().catch(() => null);
+  const storedLocale = response?.data?.locale ?? null;
+
+  if (storedLocale === "en" || storedLocale === "zh-CN") {
+    const nextLocale = storedLocale === "zh-CN" ? "zh" : "en";
+    setLocaleState(nextLocale);
+    try {
+      localStorage.setItem(STORAGE_KEY, nextLocale);
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
+
+  setLocaleState(localCandidate);
+  try {
+    localStorage.setItem(STORAGE_KEY, localCandidate);
+  } catch {
+    /* ignore */
+  }
+
+  if (response) {
+    await syncDesktopLocale(localCandidate);
+  }
 }
