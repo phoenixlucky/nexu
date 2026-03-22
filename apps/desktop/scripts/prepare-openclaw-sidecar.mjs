@@ -134,6 +134,10 @@ const CORE_DIST_REPLY_BUNDLE_PATTERNS = [/^reply-.*\.js$/u];
 const FEISHU_PRE_LLM_SINGLE_AGENT_SEARCH = `
       // --- Single-agent dispatch (existing behavior) ---
       const ctxPayload = buildCtxPayloadForAgent(
+        route.sessionKey,
+        route.accountId,
+        ctx.mentionedBot,
+      );
 `.trim();
 const FEISHU_PRE_LLM_SINGLE_AGENT_REPLACEMENT = [
   "      // --- Single-agent dispatch (existing behavior) ---",
@@ -533,6 +537,23 @@ function applyExactReplacement(source, search, replacement, label) {
   return source.replace(search, replacement);
 }
 
+function countOccurrences(source, search) {
+  if (search.length === 0) {
+    return 0;
+  }
+
+  let count = 0;
+  let index = 0;
+  while (true) {
+    const nextIndex = source.indexOf(search, index);
+    if (nextIndex === -1) {
+      return count;
+    }
+    count += 1;
+    index = nextIndex + search.length;
+  }
+}
+
 async function patchReplyOutcomeBridge(openclawPackageRoot) {
   const patchedFiles = new Map();
   const feishuBotPath = resolve(
@@ -572,6 +593,20 @@ async function patchReplyOutcomeBridge(openclawPackageRoot) {
     );
     console.log(
       "[openclaw-sidecar] patched feishu single-agent pre-llm trigger",
+    );
+  }
+
+  if (
+    countOccurrences(feishuBotSource, FEISHU_PRE_LLM_SINGLE_AGENT_SEARCH) > 1
+  ) {
+    throw new Error(
+      "Feishu bot patch left a duplicate buildCtxPayloadForAgent argument block.",
+    );
+  }
+
+  if (feishuBotSource.includes("return;\n      }\n        route.sessionKey,")) {
+    throw new Error(
+      "Feishu bot patch left a dangling buildCtxPayloadForAgent argument tail.",
     );
   }
 
