@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { cp, lstat, mkdir, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,6 +30,36 @@ const rmWithRetriesOptions = {
   maxRetries: 5,
   retryDelay: 200,
 };
+
+/**
+ * Dereference pnpm symlinks for extraResources that electron-builder
+ * copies into the bundle. Without this, symlinks point to non-existent
+ * paths in the final .app bundle, causing codesign to fail.
+ */
+async function dereferencePnpmSymlinks() {
+  const targets = [
+    resolve(electronRoot, "node_modules/sharp"),
+    resolve(electronRoot, "node_modules/@img"),
+  ];
+
+  for (const target of targets) {
+    try {
+      const stat = await lstat(target);
+      if (!stat.isSymbolicLink()) {
+        continue;
+      }
+
+      const realTarget = await realpath(target);
+      console.log(`[dist:mac] dereferencing pnpm symlink: ${target} -> ${realTarget}`);
+
+      await rm(target, rmWithRetriesOptions);
+      await cp(realTarget, target, { recursive: true, dereference: true });
+    } catch (err) {
+      // Target doesn't exist or other error - skip silently
+      console.log(`[dist:mac] skipping ${target}: ${err.message}`);
+    }
+  }
+}
 
 function parseEnvFile(content) {
   const values = {};
@@ -433,6 +463,10 @@ async function main() {
     },
   );
   env.CUSTOM_DMGBUILD_PATH = await ensureDmgbuildBundle();
+
+  // Dereference pnpm symlinks before electron-builder runs
+  await dereferencePnpmSymlinks();
+
   // Use git short SHA as CFBundleVersion (shown in parentheses in About dialog).
   // Falls back to "dev" for local builds outside a git repo.
   let buildVersion = "dev";
