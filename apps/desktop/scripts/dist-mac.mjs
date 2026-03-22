@@ -1,6 +1,15 @@
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cp, lstat, mkdir, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import {
+  cp,
+  lstat,
+  mkdir,
+  readFile,
+  readdir,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,7 +59,9 @@ async function dereferencePnpmSymlinks() {
       }
 
       const realTarget = await realpath(target);
-      console.log(`[dist:mac] dereferencing pnpm symlink: ${target} -> ${realTarget}`);
+      console.log(
+        `[dist:mac] dereferencing pnpm symlink: ${target} -> ${realTarget}`,
+      );
 
       await rm(target, rmWithRetriesOptions);
       await cp(realTarget, target, { recursive: true, dereference: true });
