@@ -50,7 +50,6 @@ const rmWithRetriesOptions = {
 async function dereferencePnpmSymlinks() {
   const nodeModulesPath = resolve(electronRoot, "node_modules");
 
-  // Find all symlinks in node_modules
   let symlinks = [];
   try {
     const findResult = execFileSync(
@@ -74,7 +73,6 @@ async function dereferencePnpmSymlinks() {
     `[dist:mac] dereferencing ${symlinks.length} pnpm symlinks in node_modules`,
   );
 
-  // Collect symlink -> realpath mappings BEFORE modifying anything
   const mappings = [];
   for (const symlinkPath of symlinks) {
     try {
@@ -87,11 +85,9 @@ async function dereferencePnpmSymlinks() {
     }
   }
 
-  // Now replace each symlink with the actual content
   for (const { symlinkPath, realPath } of mappings) {
     try {
       await rm(symlinkPath, rmWithRetriesOptions);
-      // cp -RL: recursive + dereference all nested symlinks
       execFileSync("cp", ["-RL", realPath, symlinkPath], { stdio: "pipe" });
     } catch (err) {
       console.log(
@@ -100,13 +96,11 @@ async function dereferencePnpmSymlinks() {
     }
   }
 
-  // Also handle @img which is a peer dependency of sharp in pnpm store
   const sharpPath = resolve(nodeModulesPath, "sharp");
   const imgPath = resolve(nodeModulesPath, "@img");
   try {
     const stat = await lstat(sharpPath).catch(() => null);
     if (stat?.isDirectory()) {
-      // sharp is now a real directory, find @img in pnpm store
       const pnpmSharpPath = mappings.find((m) =>
         m.symlinkPath.endsWith("/sharp"),
       )?.realPath;
@@ -124,7 +118,6 @@ async function dereferencePnpmSymlinks() {
     console.log(`[dist:mac] failed to copy @img: ${err.message}`);
   }
 
-  // Verify no symlinks remain
   try {
     const remaining = execFileSync("find", [nodeModulesPath, "-type", "l"], {
       encoding: "utf8",
