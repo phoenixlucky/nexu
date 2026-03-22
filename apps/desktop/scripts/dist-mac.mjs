@@ -1,6 +1,7 @@
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  cp,
   lstat,
   mkdir,
   readFile,
@@ -40,98 +41,51 @@ const rmWithRetriesOptions = {
 };
 
 /**
- * Dereference ALL pnpm symlinks in node_modules.
- * pnpm uses symlinks extensively, but codesign fails when .app bundles
- * contain symlinks pointing outside the bundle.
- *
- * Strategy: Find all symlinks, resolve their real paths, then replace
- * each symlink with a full copy of the target using cp -RL.
+ * Dereference pnpm symlinks for extraResources that electron-builder
+ * copies into the bundle. Without this, symlinks point to non-existent
+ * paths in the final .app bundle, causing codesign to fail.
  */
 async function dereferencePnpmSymlinks() {
-  const nodeModulesPath = resolve(electronRoot, "node_modules");
+  const sharpPath = resolve(electronRoot, "node_modules/sharp");
+  const imgPath = resolve(electronRoot, "node_modules/@img");
+  let pnpmImgPath = null;
 
-  let symlinks = [];
+  // First, dereference sharp if it's a symlink
   try {
-    const findResult = execFileSync(
-      "find",
-      [nodeModulesPath, "-type", "l", "-maxdepth", "2"],
-      { encoding: "utf8", maxBuffer: 10 * 1024 * 1024 },
-    ).trim();
-    if (findResult) {
-      symlinks = findResult.split("\n").filter(Boolean);
-    }
-  } catch {
-    // No symlinks found
-  }
-
-  if (symlinks.length === 0) {
-    console.log("[dist:mac] no symlinks found in node_modules");
-    return;
-  }
-
-  console.log(
-    `[dist:mac] dereferencing ${symlinks.length} pnpm symlinks in node_modules`,
-  );
-
-  const mappings = [];
-  for (const symlinkPath of symlinks) {
-    try {
-      const realPath = await realpath(symlinkPath);
-      mappings.push({ symlinkPath, realPath });
-    } catch (err) {
+    const sharpStat = await lstat(sharpPath);
+    if (sharpStat.isSymbolicLink()) {
+      const realSharpPath = await realpath(sharpPath);
+      pnpmImgPath = resolve(dirname(realSharpPath), "@img");
       console.log(
-        `[dist:mac] failed to resolve ${symlinkPath}: ${err.message}`,
+        `[dist:mac] dereferencing pnpm symlink: ${sharpPath} -> ${realSharpPath}`,
       );
-    }
-  }
-
-  for (const { symlinkPath, realPath } of mappings) {
-    try {
-      await rm(symlinkPath, rmWithRetriesOptions);
-      execFileSync("cp", ["-RL", realPath, symlinkPath], { stdio: "pipe" });
-    } catch (err) {
-      console.log(
-        `[dist:mac] failed to dereference ${symlinkPath}: ${err.message}`,
-      );
-    }
-  }
-
-  const sharpPath = resolve(nodeModulesPath, "sharp");
-  const imgPath = resolve(nodeModulesPath, "@img");
-  try {
-    const stat = await lstat(sharpPath).catch(() => null);
-    if (stat?.isDirectory()) {
-      const pnpmSharpPath = mappings.find((m) =>
-        m.symlinkPath.endsWith("/sharp"),
-      )?.realPath;
-      if (pnpmSharpPath) {
-        const pnpmImgPath = resolve(dirname(pnpmSharpPath), "@img");
-        const pnpmImgStat = await lstat(pnpmImgPath).catch(() => null);
-        if (pnpmImgStat) {
-          console.log("[dist:mac] copying @img from pnpm store");
-          await rm(imgPath, rmWithRetriesOptions);
-          execFileSync("cp", ["-RL", pnpmImgPath, imgPath], { stdio: "pipe" });
-        }
-      }
+      await rm(sharpPath, rmWithRetriesOptions);
+      await cp(realSharpPath, sharpPath, {
+        recursive: true,
+        dereference: true,
+      });
     }
   } catch (err) {
-    console.log(`[dist:mac] failed to copy @img: ${err.message}`);
+    console.log(`[dist:mac] skipping sharp: ${err.message}`);
   }
 
+  // Then, copy @img from sharp's node_modules to top-level if it doesn't exist
+  // (pnpm hoists @img inside sharp's node_modules, not at top level)
   try {
-    const remaining = execFileSync("find", [nodeModulesPath, "-type", "l"], {
-      encoding: "utf8",
-      maxBuffer: 10 * 1024 * 1024,
-    }).trim();
-    if (remaining) {
-      const lines = remaining.split("\n");
-      console.log(`[dist:mac] WARNING: ${lines.length} symlinks still remain`);
-      console.log(lines.slice(0, 10).join("\n"));
+    const sharpImgPath = pnpmImgPath ?? resolve(sharpPath, "node_modules/@img");
+    const sharpImgStat = await lstat(sharpImgPath).catch(() => null);
+
+    if (sharpImgStat) {
+      console.log(
+        `[dist:mac] copying @img from sharp's node_modules: ${sharpImgPath} -> ${imgPath}`,
+      );
+      await rm(imgPath, rmWithRetriesOptions);
+      await cp(sharpImgPath, imgPath, { recursive: true, dereference: true });
     } else {
-      console.log("[dist:mac] OK: all symlinks dereferenced");
+      console.log(`[dist:mac] @img not found in sharp's node_modules`);
     }
-  } catch {
-    console.log("[dist:mac] OK: no symlinks remaining");
+  } catch (err) {
+    console.log(`[dist:mac] skipping @img: ${err.message}`);
   }
 }
 
