@@ -107,6 +107,31 @@ async function dereferencePnpmSymlinks() {
       console.log(`[dist:mac] failed to copy @img: ${err.message}`);
     }
   }
+
+  // Debug: find any remaining symlinks in node_modules
+  try {
+    const nodeModulesPath = resolve(electronRoot, "node_modules");
+    const findResult = execFileSync("find", [nodeModulesPath, "-type", "l"], {
+      encoding: "utf8",
+      maxBuffer: 10 * 1024 * 1024,
+    }).trim();
+    if (findResult) {
+      const lines = findResult.split("\n");
+      console.log(
+        `[dist:mac] WARNING: ${lines.length} symlinks remaining in node_modules:`,
+      );
+      console.log(lines.slice(0, 30).join("\n"));
+    } else {
+      console.log(`[dist:mac] OK: no symlinks remaining in node_modules`);
+    }
+  } catch (err) {
+    // find returns exit code 0 even with no results, so check stderr
+    if (err.stdout?.trim()) {
+      console.log(`[dist:mac] symlinks found:`, err.stdout.trim());
+    } else {
+      console.log(`[dist:mac] failed to check for symlinks: ${err.message}`);
+    }
+  }
 }
 
 function parseEnvFile(content) {
