@@ -68,7 +68,7 @@ describe("OpenClawRuntimePluginWriter", () => {
     ).rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  it("preserves non-.bin symlinks inside plugin templates", async () => {
+  it("materializes non-.bin symlinks as real directories", async () => {
     const pluginDir = path.join(env.runtimePluginTemplatesDir, "plugin-a");
     const sharedAssetsDir = path.join(rootDir, "shared-assets");
 
@@ -80,19 +80,18 @@ describe("OpenClawRuntimePluginWriter", () => {
     const writer = new OpenClawRuntimePluginWriter(env);
     await writer.ensurePlugins();
 
-    const copiedSymlinkPath = path.join(
+    const copiedPath = path.join(
       env.openclawExtensionsDir,
       "plugin-a",
       "shared-assets",
     );
-    const copiedStat = await lstat(copiedSymlinkPath);
+    const copiedStat = await lstat(copiedPath);
 
-    expect(copiedStat.isSymbolicLink()).toBe(true);
-    await expect(readFile(copiedSymlinkPath, "utf8")).rejects.toMatchObject({
-      code: "EISDIR",
-    });
-    expect(
-      await readFile(path.join(copiedSymlinkPath, "manifest.json"), "utf8"),
-    ).toBe("{\n}\n");
+    // dereference: true materializes symlinks into real directories
+    expect(copiedStat.isSymbolicLink()).toBe(false);
+    expect(copiedStat.isDirectory()).toBe(true);
+    expect(await readFile(path.join(copiedPath, "manifest.json"), "utf8")).toBe(
+      "{\n}\n",
+    );
   });
 });
