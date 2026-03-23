@@ -12,17 +12,17 @@
 | 1. LaunchdManager service | **Done** | Core launchd wrapper |
 | 2. Plist generation | **Done** | Controller + OpenClaw templates |
 | 3. Embedded Web Server | **Done** | Replace web sidecar |
-| 4. Bootstrap flow | Not Started | Desktop startup sequence |
+| 4. Bootstrap flow | **Done** | Desktop startup sequence |
 | 5. Exit behavior | Not Started | Quit dialog + graceful shutdown |
 | 6. Dev mode scripts | Not Started | launchd-based dev workflow |
-| 7. Logging unification | Not Started | Unified log paths |
+| 7. Logging unification | **Done** | Unified to ~/.nexu/logs/ |
 | 8. Testing | Not Started | Integration tests |
 
 ---
 
 ## Current Task
 
-**Phase 4** - Bootstrap flow integration
+**Phase 5** - Exit behavior (quit dialog + graceful shutdown)
 
 ---
 
@@ -34,6 +34,8 @@
 - [x] LaunchdManager service (`apps/desktop/main/services/launchd-manager.ts`)
 - [x] Plist generator (`apps/desktop/main/services/plist-generator.ts`)
 - [x] Embedded web server (`apps/desktop/main/services/embedded-web-server.ts`)
+- [x] Bootstrap flow (`apps/desktop/main/services/launchd-bootstrap.ts`)
+- [x] Logging unified to `~/.nexu/logs/`
 
 ---
 
