@@ -63,7 +63,13 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
 
     event.preventDefault();
 
-    const decision = await showQuitDialog();
+    // In dev mode, skip dialog and keep services running (vite HMR restarts
+    // Electron frequently; stopping services each time would cause needless
+    // downtime). The dev-launchd.sh stop/clean commands use SIGKILL to bypass
+    // this handler when a full stop is intended.
+    const decision: QuitDecision = app.isPackaged
+      ? await showQuitDialog()
+      : "run-in-background";
 
     if (decision === "cancel") {
       return;

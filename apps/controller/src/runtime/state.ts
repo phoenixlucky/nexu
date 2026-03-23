@@ -1,4 +1,4 @@
-export type RuntimeStatus = "active" | "degraded" | "unhealthy";
+export type RuntimeStatus = "active" | "starting" | "degraded" | "unhealthy";
 
 export interface ControllerRuntimeState {
   status: RuntimeStatus;
@@ -15,11 +15,11 @@ export interface ControllerRuntimeState {
 
 export function createRuntimeState(): ControllerRuntimeState {
   return {
-    status: "active",
+    status: "starting",
     configSyncStatus: "active",
     skillsSyncStatus: "active",
     templatesSyncStatus: "active",
-    gatewayStatus: "active",
+    gatewayStatus: "starting",
     lastConfigSyncAt: null,
     lastSkillsSyncAt: null,
     lastTemplatesSyncAt: null,
@@ -30,9 +30,17 @@ export function createRuntimeState(): ControllerRuntimeState {
 
 function severity(status: RuntimeStatus): number {
   if (status === "active") return 0;
-  if (status === "degraded") return 1;
-  return 2;
+  if (status === "starting") return 1;
+  if (status === "degraded") return 2;
+  return 3;
 }
+
+const SEVERITY_TO_STATUS: RuntimeStatus[] = [
+  "active",
+  "starting",
+  "degraded",
+  "unhealthy",
+];
 
 export function recomputeRuntimeStatus(state: ControllerRuntimeState): void {
   const next = Math.max(
@@ -41,5 +49,5 @@ export function recomputeRuntimeStatus(state: ControllerRuntimeState): void {
     severity(state.templatesSyncStatus),
     severity(state.gatewayStatus),
   );
-  state.status = next === 0 ? "active" : next === 1 ? "degraded" : "unhealthy";
+  state.status = SEVERITY_TO_STATUS[next] ?? "unhealthy";
 }

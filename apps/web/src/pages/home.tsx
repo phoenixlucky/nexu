@@ -261,6 +261,12 @@ export function HomePage() {
           color: "var(--color-success)",
           pulse: false,
         } as const;
+      case "starting":
+        return {
+          label: t("home.status.starting"),
+          color: "var(--color-warning)",
+          pulse: true,
+        } as const;
       case "degraded":
         return {
           label: t("home.status.degraded"),
@@ -299,6 +305,13 @@ export function HomePage() {
           subtitle: t("home.status.subtitle.idle"),
           color: "var(--color-success)",
           pulse: false,
+        } as const;
+      case "starting":
+        return {
+          label: t("home.status.starting"),
+          subtitle: t("home.status.subtitle.starting"),
+          color: "var(--color-warning)",
+          pulse: true,
         } as const;
       case "degraded":
         return {

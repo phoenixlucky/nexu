@@ -11,6 +11,7 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { getWorkspaceRoot } from "../../shared/workspace-paths";
 import {
   type EmbeddedWebServer,
   startEmbeddedWebServer,
@@ -52,6 +53,8 @@ export interface LaunchdBootstrapResult {
     controller: string;
     openclaw: string;
   };
+  /** Promise that resolves when controller is ready (for optional awaiting) */
+  controllerReady: Promise<void>;
 }
 
 /**
@@ -79,6 +82,7 @@ async function waitForControllerReadiness(
 ): Promise<void> {
   const startedAt = Date.now();
   const probeUrl = `http://127.0.0.1:${port}/api/auth/get-session`;
+  let attempt = 0;
 
   while (Date.now() - startedAt < timeoutMs) {
     try {
@@ -87,14 +91,17 @@ async function waitForControllerReadiness(
       });
       if (response.status < 500) {
         console.log(
-          `Controller ready via ${probeUrl} status=${response.status}`,
+          `Controller ready via ${probeUrl} status=${response.status} after ${Date.now() - startedAt}ms`,
         );
         return;
       }
     } catch {
       // Ignore transient failures during startup
     }
-    await new Promise((r) => setTimeout(r, 250));
+    // Adaptive polling: start aggressive (50ms), increase to 250ms
+    const delay = Math.min(50 + attempt * 50, 250);
+    await new Promise((r) => setTimeout(r, delay));
+    attempt++;
   }
 
   throw new Error(`Controller readiness probe timed out for ${probeUrl}`);
@@ -119,6 +126,14 @@ export async function bootstrapWithLaunchd(
   };
 
   // Prepare plist environment
+  // Capture system PATH for launchd - launchd doesn't inherit shell env
+  const systemPath = process.env.PATH;
+  // Build NODE_PATH for TypeScript plugin resolution
+  // OpenClaw plugins need to resolve dependencies like 'openclaw/plugin-sdk'
+  // env.openclawPath = .../openclaw-runtime/node_modules/openclaw/openclaw.mjs
+  // We need: .../openclaw-runtime/node_modules
+  const nodeModulesPath = path.dirname(path.dirname(env.openclawPath));
+
   const plistEnv: PlistEnv = {
     isDev: env.isDev,
     logDir,
@@ -131,53 +146,64 @@ export async function bootstrapWithLaunchd(
     openclawStateDir: env.openclawStateDir,
     controllerCwd: env.controllerCwd,
     openclawCwd: env.openclawCwd,
+    systemPath,
+    nodeModulesPath,
   };
 
-  // 1. Ensure services are installed
+  // 1. Ensure services are installed (parallel)
   console.log("Installing launchd services...");
 
-  if (!(await launchd.isServiceInstalled(labels.controller))) {
-    const controllerPlist = generatePlist("controller", plistEnv);
-    await launchd.installService(labels.controller, controllerPlist);
-    console.log(`Installed ${labels.controller}`);
-  }
+  const ensureService = async (
+    label: string,
+    type: "controller" | "openclaw",
+  ) => {
+    if (!(await launchd.isServiceInstalled(label))) {
+      const plist = generatePlist(type, plistEnv);
+      await launchd.installService(label, plist);
+      console.log(`Installed ${label}`);
+    }
+  };
 
-  if (!(await launchd.isServiceInstalled(labels.openclaw))) {
-    const openclawPlist = generatePlist("openclaw", plistEnv);
-    await launchd.installService(labels.openclaw, openclawPlist);
-    console.log(`Installed ${labels.openclaw}`);
-  }
+  await Promise.all([
+    ensureService(labels.controller, "controller"),
+    ensureService(labels.openclaw, "openclaw"),
+  ]);
 
-  // 2. Start Controller if not running
-  console.log("Starting Controller...");
-  const controllerStatus = await launchd.getServiceStatus(labels.controller);
-  if (controllerStatus.status !== "running") {
-    await launchd.startService(labels.controller);
-  }
-  await waitForControllerReadiness(env.controllerPort);
-  console.log("Controller is ready");
+  // 2. Start services in parallel
+  console.log("Starting services...");
 
-  // 3. Start OpenClaw if not running
-  console.log("Starting OpenClaw...");
-  const openclawStatus = await launchd.getServiceStatus(labels.openclaw);
-  if (openclawStatus.status !== "running") {
-    await launchd.startService(labels.openclaw);
-  }
-  console.log("OpenClaw started");
+  const ensureRunning = async (label: string) => {
+    const status = await launchd.getServiceStatus(label);
+    if (status.status !== "running") {
+      await launchd.startService(label);
+    }
+  };
 
-  // 4. Start embedded Web Server
-  console.log("Starting embedded web server...");
-  const webServer = await startEmbeddedWebServer({
-    port: env.webPort,
-    webRoot: env.webRoot,
-    controllerPort: env.controllerPort,
-  });
-  console.log(`Web server ready on http://127.0.0.1:${env.webPort}`);
+  // Start both services and embedded web server in parallel
+  const [, , webServer] = await Promise.all([
+    ensureRunning(labels.controller),
+    ensureRunning(labels.openclaw),
+    startEmbeddedWebServer({
+      port: env.webPort,
+      webRoot: env.webRoot,
+      controllerPort: env.controllerPort,
+    }),
+  ]);
+
+  console.log(
+    `Services started, web server ready on http://127.0.0.1:${env.webPort}`,
+  );
+
+  // 5. Create background readiness promise (non-blocking)
+  const controllerReady = waitForControllerReadiness(env.controllerPort).then(
+    () => console.log("Controller is ready"),
+  );
 
   return {
     launchd,
     webServer,
     labels,
+    controllerReady,
   };
 }
 
@@ -212,7 +238,7 @@ export function isLaunchdBootstrapEnabled(): boolean {
 export function getDefaultPlistDir(isDev: boolean): string {
   if (isDev) {
     // Dev mode: use repo-local directory
-    return path.join(process.cwd(), ".tmp", "launchd");
+    return path.join(getWorkspaceRoot(), ".tmp", "launchd");
   }
   // Production: use standard LaunchAgents directory
   return path.join(os.homedir(), "Library", "LaunchAgents");
@@ -249,7 +275,7 @@ export function resolveLaunchdPaths(
   }
 
   // Development: use local paths
-  const repoRoot = process.cwd();
+  const repoRoot = getWorkspaceRoot();
   return {
     nodePath: process.execPath,
     controllerEntryPath: path.join(

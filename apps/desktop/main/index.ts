@@ -16,7 +16,7 @@ import {
 import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
-import { getDesktopAppRoot } from "../shared/workspace-paths";
+import { getDesktopAppRoot, getWorkspaceRoot } from "../shared/workspace-paths";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import { exportDiagnostics } from "./diagnostics-export";
@@ -431,6 +431,7 @@ async function waitForControllerReadiness(): Promise<void> {
     "/api/auth/get-session",
     runtimeConfig.urls.controllerBase,
   );
+  let attempt = 0;
 
   while (Date.now() - startedAt < timeoutMs) {
     try {
@@ -442,7 +443,7 @@ async function waitForControllerReadiness(): Promise<void> {
 
       if (response.status < 500) {
         logColdStart(
-          `controller ready via ${probeUrl.pathname} status=${response.status}`,
+          `controller ready via ${probeUrl.pathname} status=${response.status} after ${Date.now() - startedAt}ms`,
         );
         return;
       }
@@ -450,7 +451,10 @@ async function waitForControllerReadiness(): Promise<void> {
       // Ignore transient startup failures while the controller starts.
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    // Adaptive polling: start aggressive (50ms), increase to 250ms
+    const delay = Math.min(50 + attempt * 50, 250);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    attempt++;
   }
 
   throw new Error(
@@ -498,18 +502,28 @@ async function runLaunchdColdStart(): Promise<void> {
   const openclawStateDir = resolve(nexuHome, "runtime", "openclaw", "state");
   const openclawConfigPath = resolve(openclawStateDir, "openclaw.json");
 
+  // In dev mode, serve web app from apps/web/dist
+  // In packaged mode, serve from resources/web
+  const webRoot = isDev
+    ? resolve(getWorkspaceRoot(), "apps", "web", "dist")
+    : resolve(electronRoot, "web");
+
   launchdResult = await bootstrapWithLaunchd({
     isDev,
     controllerPort: runtimeConfig.ports.controller,
     webPort: runtimeConfig.ports.web,
-    webRoot: resolve(__dirname, "../../dist"),
+    webRoot,
     plistDir: getDefaultPlistDir(isDev),
     ...paths,
     openclawConfigPath,
     openclawStateDir,
   });
 
-  logColdStart("launchd services started, bootstrapping auth session");
+  logColdStart("launchd services started, waiting for controller readiness");
+  diagnosticsReporter?.markColdStartRunning("waiting for controller readiness");
+  await launchdResult.controllerReady;
+
+  logColdStart("controller ready, bootstrapping auth session");
   diagnosticsReporter?.markColdStartRunning(
     "bootstrapping desktop auth session",
   );

@@ -423,7 +423,7 @@ export type GetApiInternalDesktopReadyResponses = {
             ok: boolean;
             status: number;
         };
-        status: 'active' | 'degraded' | 'unhealthy';
+        status: 'active' | 'starting' | 'degraded' | 'unhealthy';
     };
 };
 

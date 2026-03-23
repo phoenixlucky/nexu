@@ -3,8 +3,9 @@
 # Launchd-based development script for Nexu Desktop
 #
 # Usage:
-#   ./scripts/dev-launchd.sh         # Start services
-#   ./scripts/dev-launchd.sh stop    # Stop services
+#   ./scripts/dev-launchd.sh         # Start services (auto-cleans first)
+#   ./scripts/dev-launchd.sh stop    # Stop all services
+#   ./scripts/dev-launchd.sh restart # Restart services
 #   ./scripts/dev-launchd.sh status  # Show service status
 #   ./scripts/dev-launchd.sh logs    # Tail all logs
 #
@@ -21,8 +22,8 @@ CONTROLLER_LABEL="io.nexu.controller.dev"
 OPENCLAW_LABEL="io.nexu.openclaw.dev"
 
 # Ports
-CONTROLLER_PORT="${CONTROLLER_PORT:-50814}"
-WEB_PORT="${WEB_PORT:-50810}"
+CONTROLLER_PORT="${CONTROLLER_PORT:-50800}"
+OPENCLAW_PORT="${OPENCLAW_PORT:-18789}"
 
 # Paths
 NODE_PATH="${NODE_PATH:-$(which node)}"
@@ -34,189 +35,147 @@ OPENCLAW_CONFIG="$OPENCLAW_STATE_DIR/openclaw.json"
 
 mkdir -p "$LOG_DIR" "$PLIST_DIR" "$OPENCLAW_STATE_DIR"
 
-# Cleanup function
-cleanup() {
-  echo "Cleaning up..."
-  launchctl kill SIGTERM "$DOMAIN/$OPENCLAW_LABEL" 2>/dev/null || true
-  launchctl kill SIGTERM "$DOMAIN/$CONTROLLER_LABEL" 2>/dev/null || true
-}
+# Full cleanup - stops and removes all related services and processes
+full_cleanup() {
+  echo "Performing full cleanup..."
 
-generate_controller_plist() {
-  cat > "$PLIST_DIR/$CONTROLLER_LABEL.plist" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>$CONTROLLER_LABEL</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>$NODE_PATH</string>
-        <string>$CONTROLLER_ENTRY</string>
-    </array>
-    <key>WorkingDirectory</key>
-    <string>$REPO_ROOT/apps/controller</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>PORT</key>
-        <string>$CONTROLLER_PORT</string>
-        <key>NODE_ENV</key>
-        <string>development</string>
-        <key>HOME</key>
-        <string>$HOME</string>
-    </dict>
-    <key>StandardOutPath</key>
-    <string>$LOG_DIR/controller.log</string>
-    <key>StandardErrorPath</key>
-    <string>$LOG_DIR/controller.error.log</string>
-    <key>KeepAlive</key>
-    <dict>
-        <key>SuccessfulExit</key>
-        <false/>
-    </dict>
-    <key>ThrottleInterval</key>
-    <integer>5</integer>
-    <key>RunAtLoad</key>
-    <false/>
-</dict>
-</plist>
-EOF
-}
+  # 1. Kill Electron first with SIGKILL to bypass quit handler
+  #    (quit handler would race with our launchd cleanup)
+  echo "  Killing Electron..."
+  pkill -9 -f "Electron.*apps/desktop" 2>/dev/null || true
+  pkill -f "vite.*apps/desktop" 2>/dev/null || true
 
-generate_openclaw_plist() {
-  cat > "$PLIST_DIR/$OPENCLAW_LABEL.plist" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>$OPENCLAW_LABEL</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>$NODE_PATH</string>
-        <string>$OPENCLAW_PATH</string>
-        <string>gateway</string>
-        <string>--auth</string>
-        <string>none</string>
-    </array>
-    <key>WorkingDirectory</key>
-    <string>$REPO_ROOT</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>OPENCLAW_CONFIG_PATH</key>
-        <string>$OPENCLAW_CONFIG</string>
-        <key>OPENCLAW_STATE_DIR</key>
-        <string>$OPENCLAW_STATE_DIR</string>
-        <key>OPENCLAW_LAUNCHD_LABEL</key>
-        <string>$OPENCLAW_LABEL</string>
-        <key>OPENCLAW_SERVICE_MARKER</key>
-        <string>launchd</string>
-        <key>HOME</key>
-        <string>$HOME</string>
-    </dict>
-    <key>StandardOutPath</key>
-    <string>$LOG_DIR/openclaw.log</string>
-    <key>StandardErrorPath</key>
-    <string>$LOG_DIR/openclaw.error.log</string>
-    <key>KeepAlive</key>
-    <dict>
-        <key>SuccessfulExit</key>
-        <false/>
-        <key>OtherJobEnabled</key>
-        <dict>
-            <key>$CONTROLLER_LABEL</key>
-            <true/>
-        </dict>
-    </dict>
-    <key>ThrottleInterval</key>
-    <integer>5</integer>
-    <key>RunAtLoad</key>
-    <false/>
-</dict>
-</plist>
-EOF
-}
+  # 2. Bootout launchd services (stops + unregisters in one step)
+  echo "  Booting out launchd services..."
+  launchctl bootout "$DOMAIN/$OPENCLAW_LABEL" 2>/dev/null || true
+  launchctl bootout "$DOMAIN/$CONTROLLER_LABEL" 2>/dev/null || true
 
-bootstrap_service() {
-  local label=$1
-  local plist="$PLIST_DIR/$label.plist"
+  sleep 1
 
-  if ! launchctl print "$DOMAIN/$label" &>/dev/null; then
-    echo "Bootstrapping $label..."
-    if ! launchctl bootstrap "$DOMAIN" "$plist" 2>&1; then
-      echo "Note: $label may already be bootstrapped"
+  # 3. Kill any remaining orphan processes
+  pkill -f "openclaw.mjs gateway" 2>/dev/null || true
+  pkill -f "controller/dist/index.js" 2>/dev/null || true
+
+  # 4. Wait for ports to be free (with timeout)
+  local max_wait=10
+  local waited=0
+  while [ $waited -lt $max_wait ]; do
+    local port_busy=0
+    if lsof -i ":$CONTROLLER_PORT" -P -n &>/dev/null; then
+      port_busy=1
     fi
-  else
-    echo "$label already bootstrapped"
-  fi
-}
-
-start_services() {
-  echo "=== Nexu Desktop (launchd mode) ==="
-  echo "Log directory: $LOG_DIR"
-  echo "Plist directory: $PLIST_DIR"
-  echo ""
-
-  # Generate plists
-  echo "Generating plist files..."
-  generate_controller_plist
-  generate_openclaw_plist
-
-  # Bootstrap services
-  bootstrap_service "$CONTROLLER_LABEL"
-  bootstrap_service "$OPENCLAW_LABEL"
-
-  # Start services
-  echo "Starting services..."
-  launchctl kickstart -k "$DOMAIN/$CONTROLLER_LABEL"
-
-  # Wait for controller
-  echo "Waiting for Controller..."
-  for i in {1..30}; do
-    if curl -s "http://127.0.0.1:$CONTROLLER_PORT/api/auth/get-session" >/dev/null 2>&1; then
-      echo "Controller is ready"
+    if lsof -i ":$OPENCLAW_PORT" -P -n &>/dev/null; then
+      port_busy=1
+    fi
+    if [ $port_busy -eq 0 ]; then
       break
     fi
+    echo "  Waiting for ports to be free..."
     sleep 1
+    waited=$((waited + 1))
   done
 
-  launchctl kickstart -k "$DOMAIN/$OPENCLAW_LABEL"
-  echo "OpenClaw started"
-
-  echo ""
-  echo "=== Services running ==="
-  show_status
-  echo ""
-  echo "View logs: $0 logs"
-  echo "Stop services: $0 stop"
+  echo "Cleanup complete."
 }
 
 stop_services() {
   echo "Stopping services..."
 
-  # Stop OpenClaw first
+  # Kill Electron with SIGKILL to bypass quit handler
+  pkill -9 -f "Electron.*apps/desktop" 2>/dev/null || true
+  pkill -f "vite.*apps/desktop" 2>/dev/null || true
+
+  # Bootout launchd services (stops + unregisters atomically)
   if launchctl print "$DOMAIN/$OPENCLAW_LABEL" &>/dev/null; then
-    echo "Stopping $OPENCLAW_LABEL..."
-    launchctl kill SIGTERM "$DOMAIN/$OPENCLAW_LABEL" 2>/dev/null || true
-    sleep 2
+    echo "  Stopping $OPENCLAW_LABEL..."
+    launchctl bootout "$DOMAIN/$OPENCLAW_LABEL" 2>/dev/null || true
   fi
-
-  # Stop Controller
   if launchctl print "$DOMAIN/$CONTROLLER_LABEL" &>/dev/null; then
-    echo "Stopping $CONTROLLER_LABEL..."
-    launchctl kill SIGTERM "$DOMAIN/$CONTROLLER_LABEL" 2>/dev/null || true
-    sleep 2
+    echo "  Stopping $CONTROLLER_LABEL..."
+    launchctl bootout "$DOMAIN/$CONTROLLER_LABEL" 2>/dev/null || true
   fi
 
-  echo "Services stopped"
+  sleep 1
+
+  # Kill any remaining orphan processes
+  pkill -f "openclaw.mjs gateway" 2>/dev/null || true
+  pkill -f "controller/dist/index.js" 2>/dev/null || true
+
+  echo "Services stopped."
+}
+
+build_controller() {
+  echo "Building controller..."
+  pnpm --filter @nexu/controller build
+}
+
+# Remove stale plist files so Electron regenerates them on next boot
+purge_plists() {
+  rm -f "$PLIST_DIR"/*.plist 2>/dev/null || true
+}
+
+start_services() {
+  echo "=== Nexu Desktop (launchd mode) ==="
+  echo ""
+
+  # Always cleanup first to ensure clean state
+  full_cleanup
+
+  echo ""
+  echo "Log directory: $LOG_DIR"
+  echo ""
+
+  # Build controller (always, to pick up code changes)
+  build_controller
+
+  # Remove stale plist files so Electron generates fresh ones
+  purge_plists
+
+  mkdir -p "$LOG_DIR"
+
+  # Start Electron desktop with launchd mode
+  # Electron will manage Controller and OpenClaw via launchd with dynamic ports
+  echo "Starting Electron desktop (launchd mode)..."
+  cd "$REPO_ROOT"
+  NEXU_USE_LAUNCHD=1 NEXU_WORKSPACE_ROOT="$REPO_ROOT" pnpm --filter @nexu/desktop dev
 }
 
 show_status() {
+  echo "=== Service Status ==="
+  echo ""
   echo "Controller ($CONTROLLER_LABEL):"
-  launchctl print "$DOMAIN/$CONTROLLER_LABEL" 2>/dev/null | grep -E "state|pid" || echo "  Not running"
+  if launchctl print "$DOMAIN/$CONTROLLER_LABEL" &>/dev/null; then
+    launchctl print "$DOMAIN/$CONTROLLER_LABEL" 2>/dev/null | grep -E "state|pid|last exit" || true
+    # Check port
+    if lsof -i ":$CONTROLLER_PORT" -P -n &>/dev/null; then
+      echo "  Port $CONTROLLER_PORT: listening"
+    else
+      echo "  Port $CONTROLLER_PORT: not listening"
+    fi
+  else
+    echo "  Not registered"
+  fi
   echo ""
   echo "OpenClaw ($OPENCLAW_LABEL):"
-  launchctl print "$DOMAIN/$OPENCLAW_LABEL" 2>/dev/null | grep -E "state|pid" || echo "  Not running"
+  if launchctl print "$DOMAIN/$OPENCLAW_LABEL" &>/dev/null; then
+    launchctl print "$DOMAIN/$OPENCLAW_LABEL" 2>/dev/null | grep -E "state|pid|last exit" || true
+    # Check port
+    if lsof -i ":$OPENCLAW_PORT" -P -n &>/dev/null; then
+      echo "  Port $OPENCLAW_PORT: listening"
+    else
+      echo "  Port $OPENCLAW_PORT: not listening"
+    fi
+  else
+    echo "  Not registered"
+  fi
+  echo ""
+  echo "=== Electron Desktop ==="
+  if pgrep -f "Electron.*apps/desktop" &>/dev/null; then
+    echo "  Running"
+    pgrep -f "Electron.*apps/desktop" | head -1 | xargs ps -p 2>/dev/null | tail -1 || true
+  else
+    echo "  Not running"
+  fi
 }
 
 tail_logs() {
@@ -245,8 +204,11 @@ case "${1:-start}" in
   logs)
     tail_logs
     ;;
+  clean)
+    full_cleanup
+    ;;
   *)
-    echo "Usage: $0 {start|stop|restart|status|logs}"
+    echo "Usage: $0 {start|stop|restart|status|logs|clean}"
     exit 1
     ;;
 esac
