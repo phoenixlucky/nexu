@@ -67,6 +67,10 @@ function stripMetadata(raw: string): string {
   return raw;
 }
 
+function stripAssistantReplyPrefix(raw: string): string {
+  return raw.replace(/^\s*\[\[reply_to_current\]\]\s*/u, "");
+}
+
 /**
  * Extract sender name from raw message text metadata.
  *
@@ -119,9 +123,13 @@ function extractMessage(msg: Record<string, unknown>): ExtractedMessage {
   }
 
   const senderName = msg.role === "user" ? extractSenderName(raw) : null;
+  const text =
+    msg.role === "assistant"
+      ? stripAssistantReplyPrefix(stripMetadata(raw))
+      : stripMetadata(raw);
 
   return {
-    text: stripMetadata(raw),
+    text,
     senderName,
     hasToolCall,
     toolCallSummary,
@@ -394,6 +402,7 @@ function ChatBubble({ msg }: { msg: ChatMessageData }) {
   const { text, senderName, hasToolCall, toolCallSummary } = extracted;
   const time = formatTs(msg.timestamp);
   const isBot = msg.role === "assistant";
+  const hasText = text.trim().length > 0;
 
   const displayName = senderName ?? "User";
   const gradient = getAvatarGradient(displayName);
@@ -429,16 +438,18 @@ function ChatBubble({ msg }: { msg: ChatMessageData }) {
           isBot ? "items-start" : "items-end text-right",
         )}
       >
-        <div
-          className={cn(
-            "inline-block max-w-full rounded-[20px] px-4 py-3 text-[13px] break-words shadow-[0_10px_24px_rgba(15,23,42,0.04)]",
-            isBot
-              ? "border border-border bg-surface-1 text-text-primary rounded-tl-sm"
-              : "bg-surface-3 text-text-primary rounded-tr-sm",
-          )}
-        >
-          <ChatMarkdown content={text} />
-        </div>
+        {hasText && (
+          <div
+            className={cn(
+              "inline-block max-w-full rounded-[20px] px-4 py-3 text-[13px] break-words shadow-[0_10px_24px_rgba(15,23,42,0.04)]",
+              isBot
+                ? "border border-border bg-surface-1 text-text-primary rounded-tl-sm"
+                : "bg-surface-3 text-text-primary rounded-tr-sm",
+            )}
+          >
+            <ChatMarkdown content={text} />
+          </div>
+        )}
         {isBot && hasToolCall && <ArtifactCard summary={toolCallSummary} />}
         {time && (
           <div
@@ -674,10 +685,10 @@ export function SessionsPage() {
             >
               {messages
                 .filter((msg) => {
-                  const { text } = extractMessage(
+                  const { text, hasToolCall } = extractMessage(
                     msg as unknown as Record<string, unknown>,
                   );
-                  return text.trim().length > 0;
+                  return text.trim().length > 0 || hasToolCall;
                 })
                 .map((msg) => (
                   <ChatBubble key={msg.id} msg={msg} />

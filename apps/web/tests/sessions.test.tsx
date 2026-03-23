@@ -397,4 +397,61 @@ describe("SessionsPage", () => {
       'href="https://applink.feishu.cn/client/bot/open?appId=cli_xxx"',
     );
   });
+
+  it("strips assistant reply markers and keeps tool-only activity visible", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    queryClient.setQueryData(["session-meta", "sess-tool"], {
+      id: "sess-tool",
+      title: "Feishu cleanup",
+      channelType: "feishu",
+      messageCount: 2,
+      lastMessageAt: "2026-03-23T03:20:00.000Z",
+      metadata: {},
+    });
+    queryClient.setQueryData(["chat-history", "sess-tool"], {
+      messages: [
+        {
+          id: "msg-prefix",
+          role: "assistant",
+          content: "[[reply_to_current]] 已处理完成，全部状态已修正为已上线。",
+          timestamp: new Date("2026-03-23T03:19:00.000Z").getTime(),
+          createdAt: "2026-03-23T03:19:00.000Z",
+        },
+        {
+          id: "msg-tool-only",
+          role: "assistant",
+          content: [
+            {
+              type: "toolCall",
+              name: "feishu_bitable_list_records",
+            },
+          ],
+          timestamp: new Date("2026-03-23T03:20:00.000Z").getTime(),
+          createdAt: "2026-03-23T03:20:00.000Z",
+        },
+      ],
+    });
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/workspace/sessions/sess-tool"]}>
+          <Routes>
+            <Route path="/workspace/sessions/:id" element={<SessionsPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(markup).toContain("已处理完成，全部状态已修正为已上线。");
+    expect(markup).not.toContain("[[reply_to_current]]");
+    expect(markup).toContain('data-tool-card="feishu_bitable_list_records"');
+    expect(markup).toContain("Feishu Bitable List Records");
+  });
 });

@@ -55,6 +55,10 @@ type ControllerConfigRecord = {
 
 const UUID_LIKE_TITLE_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const FEISHU_MENTION_TAGS_SYSTEM_LINE =
+  /\n*\[System: The content may include mention tags in the form <at user_id="[^"]+">[^<]+<\/at>\. Treat these as real mentions of Feishu entities \(users or bots\)\.\]\s*$/u;
+const FEISHU_SELF_MENTION_SYSTEM_LINE =
+  /\n*\[System: If user_id is "[^"]+", that mention refers to you\.\]\s*$/u;
 
 function sessionMetadataPath(filePath: string): string {
   return filePath.replace(/\.jsonl$/, ".meta.json");
@@ -153,6 +157,7 @@ export class SessionsRuntime {
           const messages = await this.readMessages(
             filePath,
             Number.POSITIVE_INFINITY,
+            channelType,
           );
           const lastMsg = messages.at(-1);
 
@@ -281,7 +286,11 @@ export class SessionsRuntime {
     }
     const filePath = this.getSessionFilePath(session.botId, session.sessionKey);
     return {
-      messages: await this.readMessages(filePath, limit ?? 200),
+      messages: await this.readMessages(
+        filePath,
+        limit ?? 200,
+        session.channelType,
+      ),
       sessionKey: session.sessionKey,
     };
   }
@@ -289,6 +298,7 @@ export class SessionsRuntime {
   private async readMessages(
     filePath: string,
     limit: number,
+    channelType?: string | null,
   ): Promise<ChatMessage[]> {
     let raw: string;
     try {
@@ -314,13 +324,19 @@ export class SessionsRuntime {
         if (entry.type !== "message" || !entry.message) continue;
         const role = entry.message.role;
         if (role !== "user" && role !== "assistant") continue;
-        messages.push({
-          id: entry.id ?? "",
-          role,
-          content: entry.message.content,
-          timestamp: entry.message.timestamp ?? null,
-          createdAt: entry.timestamp ?? null,
-        });
+        const normalizedMessage = this.normalizeChatMessage(
+          {
+            id: entry.id ?? "",
+            role,
+            content: entry.message.content,
+            timestamp: entry.message.timestamp ?? null,
+            createdAt: entry.timestamp ?? null,
+          },
+          channelType,
+        );
+        if (normalizedMessage) {
+          messages.push(normalizedMessage);
+        }
       } catch {
         // skip malformed lines
       }
@@ -328,6 +344,155 @@ export class SessionsRuntime {
 
     // Return last N messages
     return messages.slice(-limit);
+  }
+
+  private normalizeChatMessage(
+    message: ChatMessage,
+    channelType?: string | null,
+  ): ChatMessage | null {
+    const content = this.normalizeMessageContent(
+      message.role,
+      message.content,
+      channelType,
+    );
+    if (content == null) {
+      return null;
+    }
+
+    return {
+      ...message,
+      content,
+    };
+  }
+
+  private normalizeMessageContent(
+    role: ChatMessage["role"],
+    content: unknown,
+    channelType?: string | null,
+  ): unknown | null {
+    if (typeof content === "string") {
+      const text = this.sanitizeMessageText(role, content, channelType);
+      return text.trim().length > 0 ? text : null;
+    }
+
+    if (!Array.isArray(content)) {
+      return content;
+    }
+
+    const normalizedBlocks: Array<Record<string, unknown>> = [];
+    let hasVisibleContent = false;
+
+    for (const part of content) {
+      if (typeof part !== "object" || part === null) {
+        continue;
+      }
+
+      const block = part as Record<string, unknown>;
+      const blockType = typeof block.type === "string" ? block.type : null;
+
+      if (blockType === "thinking") {
+        continue;
+      }
+
+      if (blockType === "text") {
+        const rawText = typeof block.text === "string" ? block.text : null;
+        if (rawText == null) {
+          continue;
+        }
+
+        const text = this.sanitizeMessageText(role, rawText, channelType);
+        if (text.trim().length === 0) {
+          continue;
+        }
+
+        normalizedBlocks.push({
+          ...block,
+          text,
+        });
+        hasVisibleContent = true;
+        continue;
+      }
+
+      if (blockType === "toolCall" || blockType === "tool_use") {
+        normalizedBlocks.push(block);
+        hasVisibleContent = true;
+        continue;
+      }
+
+      normalizedBlocks.push(block);
+    }
+
+    return hasVisibleContent ? normalizedBlocks : null;
+  }
+
+  private sanitizeMessageText(
+    role: ChatMessage["role"],
+    text: string,
+    channelType?: string | null,
+  ): string {
+    if (role === "assistant") {
+      return this.stripAssistantReplyPrefix(text).trim();
+    }
+
+    return this.sanitizeUserMessageText(text, channelType);
+  }
+
+  private sanitizeUserMessageText(
+    text: string,
+    channelType?: string | null,
+  ): string {
+    const withoutMetadata = this.stripTranscriptMetadataBlocks(text);
+    const withoutChannelSuffix = this.stripChannelSystemSuffix(
+      withoutMetadata,
+      channelType,
+    );
+
+    const markerMatch = withoutChannelSuffix.match(
+      /\[message_id:\s*[^\]]+\](?:\n|\\n)(.+?):\s*([\s\S]*)$/,
+    );
+    if (markerMatch?.[2] != null) {
+      return markerMatch[2].trim();
+    }
+
+    const timestampMatch = withoutChannelSuffix.match(
+      /^\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+GMT[+-]\d+\]\s*([\s\S]*)$/,
+    );
+    if (timestampMatch?.[1] != null) {
+      return timestampMatch[1].trim();
+    }
+
+    return withoutChannelSuffix.trim();
+  }
+
+  private stripAssistantReplyPrefix(text: string): string {
+    return text.replace(/^\s*\[\[reply_to_current\]\]\s*/u, "");
+  }
+
+  private stripTranscriptMetadataBlocks(text: string): string {
+    return text
+      .replace(
+        /Conversation info \(untrusted metadata\):\s*```json\s*[\s\S]*?```\s*/gu,
+        "",
+      )
+      .replace(
+        /Sender \(untrusted metadata\):\s*```json\s*[\s\S]*?```\s*/gu,
+        "",
+      );
+  }
+
+  private stripChannelSystemSuffix(
+    text: string,
+    channelType?: string | null,
+  ): string {
+    if (channelType !== "feishu") {
+      return text;
+    }
+
+    let normalized = text.trimEnd();
+    normalized = normalized.replace(FEISHU_SELF_MENTION_SYSTEM_LINE, "");
+    normalized = normalized.replace(FEISHU_MENTION_TAGS_SYSTEM_LINE, "");
+
+    return normalized.trimEnd();
   }
 
   async getSession(id: string): Promise<SessionResponse | null> {
