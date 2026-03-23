@@ -94,6 +94,8 @@ When supervisor is detected, OpenClaw will:
 | **Controller** | `com.nexu.controller` | API Server, config management, state storage | Yes (auto-restart on crash) |
 | **OpenClaw** | `com.nexu.openclaw` | Bot Runtime, channel connections | Yes (auto-restart on crash) |
 
+> **Isolation from Native OpenClaw**: Nexu Desktop uses the `com.nexu.*` namespace for launchd labels, completely independent from OpenClaw's native `openclaw install` which uses `io.openclaw.*`. State directories are also separate (`~/.nexu/` vs `~/.openclaw/`). Users can run Nexu Desktop and a standalone OpenClaw instance simultaneously without conflicts.
+
 ### 2.3 Key Design Decisions
 
 #### Decision 1: Controller and OpenClaw as Independent LaunchAgents

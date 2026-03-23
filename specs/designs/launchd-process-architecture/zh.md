@@ -94,6 +94,8 @@ const SYSTEMD_SUPERVISOR_HINT_ENV_VARS = [
 | **Controller** | `com.nexu.controller` | API Server, 配置管理, 状态存储 | Yes (崩溃自动重启) |
 | **OpenClaw** | `com.nexu.openclaw` | Bot Runtime, Channel 连接 | Yes (崩溃自动重启) |
 
+> **与原生 OpenClaw 隔离**: Nexu Desktop 使用 `com.nexu.*` 命名空间作为 launchd label，与 OpenClaw 原生 `openclaw install` 使用的 `io.openclaw.*` 完全独立。状态目录也分离（`~/.nexu/` vs `~/.openclaw/`）。用户可以同时运行 Nexu Desktop 和独立的 OpenClaw 实例，互不冲突。
+
 ### 2.3 关键设计决策
 
 #### 决策 1: Controller 和 OpenClaw 作为独立 LaunchAgent
