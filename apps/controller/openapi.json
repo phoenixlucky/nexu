@@ -5361,7 +5361,6 @@
                           "source": {
                             "type": "string",
                             "enum": [
-                              "curated",
                               "managed",
                               "custom"
                             ]
@@ -5417,7 +5416,6 @@
                           "source": {
                             "type": "string",
                             "enum": [
-                              "curated",
                               "managed",
                               "custom"
                             ]

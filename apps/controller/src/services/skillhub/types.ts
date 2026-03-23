@@ -15,7 +15,7 @@ export type CatalogMeta = {
   skillCount: number;
 };
 
-export type SkillSource = "curated" | "managed" | "custom";
+export type SkillSource = "managed" | "custom";
 
 export type InstalledSkill = {
   slug: string;

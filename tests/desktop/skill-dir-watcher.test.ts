@@ -74,41 +74,24 @@ describe("SkillDirWatcher", () => {
       expect(db.getAllInstalled()).toHaveLength(2);
     });
 
-    it("skips skills already in ledger and does not overwrite source", () => {
+    it("skips skills already in ledger", () => {
       writeSkill(skillsDir, "github");
-      db.recordInstall("github", "curated");
+      db.recordInstall("github", "managed");
 
-      watcher = new SkillDirWatcher({
-        skillsDir,
-        skillDb: db,
-      });
+      watcher = new SkillDirWatcher({ skillsDir, skillDb: db });
       watcher.syncNow();
 
-      // Should still be curated, not overwritten to managed
-      expect(db.isInstalled("github", "curated")).toBe(true);
-      expect(db.isInstalled("github", "managed")).toBe(false);
+      expect(db.isInstalled("github", "managed")).toBe(true);
       expect(db.getAllInstalled()).toHaveLength(1);
     });
 
-    it("marks managed skills as uninstalled when missing from disk", () => {
+    it("marks missing skills as uninstalled", () => {
       db.recordInstall("weather", "managed");
 
       watcher = new SkillDirWatcher({ skillsDir, skillDb: db });
       watcher.syncNow();
 
       expect(db.isInstalled("weather", "managed")).toBe(false);
-    });
-
-    it("removes curated records when missing from disk (eligible for re-install)", () => {
-      db.recordInstall("github", "curated");
-
-      watcher = new SkillDirWatcher({ skillsDir, skillDb: db });
-      watcher.syncNow();
-
-      // Record should be fully removed, not just marked uninstalled
-      expect(db.isInstalled("github", "curated")).toBe(false);
-      // isRemovedByUser should be false — record was removed, not user-uninstalled
-      expect(db.isRemovedByUser("github")).toBe(false);
     });
 
     it("no-ops when skillsDir does not exist", () => {

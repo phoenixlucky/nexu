@@ -309,13 +309,8 @@ export class CatalogManager {
    * Used by SkillhubService to enqueue on startup.
    */
   getCuratedSlugsToEnqueue(): string[] {
-    return CURATED_SKILL_SLUGS.filter(
-      (slug) =>
-        !this.db.isInstalled(slug, "curated") &&
-        !this.db.isInstalled(slug, "managed") &&
-        !this.db.isInstalled(slug, "custom") &&
-        !this.db.isRemovedByUser(slug),
-    );
+    const allInstalled = new Set(this.db.getAllInstalled().map((r) => r.slug));
+    return CURATED_SKILL_SLUGS.filter((slug) => !allInstalled.has(slug));
   }
 
   /**
@@ -370,7 +365,7 @@ export class CatalogManager {
         skillDb: this.db,
       });
       if (copied.length > 0) {
-        this.db.recordBulkInstall(copied, "curated");
+        this.db.recordBulkInstall(copied, "managed");
         this.log("info", `curated static skills copied: ${copied.join(", ")}`);
       }
     }
@@ -385,7 +380,7 @@ export class CatalogManager {
           if (
             entry.isDirectory() &&
             existsSync(resolve(this.skillsDir, entry.name, "SKILL.md")) &&
-            !this.db.isInstalled(entry.name, "curated") &&
+            !this.db.isInstalled(entry.name, "managed") &&
             !this.db.isInstalled(entry.name, "managed") &&
             !this.db.isInstalled(entry.name, "custom")
           ) {
@@ -396,7 +391,7 @@ export class CatalogManager {
         // Directory not readable — skip
       }
       if (untracked.length > 0) {
-        this.db.recordBulkInstall(untracked, "curated");
+        this.db.recordBulkInstall(untracked, "managed");
         this.log(
           "info",
           `curated on-disk skills recorded: ${untracked.join(", ")}`,
@@ -479,7 +474,7 @@ export class CatalogManager {
     }
 
     if (installed.length > 0) {
-      this.db.recordBulkInstall(installed, "curated");
+      this.db.recordBulkInstall(installed, "managed");
     }
 
     return { installed, skipped: toSkip, failed };
@@ -525,57 +520,25 @@ export class CatalogManager {
     const dbRecords = this.db.getAllInstalled();
 
     // DB → disk: handle "installed" records whose SKILL.md is missing from disk
-    const curatedMissing: Array<{ slug: string; source: SkillSource }> = [];
-    const otherMissing: Array<{ slug: string; source: SkillSource }> = [];
+    const missingBySource = new Map<SkillSource, string[]>();
     for (const record of dbRecords) {
       const skillMd = resolve(this.skillsDir, record.slug, "SKILL.md");
       if (!existsSync(skillMd)) {
-        if (record.source === "curated") {
-          curatedMissing.push({ slug: record.slug, source: record.source });
-        } else {
-          otherMissing.push({ slug: record.slug, source: record.source });
-        }
+        const list = missingBySource.get(record.source) ?? [];
+        list.push(record.slug);
+        missingBySource.set(record.source, list);
       }
     }
 
-    // Clean up curated "installed" records missing from disk — remove the
-    // record so installCuratedSkills can re-install them on this startup.
-    if (curatedMissing.length > 0) {
-      this.db.removeRecords(curatedMissing);
+    let totalMissing = 0;
+    for (const [source, slugs] of missingBySource) {
+      this.db.markUninstalledBySlugs(slugs, source);
+      totalMissing += slugs.length;
+    }
+    if (totalMissing > 0) {
       this.log(
         "info",
-        `reconcile: ${curatedMissing.length} curated installed records removed (missing from disk, eligible for re-install)`,
-      );
-    }
-
-    // Clean up stale "uninstalled" curated records for slugs that have been
-    // retired from CURATED_SKILL_SLUGS. These records block re-installation
-    // via isRemovedByUser() and are no longer needed.
-    // NOTE: We intentionally keep uninstalled records for slugs still in the
-    // curated list — those represent the user's explicit choice to remove them.
-    const activeCuratedSlugs = new Set(CURATED_SKILL_SLUGS);
-    const retiredCurated: Array<{ slug: string; source: SkillSource }> = [];
-    for (const record of this.db.getUninstalledCurated()) {
-      if (!activeCuratedSlugs.has(record.slug)) {
-        retiredCurated.push({ slug: record.slug, source: record.source });
-      }
-    }
-    if (retiredCurated.length > 0) {
-      this.db.removeRecords(retiredCurated);
-      this.log(
-        "info",
-        `reconcile: ${retiredCurated.length} retired curated records purged`,
-      );
-    }
-
-    // Non-curated (managed/custom) skills: mark uninstalled as before
-    for (const { slug, source } of otherMissing) {
-      this.db.markUninstalledBySlugs([slug], source);
-    }
-    if (otherMissing.length > 0) {
-      this.log(
-        "info",
-        `reconcile: ${otherMissing.length} managed/custom records marked uninstalled (missing from disk)`,
+        `reconcile: ${totalMissing} installed records marked uninstalled (missing from disk)`,
       );
     }
 
@@ -606,12 +569,7 @@ export class CatalogManager {
       );
     }
 
-    if (
-      curatedMissing.length === 0 &&
-      retiredCurated.length === 0 &&
-      otherMissing.length === 0 &&
-      diskOnly.length === 0
-    ) {
+    if (totalMissing === 0 && diskOnly.length === 0) {
       this.log("info", "reconcile: DB and disk are in sync");
     }
   }

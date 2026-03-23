@@ -2038,7 +2038,7 @@ export type GetApiV1SkillhubCatalogResponses = {
         installedSlugs: Array<string>;
         installedSkills: Array<{
             slug: string;
-            source: 'curated' | 'managed' | 'custom';
+            source: 'managed' | 'custom';
             name: string;
             description: string;
             installedAt: string;
@@ -2050,7 +2050,7 @@ export type GetApiV1SkillhubCatalogResponses = {
         };
         queue: Array<{
             slug: string;
-            source: 'curated' | 'managed' | 'custom';
+            source: 'managed' | 'custom';
             status: 'queued' | 'downloading' | 'installing-deps' | 'done' | 'failed';
             position: number;
             error: string;

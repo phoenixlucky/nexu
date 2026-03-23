@@ -274,7 +274,7 @@ describe("SkillhubService", () => {
     });
     expect(db.recordBulkInstall).toHaveBeenCalledWith(
       ["skill-a", "skill-b"],
-      "curated",
+      "managed",
     );
   });
 
@@ -345,8 +345,8 @@ describe("SkillhubService", () => {
 
     const queue = mocks.installQueueInstances[0];
     expect(queue.enqueue).toHaveBeenCalledTimes(2);
-    expect(queue.enqueue).toHaveBeenCalledWith("alpha", "curated");
-    expect(queue.enqueue).toHaveBeenCalledWith("beta", "curated");
+    expect(queue.enqueue).toHaveBeenCalledWith("alpha", "managed");
+    expect(queue.enqueue).toHaveBeenCalledWith("beta", "managed");
   });
 
   it("start() calls dirWatcher.start() after enqueuing", async () => {
@@ -366,7 +366,7 @@ describe("SkillhubService", () => {
       callOrder.push("enqueue");
       return {
         slug: "x",
-        source: "curated",
+        source: "managed",
         status: "queued",
         position: 0,
         error: null,

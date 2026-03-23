@@ -97,7 +97,7 @@ export class SkillhubService {
         skillDb: this.db,
       });
       if (copied.length > 0) {
-        this.db.recordBulkInstall(copied, "curated");
+        this.db.recordBulkInstall(copied, "managed");
       }
     }
 
@@ -107,7 +107,7 @@ export class SkillhubService {
     // Step 3: Enqueue curated skills from ClawHub that aren't on disk yet
     const toEnqueue = this.catalogManager.getCuratedSlugsToEnqueue();
     for (const slug of toEnqueue) {
-      this.installQueue.enqueue(slug, "curated");
+      this.installQueue.enqueue(slug, "managed");
     }
   }
 
