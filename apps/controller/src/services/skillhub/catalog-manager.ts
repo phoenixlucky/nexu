@@ -101,7 +101,6 @@ export class CatalogManager {
     cacheDir: string,
     opts: {
       skillsDir?: string;
-      curatedSkillsDir?: string; // accepted for backward compat, unused
       staticSkillsDir?: string;
       skillDb: SkillDb;
       log?: SkillhubLogFn;

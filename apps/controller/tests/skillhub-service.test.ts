@@ -181,7 +181,6 @@ function createEnv(rootDir: string): ControllerEnv {
     openclawStateDir,
     openclawConfigPath: path.join(openclawStateDir, "openclaw.json"),
     openclawSkillsDir: path.join(openclawStateDir, "skills"),
-    openclawCuratedSkillsDir: path.join(openclawStateDir, "bundled-skills"),
     skillhubCacheDir: path.join(nexuHomeDir, "skillhub-cache"),
     skillDbPath: path.join(nexuHomeDir, "skill-ledger.db"),
     staticSkillsDir: undefined,
