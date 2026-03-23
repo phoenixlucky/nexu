@@ -7,3 +7,4 @@ Click the links below for detailed setup guides:
 - [Feishu](/guide/channels/feishu)
 - [Slack](/guide/channels/slack)
 - [Discord](/guide/channels/discord)
+- [WeChat (ClawBot)](/guide/wechat-clawbot) — usage notes; follow WeChat’s official rules for ClawBot and plugins

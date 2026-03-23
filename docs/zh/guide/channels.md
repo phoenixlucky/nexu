@@ -7,3 +7,4 @@ nexu 支持同时接入多个聊天渠道，在客户端填入凭证即可完成
 - [飞书](/zh/guide/channels/feishu)
 - [Slack](/zh/guide/channels/slack)
 - [Discord](/zh/guide/channels/discord)
+- [微信（ClawBot）](/zh/guide/wechat-clawbot) — 使用备忘；ClawBot / 插件规则请以微信官方为准
