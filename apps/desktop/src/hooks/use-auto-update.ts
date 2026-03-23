@@ -17,6 +17,7 @@ export type UpdateState = {
   percent: number;
   errorMessage: string | null;
   dismissed: boolean;
+  userInitiated: boolean;
 };
 
 export function useAutoUpdate() {
@@ -27,6 +28,7 @@ export function useAutoUpdate() {
     percent: 0,
     errorMessage: null,
     dismissed: false,
+    userInitiated: false,
   });
 
   useEffect(() => {
@@ -39,7 +41,7 @@ export function useAutoUpdate() {
       updater.onEvent("update:checking", () => {
         setState((prev) => ({
           ...prev,
-          phase: "checking",
+          phase: prev.userInitiated ? "checking" : prev.phase,
           errorMessage: null,
         }));
       }),
@@ -52,6 +54,7 @@ export function useAutoUpdate() {
           phase: "available",
           version: data.version,
           releaseNotes: data.releaseNotes ?? null,
+          userInitiated: false,
         }));
       }),
     );
@@ -60,8 +63,9 @@ export function useAutoUpdate() {
       updater.onEvent("update:up-to-date", () => {
         setState((prev) => ({
           ...prev,
-          phase: "up-to-date",
+          phase: prev.userInitiated ? "up-to-date" : "idle",
           errorMessage: null,
+          userInitiated: false,
         }));
       }),
     );
@@ -72,6 +76,7 @@ export function useAutoUpdate() {
           ...prev,
           phase: "downloading",
           percent: data.percent,
+          userInitiated: false,
         }));
       }),
     );
@@ -83,6 +88,7 @@ export function useAutoUpdate() {
           phase: "ready",
           version: data.version,
           percent: 100,
+          userInitiated: false,
         }));
       }),
     );
@@ -93,6 +99,7 @@ export function useAutoUpdate() {
           ...prev,
           phase: "error",
           errorMessage: data.message,
+          userInitiated: false,
         }));
       }),
     );
@@ -111,7 +118,9 @@ export function useAutoUpdate() {
 
     const timer = window.setTimeout(() => {
       setState((prev) =>
-        prev.phase === "up-to-date" ? { ...prev, phase: "idle" } : prev,
+        prev.phase === "up-to-date"
+          ? { ...prev, phase: "idle", userInitiated: false }
+          : prev,
       );
     }, 2800);
 
@@ -121,6 +130,13 @@ export function useAutoUpdate() {
   }, [state.phase]);
 
   const check = useCallback(async () => {
+    setState((prev) => ({
+      ...prev,
+      phase: "checking",
+      errorMessage: null,
+      dismissed: false,
+      userInitiated: true,
+    }));
     try {
       await checkForUpdate();
     } catch {
