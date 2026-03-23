@@ -80,6 +80,7 @@ function SkillCard({
   return (
     <Link
       to={`/workspace/skills/${skill.slug}`}
+      draggable={false}
       className={cn(
         "card flex flex-col p-4",
         isInstalled && !pendingAction ? "" : "",
