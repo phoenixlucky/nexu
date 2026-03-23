@@ -353,6 +353,11 @@ export class CatalogManager {
     }
   }
 
+  /**
+   * @deprecated Replaced by the InstallQueue-based flow in SkillhubService.start().
+   * Curated slugs are now resolved via {@link getCuratedSlugsToEnqueue} (ledger-only)
+   * and enqueued into the InstallQueue. This method is retained for backward compatibility.
+   */
   async installCuratedSkills(): Promise<CuratedInstallResult> {
     // Step 1: Copy static skills (not on ClawHub) from app bundle into skillsDir
     if (this.staticSkillsDir) {

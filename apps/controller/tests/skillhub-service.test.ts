@@ -216,7 +216,7 @@ describe("SkillhubService", () => {
       copied: [],
       skipped: [],
     });
-    delete process.env.CI;
+    process.env.CI = undefined;
   });
 
   afterEach(async () => {
