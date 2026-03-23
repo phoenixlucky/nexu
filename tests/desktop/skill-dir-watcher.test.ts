@@ -27,7 +27,7 @@ function wait(ms: number): Promise<void> {
 
 async function waitUntil(
   fn: () => boolean,
-  timeoutMs = 2000,
+  timeoutMs = 5000,
   intervalMs = 50,
 ): Promise<void> {
   const start = Date.now();

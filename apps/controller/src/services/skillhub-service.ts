@@ -13,6 +13,7 @@ export class SkillhubService {
   private readonly dirWatcher: SkillDirWatcher;
   private readonly db: SkillDb;
   private readonly env: ControllerEnv;
+  private readonly isFirstLaunch: boolean;
 
   private constructor(
     env: ControllerEnv,
@@ -20,15 +21,20 @@ export class SkillhubService {
     installQueue: InstallQueue,
     dirWatcher: SkillDirWatcher,
     db: SkillDb,
+    isFirstLaunch: boolean,
   ) {
     this.env = env;
     this.catalogManager = catalogManager;
     this.installQueue = installQueue;
     this.dirWatcher = dirWatcher;
     this.db = db;
+    this.isFirstLaunch = isFirstLaunch;
   }
 
   static async create(env: ControllerEnv): Promise<SkillhubService> {
+    // Check if ledger exists BEFORE SkillDb.create() (which creates it)
+    const isFirstLaunch = !existsSync(env.skillDbPath);
+
     const skillDb = await SkillDb.create(env.skillDbPath);
     const log = (level: "info" | "error" | "warn", message: string) => {
       console[level === "error" ? "error" : "log"](`[skillhub] ${message}`);
@@ -61,6 +67,7 @@ export class SkillhubService {
       installQueue,
       dirWatcher,
       skillDb,
+      isFirstLaunch,
     );
   }
 
@@ -68,7 +75,20 @@ export class SkillhubService {
     this.catalogManager.start();
     if (process.env.CI) return;
 
-    // Step 1: Copy static bundled skills (filesystem only, no ClawHub)
+    if (this.isFirstLaunch) {
+      this.initialize();
+    }
+
+    // Always start watching for external skill changes (agent installs)
+    this.dirWatcher.start();
+  }
+
+  /**
+   * First-launch initialization: copy static skills, enqueue curated skills.
+   * Only runs when the skill ledger did not exist (fresh install or reinstall).
+   */
+  private initialize(): void {
+    // Step 1: Copy static bundled skills to skills dir + record in DB
     if (this.env.staticSkillsDir && existsSync(this.env.staticSkillsDir)) {
       const { copied } = copyStaticSkills({
         staticDir: this.env.staticSkillsDir,
@@ -80,17 +100,14 @@ export class SkillhubService {
       }
     }
 
-    // Step 2: Sync disk state with ledger (detect externally added/removed skills)
+    // Step 2: Sync disk state with ledger (detect skills already on disk)
     this.dirWatcher.syncNow();
 
-    // Step 3: Enqueue curated skills that have never been seen in ledger
+    // Step 3: Enqueue curated skills from ClawHub that aren't on disk yet
     const toEnqueue = this.catalogManager.getCuratedSlugsToEnqueue();
     for (const slug of toEnqueue) {
       this.installQueue.enqueue(slug, "curated");
     }
-
-    // Step 4: Start watching for external skill changes (agent installs)
-    this.dirWatcher.start();
   }
 
   get catalog(): CatalogManager {

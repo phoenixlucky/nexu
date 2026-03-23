@@ -112,7 +112,9 @@ export const env = {
   skillDbPath: path.join(nexuHomeDir, "skill-ledger.json"),
   staticSkillsDir: parsed.SKILLHUB_STATIC_SKILLS_DIR
     ? expandHomeDir(parsed.SKILLHUB_STATIC_SKILLS_DIR)
-    : undefined,
+    : workspaceRoot
+      ? path.join(workspaceRoot, "apps", "desktop", "static", "bundled-skills")
+      : undefined,
   platformTemplatesDir: parsed.PLATFORM_TEMPLATES_DIR
     ? expandHomeDir(parsed.PLATFORM_TEMPLATES_DIR)
     : undefined,
