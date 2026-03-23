@@ -164,9 +164,6 @@ export type HostDesktopCommand =
       surface: "web";
     }
   | {
-      type: "desktop:open-about-dialog";
-    }
-  | {
       type: "desktop:check-for-updates";
     };
 

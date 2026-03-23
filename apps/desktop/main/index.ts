@@ -214,12 +214,6 @@ function notifyDesktopAuthSessionRestored(): void {
   });
 }
 
-function openAboutDialog(): void {
-  mainWindow?.webContents.send("host:desktop-command", {
-    type: "desktop:open-about-dialog",
-  });
-}
-
 function triggerUpdateCheck(): void {
   mainWindow?.webContents.send("host:desktop-command", {
     type: "desktop:check-for-updates",
@@ -260,10 +254,6 @@ function installApplicationMenu(): void {
   const helpMenu: MenuItemConstructorOptions = {
     role: "help",
     submenu: [
-      {
-        label: "About Nexu",
-        click: () => openAboutDialog(),
-      },
       {
         label: "Check for Updates…",
         click: () => triggerUpdateCheck(),
