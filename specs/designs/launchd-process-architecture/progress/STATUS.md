@@ -1,0 +1,86 @@
+# Implementation Status
+
+**Last Updated**: 2026-03-23
+**Branch**: `refactor/launchd-process-architecture`
+
+---
+
+## Overall Progress
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| 1. LaunchdManager service | Not Started | Core launchd wrapper |
+| 2. Plist generation | Not Started | Controller + OpenClaw templates |
+| 3. Embedded Web Server | Not Started | Replace web sidecar |
+| 4. Bootstrap flow | Not Started | Desktop startup sequence |
+| 5. Exit behavior | Not Started | Quit dialog + graceful shutdown |
+| 6. Dev mode scripts | Not Started | launchd-based dev workflow |
+| 7. Logging unification | Not Started | Unified log paths |
+| 8. Testing | Not Started | Integration tests |
+
+---
+
+## Current Task
+
+**None** - Starting implementation
+
+---
+
+## Completed
+
+- [x] Design document (PR #356 merged)
+- [x] Cherry-pick WebSocket close code fix (PR #365)
+- [x] Change namespace to `io.nexu.*` (pending)
+
+---
+
+## Blockers
+
+None currently.
+
+---
+
+## TODO Checklist
+
+### Phase 1: LaunchdManager Service
+- [ ] Create `apps/desktop/src/main/services/launchd-manager.ts`
+- [ ] Implement `installService()`, `uninstallService()`
+- [ ] Implement `startService()`, `stopService()`, `stopServiceGracefully()`
+- [ ] Implement `getServiceStatus()`, `isServiceRegistered()`, `isServiceInstalled()`
+- [ ] Add unit tests
+
+### Phase 2: Plist Generation
+- [ ] Create `apps/desktop/src/main/services/plist-generator.ts`
+- [ ] Controller plist template
+- [ ] OpenClaw plist template
+- [ ] Dev vs prod label handling
+
+### Phase 3: Embedded Web Server
+- [ ] Create `apps/desktop/src/main/embedded-web-server.ts`
+- [ ] Static file serving with async fs
+- [ ] API proxy to Controller
+- [ ] SPA fallback logic
+
+### Phase 4: Bootstrap Flow
+- [ ] Modify `apps/desktop/main/index.ts` for launchd bootstrap
+- [ ] Service installation on first run
+- [ ] Health check and readiness waiting
+
+### Phase 5: Exit Behavior
+- [ ] Implement quit dialog (Quit Completely / Run in Background / Cancel)
+- [ ] Graceful service shutdown
+
+### Phase 6: Dev Mode
+- [ ] Create `scripts/dev-launchd.sh`
+- [ ] Dev plist templates
+- [ ] Cleanup on script exit
+
+### Phase 7: Logging
+- [ ] Unify log paths to `~/.nexu/logs/`
+- [ ] Update Controller log config
+- [ ] Update OpenClaw log config
+
+### Phase 8: Testing
+- [ ] LaunchdManager unit tests
+- [ ] Embedded web server tests
+- [ ] Integration tests
