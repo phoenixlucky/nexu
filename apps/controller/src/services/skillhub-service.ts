@@ -57,6 +57,7 @@ export class SkillhubService {
 
     const dirWatcher = new SkillDirWatcher({
       skillsDir: env.openclawSkillsDir,
+      isSlugInFlight: (slug) => installQueue.isInFlight(slug),
       skillDb,
       log,
     });

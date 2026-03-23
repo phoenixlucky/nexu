@@ -91,6 +91,14 @@ export class InstallQueue {
     return this.toReadonly(item);
   }
 
+  /**
+   * Returns true if the slug is queued or actively being installed.
+   * Used by SkillDirWatcher to skip in-flight slugs during syncNow().
+   */
+  isInFlight(slug: string): boolean {
+    return this.active.has(slug) || this.pending.some((i) => i.slug === slug);
+  }
+
   getQueue(): readonly QueueItem[] {
     const all: QueueItem[] = [];
     let position = 0;

@@ -16,6 +16,7 @@ export class SkillDirWatcher {
   private readonly db: SkillDb;
   private readonly log: SkillDirWatcherLogFn;
   private readonly debounceMs: number;
+  private readonly isSlugInFlight: (slug: string) => boolean;
   private watcher: FSWatcher | null = null;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -24,11 +25,14 @@ export class SkillDirWatcher {
     skillDb: SkillDb;
     log?: SkillDirWatcherLogFn;
     debounceMs?: number;
+    /** Returns true if the slug is currently being installed by the queue. */
+    isSlugInFlight?: (slug: string) => boolean;
   }) {
     this.skillsDir = opts.skillsDir;
     this.db = opts.skillDb;
     this.log = opts.log ?? defaultLog;
     this.debounceMs = opts.debounceMs ?? 500;
+    this.isSlugInFlight = opts.isSlugInFlight ?? (() => false);
   }
 
   syncNow(): void {
@@ -43,7 +47,10 @@ export class SkillDirWatcher {
     const installedSlugs = new Set(installed.map((r) => r.slug));
 
     // Disk has it, ledger doesn't -> record as managed
-    const added = diskSlugs.filter((slug) => !installedSlugs.has(slug));
+    // Skip slugs currently in the install queue — the queue will record with the correct source.
+    const added = diskSlugs.filter(
+      (slug) => !installedSlugs.has(slug) && !this.isSlugInFlight(slug),
+    );
     if (added.length > 0) {
       this.db.recordBulkInstall(added, "managed");
       this.log(
