@@ -1,5 +1,10 @@
 export { CatalogManager } from "./catalog-manager.js";
 export type { SkillhubLogFn } from "./catalog-manager.js";
+export {
+  InstallQueue,
+  parseRateLimitPauseMs,
+} from "./install-queue.js";
+export type { InstallExecutor } from "./install-queue.js";
 export { SkillDb } from "./skill-db.js";
 export type {
   SkillhubCatalogData,
