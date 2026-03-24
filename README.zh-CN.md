@@ -33,7 +33,7 @@
 
 ---
 
-## 📋 概述
+## 📋 What is nexu?
 
 **nexu**（奈苏，next to you）是一个开源桌面客户端，让你的 **OpenClaw 🦞** Agent 直接运行在微信、飞书、Slack、Discord 等 IM 中。
 
@@ -209,6 +209,28 @@ pnpm test
 - 为新功能编写测试
 - 按需更新文档
 - 保持提交原子化且描述清晰
+
+---
+
+## ❓ FAQ
+
+**Q: nexu 免费吗？**
+A: 客户端完全免费且开源（MIT）。内测期间，内置的顶级模型也免费无限量使用。正式版后，你可以使用自带 API Key 按量付费。
+
+**Q: 支持哪些操作系统？**
+A: 目前支持 macOS 12+（Apple Silicon）。Windows 和 macOS Intel 版本正在开发中，可邮件 [support@nexu.ai](mailto:support@nexu.ai) 获取进展。
+
+**Q: 支持哪些 IM 平台？**
+A: 内置支持微信、飞书、Slack、Discord，开箱即用。
+
+**Q: 我的数据安全吗？**
+A: 所有数据保存在本机，nexu 不托管你的业务数据。源码开源可审计。
+
+**Q: 可以使用自己的 API Key 吗？**
+A: 可以。填入你的 API Key 即可使用，无需注册账号或登录。
+
+**Q: 微信接入需要什么条件？**
+A: 适配微信 8.0.7 OpenClaw 插件，点击连接、微信扫码即可，无需额外配置。
 
 ---
 

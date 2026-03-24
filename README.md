@@ -33,7 +33,7 @@
 
 ---
 
-## 📋 Overview
+## 📋 What is nexu?
 
 **nexu** (next to you) is an open-source desktop client that runs your **OpenClaw 🦞** Agent directly inside WeChat, Feishu, Slack, Discord, and other IM channels.
 
@@ -209,6 +209,28 @@ Contributions are welcome! The full English guide is [CONTRIBUTING.md](CONTRIBUT
 - Write tests for new functionality
 - Update documentation as needed
 - Keep commits atomic and descriptive
+
+---
+
+## ❓ FAQ
+
+**Q: Is nexu free?**
+A: The client is completely free and open-source (MIT). During the beta, built-in top-tier models are also free with unlimited usage. After GA, you can bring your own API Key and pay providers directly.
+
+**Q: Which operating systems are supported?**
+A: macOS 12+ (Apple Silicon) is supported today. Windows and macOS Intel are in development — email [support@nexu.ai](mailto:support@nexu.ai) for updates.
+
+**Q: Which IM platforms are supported?**
+A: WeChat, Feishu, Slack, and Discord are built in and work out of the box.
+
+**Q: Is my data safe?**
+A: All data stays on your machine. nexu does not host your business data. The source code is open for audit.
+
+**Q: Can I use my own API Key?**
+A: Yes. Add your API Key and use the client without creating an account or logging in.
+
+**Q: What do I need to connect WeChat?**
+A: nexu works with the WeChat 8.0.7 OpenClaw plugin. Click connect, scan with WeChat, and you're good to go — no extra setup required.
 
 ---
 
