@@ -149,6 +149,9 @@ start_services() {
 
   mkdir -p "$LOG_DIR"
 
+  # When this script exits (Electron quit, Ctrl+C, etc), stop launchd services
+  trap 'echo ""; echo "Cleaning up..."; stop_services' EXIT INT TERM
+
   # Start Electron desktop with launchd mode
   # Electron will manage Controller and OpenClaw via launchd with dynamic ports
   echo "Starting Electron desktop (launchd mode)..."
