@@ -150,11 +150,10 @@ start_services() {
   # When this script exits (Electron quit, Ctrl+C, etc), stop launchd services
   trap 'echo ""; echo "Cleaning up..."; stop_services' EXIT INT TERM
 
-  # Start Electron desktop with launchd mode
-  # Electron will manage Controller and OpenClaw via launchd with dynamic ports
+  # Start Electron desktop with launchd mode (pre-built, no vite watch)
   echo "Starting Electron desktop (launchd mode)..."
   cd "$REPO_ROOT"
-  NEXU_USE_LAUNCHD=1 NEXU_WORKSPACE_ROOT="$REPO_ROOT" pnpm --filter @nexu/desktop dev
+  NEXU_USE_LAUNCHD=1 NEXU_WORKSPACE_ROOT="$REPO_ROOT" pnpm exec electron apps/desktop
 }
 
 show_status() {
