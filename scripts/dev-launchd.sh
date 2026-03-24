@@ -205,6 +205,35 @@ tail_logs() {
   fi
 }
 
+reload_controller() {
+  echo "Rebuilding controller..."
+  pnpm --filter @nexu/controller build
+  echo "Restarting controller service..."
+  if launchctl print "$DOMAIN/$CONTROLLER_LABEL" &>/dev/null; then
+    launchctl kickstart -k "$DOMAIN/$CONTROLLER_LABEL"
+    echo "Controller reloaded."
+  else
+    echo "Controller service not registered. Run 'pnpm start' first."
+  fi
+}
+
+reload_web() {
+  echo "Rebuilding web..."
+  pnpm --filter @nexu/web build
+  echo "Web rebuilt. Reload the page in the desktop app (Cmd+R or restart Electron)."
+}
+
+reload_all() {
+  echo "Rebuilding controller + web..."
+  pnpm --filter @nexu/controller build
+  pnpm --filter @nexu/web build
+  echo "Restarting controller service..."
+  if launchctl print "$DOMAIN/$CONTROLLER_LABEL" &>/dev/null; then
+    launchctl kickstart -k "$DOMAIN/$CONTROLLER_LABEL"
+  fi
+  echo "Reloaded. Restart Electron if desktop shell code changed."
+}
+
 # Main
 case "${1:-start}" in
   start)
@@ -218,6 +247,15 @@ case "${1:-start}" in
     sleep 1
     start_services
     ;;
+  reload)
+    reload_all
+    ;;
+  reload:controller)
+    reload_controller
+    ;;
+  reload:web)
+    reload_web
+    ;;
   status)
     show_status
     ;;
@@ -228,7 +266,7 @@ case "${1:-start}" in
     full_cleanup
     ;;
   *)
-    echo "Usage: $0 {start|stop|restart|status|logs|clean}"
+    echo "Usage: $0 {start|stop|restart|reload|reload:controller|reload:web|status|logs|clean}"
     exit 1
     ;;
 esac
