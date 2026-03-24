@@ -21,7 +21,7 @@ FEISHU_APP_ID=cli_xxx
 FEISHU_APP_SECRET=xxx
 FEISHU_ACCOUNT_ID=cli_xxx
 FEISHU_CONFIG_PATH=path/to/openclaw.json
-FEISHU_DOMAIN=feishu
+FEISHU_DOMAIN=https://open.feishu.cn
 ```
 
 What it does:

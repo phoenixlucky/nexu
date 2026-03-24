@@ -143,20 +143,25 @@ async function loadCredentials(options) {
 }
 
 function summarizeMessage(event) {
+  const payload = event?.event ?? event;
+  const header = event?.header ?? payload?.header;
+  const message = payload?.message;
+  const sender = payload?.sender;
+
   return {
-    eventId: event.header?.event_id,
-    eventType: event.header?.event_type,
-    messageId: event.event?.message?.message_id,
-    chatId: event.event?.message?.chat_id,
-    chatType: event.event?.message?.chat_type,
-    messageType: event.event?.message?.message_type,
-    openId: event.event?.sender?.sender_id?.open_id,
+    eventId: header?.event_id,
+    eventType: header?.event_type,
+    messageId: message?.message_id,
+    chatId: message?.chat_id,
+    chatType: message?.chat_type,
+    messageType: message?.message_type,
+    openId: sender?.sender_id?.open_id,
     text: (() => {
       try {
-        const content = event.event?.message?.content;
+        const content = message?.content;
         return content ? JSON.parse(content).text : undefined;
       } catch {
-        return event.event?.message?.content;
+        return message?.content;
       }
     })(),
   };
