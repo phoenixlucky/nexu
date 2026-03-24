@@ -10,6 +10,7 @@
 
 import { execFile } from "node:child_process";
 import * as fs from "node:fs/promises";
+import { createConnection } from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
@@ -190,9 +191,6 @@ async function probeControllerHealth(port: number): Promise<boolean> {
 
 async function probePort(port: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const { createConnection } = require("node:net") as typeof import(
-      "node:net",
-    );
     const socket = createConnection({ host: "127.0.0.1", port });
     socket.once("connect", () => {
       socket.destroy();
