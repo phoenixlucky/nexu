@@ -223,6 +223,7 @@ if (sentryDsn) {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let forceQuit = false;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let sleepGuard: SleepGuard | null = null;
 let launchdResult: LaunchdBootstrapResult | null = null;
@@ -720,6 +721,18 @@ function createMainWindow(): BrowserWindow {
     focusMainWindow();
   });
 
+  // In launchd mode on macOS, intercept window close to hide instead of
+  // destroy. This preserves the webview state (auth session, page) so
+  // reopening from Dock doesn't show a login page.
+  if (process.platform === "darwin") {
+    window.on("close", (event) => {
+      if (!forceQuit) {
+        event.preventDefault();
+        window.hide();
+      }
+    });
+  }
+
   window.on("closed", () => {
     if (mainWindow === window) {
       mainWindow = null;
@@ -938,6 +951,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", (event) => {
+  forceQuit = true;
   sleepGuard?.dispose("app-before-quit");
   void diagnosticsReporter?.flushNow().catch(() => undefined);
   flushRuntimeLoggers();
