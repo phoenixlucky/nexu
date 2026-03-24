@@ -27,6 +27,8 @@ export interface PlistEnv {
   controllerCwd: string;
   /** Working directory for openclaw */
   openclawCwd: string;
+  /** Gateway auth token (shared between controller and openclaw) */
+  gatewayToken?: string;
   /** System PATH for launchd environment */
   systemPath?: string;
   /** NODE_PATH for module resolution (TypeScript plugins need this) */
@@ -75,7 +77,13 @@ function generateControllerPlist(label: string, env: PlistEnv): string {
         <key>PORT</key>
         <string>${env.controllerPort}</string>
         <key>RUNTIME_MANAGE_OPENCLAW_PROCESS</key>
-        <string>false</string>
+        <string>false</string>${
+          env.gatewayToken
+            ? `
+        <key>OPENCLAW_GATEWAY_TOKEN</key>
+        <string>${escapeXml(env.gatewayToken)}</string>`
+            : ""
+        }
         <key>NODE_ENV</key>
         <string>${env.isDev ? "development" : "production"}</string>
         <key>HOME</key>

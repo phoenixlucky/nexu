@@ -45,6 +45,8 @@ export interface LaunchdBootstrapEnv {
   controllerCwd: string;
   /** OpenClaw working directory */
   openclawCwd: string;
+  /** Gateway auth token */
+  gatewayToken?: string;
   /** Plist directory (default: ~/Library/LaunchAgents or repo-local for dev) */
   plistDir?: string;
 }
@@ -149,6 +151,7 @@ export async function bootstrapWithLaunchd(
     openclawStateDir: env.openclawStateDir,
     controllerCwd: env.controllerCwd,
     openclawCwd: env.openclawCwd,
+    gatewayToken: env.gatewayToken,
     systemPath,
     nodeModulesPath,
   };
