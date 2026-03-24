@@ -487,7 +487,7 @@ async function runLaunchdColdStart(): Promise<void> {
       new URL(runtimeConfig.urls.openclawBase).port || 18789,
     ),
     nexuHome: isDev ? nexuHome : undefined,
-    gatewayToken: runtimeConfig.tokens.gateway,
+    gatewayToken: isDev ? undefined : runtimeConfig.tokens.gateway,
     webPort: runtimeConfig.ports.web,
     webRoot,
     plistDir: getDefaultPlistDir(isDev),
