@@ -7,7 +7,7 @@
  * - Cancel: don't quit
  */
 
-import { app, dialog } from "electron";
+import { BrowserWindow, app, dialog } from "electron";
 import type { EmbeddedWebServer } from "./embedded-web-server";
 import type { LaunchdManager } from "./launchd-manager";
 
@@ -141,10 +141,17 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
         console.error(`Error stopping ${opts.labels.controller}:`, err);
       }
     } else {
+      // "Run in background" — hide all windows but keep the process alive
+      // so launchd services continue running. User can reopen from Dock.
       console.log("Keeping services running in background");
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.hide();
+      }
+      isQuitting = false;
+      return;
     }
 
-    // Remove handler and quit
+    // Remove handler and quit (only for "quit-completely")
     app.removeAllListeners("before-quit");
     app.quit();
   });
