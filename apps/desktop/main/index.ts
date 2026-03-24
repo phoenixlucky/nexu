@@ -511,6 +511,9 @@ async function runLaunchdColdStart(): Promise<void> {
   launchdResult = await bootstrapWithLaunchd({
     isDev,
     controllerPort: runtimeConfig.ports.controller,
+    openclawPort: Number(
+      new URL(runtimeConfig.urls.openclawBase).port || 18789,
+    ),
     webPort: runtimeConfig.ports.web,
     webRoot,
     plistDir: getDefaultPlistDir(isDev),

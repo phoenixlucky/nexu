@@ -74,6 +74,10 @@ function generateControllerPlist(label: string, env: PlistEnv): string {
         <string>1</string>
         <key>PORT</key>
         <string>${env.controllerPort}</string>
+        <key>OPENCLAW_GATEWAY_PORT</key>
+        <string>${env.openclawPort}</string>
+        <key>RUNTIME_MANAGE_OPENCLAW_PROCESS</key>
+        <string>false</string>
         <key>NODE_ENV</key>
         <string>${env.isDev ? "development" : "production"}</string>
         <key>HOME</key>

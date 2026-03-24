@@ -24,6 +24,8 @@ export interface LaunchdBootstrapEnv {
   isDev: boolean;
   /** Controller HTTP port */
   controllerPort: number;
+  /** OpenClaw gateway port */
+  openclawPort: number;
   /** Web UI port */
   webPort: number;
   /** Path to web static files */
@@ -138,7 +140,7 @@ export async function bootstrapWithLaunchd(
     isDev: env.isDev,
     logDir,
     controllerPort: env.controllerPort,
-    openclawPort: 0, // OpenClaw uses config file, not port env
+    openclawPort: env.openclawPort,
     nodePath: env.nodePath,
     controllerEntryPath: env.controllerEntryPath,
     openclawPath: env.openclawPath,
