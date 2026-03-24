@@ -44,6 +44,9 @@ describe("generatePlist", () => {
 
     expect(plist).toContain("<string>io.nexu.openclaw</string>");
     expect(plist).toContain("<string>/app/openclaw/openclaw.mjs</string>");
+    expect(plist).toContain("<string>gateway</string>");
+    expect(plist).toContain("<string>run</string>");
+    expect(plist).toContain("<key>OPENCLAW_CONFIG</key>");
     // Check OPENCLAW_CONFIG_PATH env var (not --config argument)
     expect(plist).toContain("<key>OPENCLAW_CONFIG_PATH</key>");
     expect(plist).toContain("<key>OPENCLAW_STATE_DIR</key>");
@@ -110,6 +113,25 @@ describe("generatePlist", () => {
     );
     expect(openclawPlist).toContain(
       "<string>/Users/testuser/.nexu/logs/openclaw.error.log</string>",
+    );
+  });
+
+  it("sets ELECTRON_RUN_AS_NODE=1 for both services", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+
+    const controllerPlist = generatePlist("controller", mockEnv);
+    const openclawPlist = generatePlist("openclaw", mockEnv);
+
+    // Both services should use ELECTRON_RUN_AS_NODE=1 to run as pure Node.js
+    expect(controllerPlist).toContain("<key>ELECTRON_RUN_AS_NODE</key>");
+    expect(controllerPlist).toContain(
+      "<key>ELECTRON_RUN_AS_NODE</key>\n        <string>1</string>",
+    );
+    expect(openclawPlist).toContain("<key>ELECTRON_RUN_AS_NODE</key>");
+    expect(openclawPlist).toContain(
+      "<key>ELECTRON_RUN_AS_NODE</key>\n        <string>1</string>",
     );
   });
 });

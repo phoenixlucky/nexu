@@ -27,6 +27,10 @@ export interface PlistEnv {
   controllerCwd: string;
   /** Working directory for openclaw */
   openclawCwd: string;
+  /** System PATH for launchd environment */
+  systemPath?: string;
+  /** NODE_PATH for module resolution (TypeScript plugins need this) */
+  nodeModulesPath?: string;
 }
 
 /**
@@ -66,6 +70,8 @@ function generateControllerPlist(label: string, env: PlistEnv): string {
 
     <key>EnvironmentVariables</key>
     <dict>
+        <key>ELECTRON_RUN_AS_NODE</key>
+        <string>1</string>
         <key>PORT</key>
         <string>${env.controllerPort}</string>
         <key>NODE_ENV</key>
@@ -119,7 +125,8 @@ function generateOpenclawPlist(label: string, env: PlistEnv): string {
     <array>
         <string>${escapeXml(env.nodePath)}</string>
         <string>${escapeXml(env.openclawPath)}</string>
-        <string>gateway</string>${authArgs}
+        <string>gateway</string>
+        <string>run</string>${authArgs}
     </array>
 
     <key>WorkingDirectory</key>
@@ -127,6 +134,10 @@ function generateOpenclawPlist(label: string, env: PlistEnv): string {
 
     <key>EnvironmentVariables</key>
     <dict>
+        <key>ELECTRON_RUN_AS_NODE</key>
+        <string>1</string>
+        <key>OPENCLAW_CONFIG</key>
+        <string>${escapeXml(env.openclawConfigPath)}</string>
         <key>OPENCLAW_CONFIG_PATH</key>
         <string>${escapeXml(env.openclawConfigPath)}</string>
         <key>OPENCLAW_STATE_DIR</key>
@@ -136,7 +147,19 @@ function generateOpenclawPlist(label: string, env: PlistEnv): string {
         <key>OPENCLAW_SERVICE_MARKER</key>
         <string>launchd</string>
         <key>HOME</key>
-        <string>${escapeXml(os.homedir())}</string>
+        <string>${escapeXml(os.homedir())}</string>${
+          env.systemPath
+            ? `
+        <key>PATH</key>
+        <string>${escapeXml(env.systemPath)}</string>`
+            : ""
+        }${
+          env.nodeModulesPath
+            ? `
+        <key>NODE_PATH</key>
+        <string>${escapeXml(env.nodeModulesPath)}</string>`
+            : ""
+        }
     </dict>
 
     <key>StandardOutPath</key>
