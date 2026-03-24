@@ -196,6 +196,9 @@ const zhCN = {
   "home.channel.phase.done": "一切就绪！nexu 可以开始对话了",
   "home.channel.restarting": "重启中...",
   "home.channel.error": "错误",
+  "home.channel.errorDetail.not configured": "请重新连接",
+  "home.channel.errorDetail.session expired": "请重新连接",
+  "home.channel.errorDetail.disabled": "已停用",
   "home.channel.disconnected": "已断开",
   "home.agent.alive": "Agent 运行中",
   "home.agent.starting": "Agent 启动中...",
@@ -387,6 +390,9 @@ const zhCN = {
   "skills.clawhubDisclaimerAfterLink": "反馈。",
   "skills.recommended": "推荐",
   "skills.installed": "已安装",
+  "skills.installQueued": "技能已加入安装队列",
+  "skills.skillNotFound":
+    '"{{slug}}" 在 ClawHub 上不可用，可能已被移除或重命名。',
   "skills.import": "导入",
   "skills.importSkill": "导入技能",
   "skills.importSkillDesc": "从 zip 文件或 GitHub 仓库添加自定义技能",
@@ -490,6 +496,9 @@ const zhCN = {
   "sessions.chat.unavailable": "运行时不可用",
   "sessions.chat.unavailableDesc": "无法连接到聊天运行时。",
   "sessions.chat.loading": "加载消息中...",
+  "sessions.chat.replyLabel": "回复",
+  "sessions.chat.toolActivity": "工具",
+  "sessions.chat.toolCompleted": "已完成",
 
   // ── Integrations Page ──
   "integrations.pageTitle": "集成",

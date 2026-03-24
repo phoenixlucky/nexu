@@ -20,6 +20,9 @@ import type {
   RuntimeUnitState,
 } from "../shared/host";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
+import { SurfaceFrame } from "./components/surface-frame";
+import { UpdateBanner } from "./components/update-banner";
+import { useAutoUpdate } from "./hooks/use-auto-update";
 import {
   checkComponentUpdates,
   getAppInfo,
@@ -35,6 +38,7 @@ import {
   triggerMainProcessCrash,
   triggerRendererProcessCrash,
 } from "./lib/host-api";
+import { CloudProfilePage } from "./pages/cloud-profile-page";
 import "./runtime-page.css";
 
 const amplitudeApiKey = import.meta.env.VITE_AMPLITUDE_API_KEY;
@@ -295,61 +299,7 @@ function getWebviewPreloadUrl(): string {
   ).href;
 }
 
-function SurfaceFrame({
-  title,
-  description,
-  src,
-  version,
-  preload,
-}: {
-  title: string;
-  description: string;
-  src: string | null;
-  version: number;
-  preload?: string;
-}) {
-  // React doesn't forward unknown attributes to custom elements like <webview>.
-  // We must set `preload` BEFORE `src` — otherwise the webview navigates without it.
-  // Use a ref callback to set both attributes in the correct order via DOM API.
-  const webviewRefCallback = useCallback(
-    (el: HTMLElement | null) => {
-      if (!el || !src) return;
-      if (preload) {
-        el.setAttribute("preload", preload);
-      }
-      el.setAttribute("src", src);
-    },
-    [preload, src],
-  );
-
-  return (
-    <section className="surface-frame">
-      <header className="surface-frame-header">
-        <div>
-          <span className="surface-frame-eyebrow">embedded surface</span>
-          <h2>{title}</h2>
-          <p>{description}</p>
-        </div>
-        <code>{src ?? "Resolving local runtime URL..."}</code>
-      </header>
-
-      {src ? (
-        <webview
-          ref={webviewRefCallback as React.Ref<HTMLWebViewElement>}
-          className="desktop-web-frame"
-          key={`${src}:${version}`}
-          // @ts-expect-error Electron webview boolean attribute — must be empty string, not boolean
-          allowpopups=""
-        />
-      ) : (
-        <div className="surface-frame-empty">
-          <div className="surface-frame-spinner" />
-          Starting local services…
-        </div>
-      )}
-    </section>
-  );
-}
+// SurfaceFrame is imported from the shared component — see components/surface-frame.tsx
 
 function RuntimeUnitCard({
   unit,
@@ -994,15 +944,14 @@ function DiagnosticsPage({
 
 function DesktopShell() {
   const isPackaged = window.nexuHost.bootstrap.isPackaged;
-  const [activeSurface, setActiveSurface] = useState<DesktopSurface>(
-    isPackaged ? "web" : "control",
-  );
+  const [activeSurface, setActiveSurface] = useState<DesktopSurface>("web");
   const [chromeMode, setChromeMode] = useState<DesktopChromeMode>(
     isPackaged ? "immersive" : "full",
   );
-  const [webSurfaceVersion, setWebSurfaceVersion] = useState(0);
+  const webSurfaceVersion = 0;
   const [runtimeConfig, setRuntimeConfig] =
     useState<DesktopRuntimeConfig | null>(null);
+  const update = useAutoUpdate();
   useEffect(() => {
     void getRuntimeConfig()
       .then(setRuntimeConfig)
@@ -1011,15 +960,15 @@ function DesktopShell() {
 
   useEffect(() => {
     return onDesktopCommand((command) => {
-      if (command.type === "desktop:auth-session-restored") {
-        setWebSurfaceVersion((current) => current + 1);
+      if (command.type === "desktop:check-for-updates") {
+        void update.check();
         return;
       }
 
       setActiveSurface(command.surface);
       setChromeMode(command.chromeMode);
     });
-  }, []);
+  }, [update]);
 
   // Poll the controller ready endpoint through the web sidecar proxy before mounting the webview.
   const [controllerReady, setControllerReady] = useState(false);
@@ -1097,6 +1046,12 @@ function DesktopShell() {
             onClick={() => setActiveSurface("control")}
           />
           <SurfaceButton
+            active={activeSurface === "cloud-profile"}
+            label="Cloud Profile"
+            meta="Switch cloud endpoints and reset auth state"
+            onClick={() => setActiveSurface("cloud-profile")}
+          />
+          <SurfaceButton
             active={activeSurface === "web"}
             disabled={!desktopWebUrl}
             label="Web"
@@ -1143,14 +1098,6 @@ function DesktopShell() {
                 <dt>Built At</dt>
                 <dd>{formatBuildTimestamp(runtimeConfig.buildInfo.builtAt)}</dd>
               </div>
-              <div>
-                <dt>Cloud</dt>
-                <dd>{runtimeConfig.urls.nexuCloud}</dd>
-              </div>
-              <div>
-                <dt>Link</dt>
-                <dd>{runtimeConfig.urls.nexuLink ?? "(not set)"}</dd>
-              </div>
             </dl>
           </div>
         ) : null}
@@ -1161,6 +1108,13 @@ function DesktopShell() {
           style={{ display: activeSurface === "control" ? "contents" : "none" }}
         >
           <EmbeddedControlPlane />
+        </div>
+        <div
+          style={{
+            display: activeSurface === "cloud-profile" ? "contents" : "none",
+          }}
+        >
+          <CloudProfilePage />
         </div>
         <div style={{ display: activeSurface === "web" ? "contents" : "none" }}>
           <SurfaceFrame
@@ -1191,6 +1145,17 @@ function DesktopShell() {
           <DiagnosticsPage runtimeConfig={runtimeConfig} />
         </div>
       </main>
+
+      <UpdateBanner
+        dismissed={update.dismissed}
+        errorMessage={update.errorMessage}
+        onDismiss={update.dismiss}
+        onDownload={() => void update.download()}
+        onInstall={() => void update.install()}
+        percent={update.percent}
+        phase={update.phase}
+        version={update.version}
+      />
     </div>
   );
 }

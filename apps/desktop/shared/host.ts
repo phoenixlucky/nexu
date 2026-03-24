@@ -16,7 +16,14 @@ export const hostInvokeChannels = [
   "runtime:stop-all",
   "runtime:show-log-file",
   "runtime:query-events",
-  "desktop:ensure-auth-session",
+  "desktop:get-cloud-status",
+  "desktop:create-cloud-profile",
+  "desktop:connect-cloud-profile",
+  "desktop:disconnect-cloud-profile",
+  "desktop:switch-cloud-profile",
+  "desktop:import-cloud-profiles",
+  "desktop:update-cloud-profile",
+  "desktop:delete-cloud-profile",
   "shell:open-external",
   "update:check",
   "update:download",
@@ -71,8 +78,40 @@ export type HostInvokePayloadMap = {
     id: RuntimeUnitId;
   };
   "runtime:query-events": RuntimeEventQuery;
-  "desktop:ensure-auth-session": {
-    force?: boolean;
+  "desktop:get-cloud-status": undefined;
+  "desktop:create-cloud-profile": {
+    profile: {
+      name: string;
+      cloudUrl: string;
+      linkUrl: string;
+    };
+  };
+  "desktop:connect-cloud-profile": {
+    name: string;
+  };
+  "desktop:disconnect-cloud-profile": {
+    name: string;
+  };
+  "desktop:switch-cloud-profile": {
+    name: string;
+  };
+  "desktop:import-cloud-profiles": {
+    profiles: Array<{
+      name: string;
+      cloudUrl: string;
+      linkUrl: string;
+    }>;
+  };
+  "desktop:update-cloud-profile": {
+    previousName: string;
+    profile: {
+      name: string;
+      cloudUrl: string;
+      linkUrl: string;
+    };
+  };
+  "desktop:delete-cloud-profile": {
+    name: string;
   };
   "shell:open-external": {
     url: string;
@@ -106,8 +145,205 @@ export type HostInvokeResultMap = {
     ok: boolean;
   };
   "runtime:query-events": RuntimeEventQueryResult;
-  "desktop:ensure-auth-session": {
+  "desktop:get-cloud-status": {
+    connected: boolean;
+    polling?: boolean;
+    userName?: string | null;
+    userEmail?: string | null;
+    connectedAt?: string | null;
+    models?: Array<{
+      id: string;
+      name: string;
+      provider?: string;
+    }>;
+    cloudUrl: string;
+    linkUrl: string | null;
+    activeProfileName: string;
+    profiles: Array<{
+      name: string;
+      cloudUrl: string;
+      linkUrl: string;
+      connected: boolean;
+      polling?: boolean;
+      userName?: string | null;
+      userEmail?: string | null;
+      connectedAt?: string | null;
+      modelCount: number;
+    }>;
+  };
+  "desktop:create-cloud-profile": {
     ok: boolean;
+    connected: boolean;
+    polling?: boolean;
+    userName?: string | null;
+    userEmail?: string | null;
+    connectedAt?: string | null;
+    models?: Array<{
+      id: string;
+      name: string;
+      provider?: string;
+    }>;
+    cloudUrl: string;
+    linkUrl: string | null;
+    activeProfileName: string;
+    profiles: Array<{
+      name: string;
+      cloudUrl: string;
+      linkUrl: string;
+      connected: boolean;
+      polling?: boolean;
+      userName?: string | null;
+      userEmail?: string | null;
+      connectedAt?: string | null;
+      modelCount: number;
+    }>;
+    configPushed: boolean;
+  };
+  "desktop:connect-cloud-profile": {
+    browserUrl?: string;
+    error?: string;
+    status: HostInvokeResultMap["desktop:get-cloud-status"];
+    configPushed: boolean;
+  };
+  "desktop:disconnect-cloud-profile": {
+    ok: boolean;
+    connected: boolean;
+    polling?: boolean;
+    userName?: string | null;
+    userEmail?: string | null;
+    connectedAt?: string | null;
+    models?: Array<{
+      id: string;
+      name: string;
+      provider?: string;
+    }>;
+    cloudUrl: string;
+    linkUrl: string | null;
+    activeProfileName: string;
+    profiles: Array<{
+      name: string;
+      cloudUrl: string;
+      linkUrl: string;
+      connected: boolean;
+      polling?: boolean;
+      userName?: string | null;
+      userEmail?: string | null;
+      connectedAt?: string | null;
+      modelCount: number;
+    }>;
+    configPushed: boolean;
+  };
+  "desktop:switch-cloud-profile": {
+    ok: boolean;
+    connected: boolean;
+    polling?: boolean;
+    userName?: string | null;
+    userEmail?: string | null;
+    connectedAt?: string | null;
+    models?: Array<{
+      id: string;
+      name: string;
+      provider?: string;
+    }>;
+    cloudUrl: string;
+    linkUrl: string | null;
+    activeProfileName: string;
+    profiles: Array<{
+      name: string;
+      cloudUrl: string;
+      linkUrl: string;
+      connected: boolean;
+      polling?: boolean;
+      userName?: string | null;
+      userEmail?: string | null;
+      connectedAt?: string | null;
+      modelCount: number;
+    }>;
+    configPushed: boolean;
+  };
+  "desktop:import-cloud-profiles": {
+    ok: boolean;
+    connected: boolean;
+    polling?: boolean;
+    userName?: string | null;
+    userEmail?: string | null;
+    connectedAt?: string | null;
+    models?: Array<{
+      id: string;
+      name: string;
+      provider?: string;
+    }>;
+    cloudUrl: string;
+    linkUrl: string | null;
+    activeProfileName: string;
+    profiles: Array<{
+      name: string;
+      cloudUrl: string;
+      linkUrl: string;
+      connected: boolean;
+      polling?: boolean;
+      userName?: string | null;
+      userEmail?: string | null;
+      connectedAt?: string | null;
+      modelCount: number;
+    }>;
+    configPushed: boolean;
+  };
+  "desktop:update-cloud-profile": {
+    ok: boolean;
+    connected: boolean;
+    polling?: boolean;
+    userName?: string | null;
+    userEmail?: string | null;
+    connectedAt?: string | null;
+    models?: Array<{
+      id: string;
+      name: string;
+      provider?: string;
+    }>;
+    cloudUrl: string;
+    linkUrl: string | null;
+    activeProfileName: string;
+    profiles: Array<{
+      name: string;
+      cloudUrl: string;
+      linkUrl: string;
+      connected: boolean;
+      polling?: boolean;
+      userName?: string | null;
+      userEmail?: string | null;
+      connectedAt?: string | null;
+      modelCount: number;
+    }>;
+    configPushed: boolean;
+  };
+  "desktop:delete-cloud-profile": {
+    ok: boolean;
+    connected: boolean;
+    polling?: boolean;
+    userName?: string | null;
+    userEmail?: string | null;
+    connectedAt?: string | null;
+    models?: Array<{
+      id: string;
+      name: string;
+      provider?: string;
+    }>;
+    cloudUrl: string;
+    linkUrl: string | null;
+    activeProfileName: string;
+    profiles: Array<{
+      name: string;
+      cloudUrl: string;
+      linkUrl: string;
+      connected: boolean;
+      polling?: boolean;
+      userName?: string | null;
+      userEmail?: string | null;
+      connectedAt?: string | null;
+      modelCount: number;
+    }>;
+    configPushed: boolean;
   };
   "shell:open-external": {
     ok: boolean;
@@ -144,7 +380,12 @@ export type DiagnosticsInfo = {
   nativeCrashPipeline: "local-only" | "sentry";
 };
 
-export type DesktopSurface = "web" | "openclaw" | "control" | "diagnostics";
+export type DesktopSurface =
+  | "web"
+  | "openclaw"
+  | "control"
+  | "cloud-profile"
+  | "diagnostics";
 
 export type DesktopChromeMode = "full" | "immersive";
 
@@ -160,8 +401,7 @@ export type HostDesktopCommand =
       chromeMode: DesktopChromeMode;
     }
   | {
-      type: "desktop:auth-session-restored";
-      surface: "web";
+      type: "desktop:check-for-updates";
     };
 
 export type RuntimeUnitSnapshot = Omit<RuntimeUnitState, "logTail">;
@@ -266,7 +506,7 @@ export type HostBootstrap = {
 };
 
 export type UpdateSource = "r2" | "github";
-export type UpdateChannelName = "stable" | "beta";
+export type UpdateChannelName = "stable" | "beta" | "nightly";
 
 export const updaterEvents = [
   "update:checking",
@@ -279,10 +519,25 @@ export const updaterEvents = [
 
 export type UpdaterEvent = (typeof updaterEvents)[number];
 
+export interface UpdateCheckDiagnostic {
+  channel: UpdateChannelName;
+  source: UpdateSource;
+  feedUrl: string;
+  currentVersion: string;
+  remoteVersion?: string;
+  remoteReleaseDate?: string;
+}
+
 export type UpdaterEventMap = {
-  "update:checking": Record<string, never>;
-  "update:available": { version: string; releaseNotes?: string };
-  "update:up-to-date": Record<string, never>;
+  "update:checking": UpdateCheckDiagnostic;
+  "update:available": {
+    version: string;
+    releaseNotes?: string;
+    diagnostic: UpdateCheckDiagnostic;
+  };
+  "update:up-to-date": {
+    diagnostic: UpdateCheckDiagnostic;
+  };
   "update:progress": {
     percent: number;
     bytesPerSecond: number;
@@ -290,7 +545,10 @@ export type UpdaterEventMap = {
     total: number;
   };
   "update:downloaded": { version: string };
-  "update:error": { message: string };
+  "update:error": {
+    message: string;
+    diagnostic?: UpdateCheckDiagnostic;
+  };
 };
 
 export type UpdaterBridge = {

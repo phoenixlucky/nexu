@@ -395,6 +395,10 @@ export function compileOpenClawConfig(
             enabled: true,
           },
         },
+        humanDelay: {
+          mode: "off",
+        },
+        verboseDefault: "on",
       },
       list: compileAgentList(config, env),
     },

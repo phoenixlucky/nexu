@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import type { UpdateChannelName } from "./host";
 import { getDesktopAppRoot } from "./workspace-paths";
 
 export const DEFAULT_CONTROLLER_PORT = 50_800;
@@ -8,18 +9,12 @@ export const DEFAULT_OPENCLAW_BASE_URL = "http://127.0.0.1:18789";
 export const DEFAULT_GATEWAY_TOKEN = "gw-secret-token";
 export const DEFAULT_NEXU_HOME = "~/.nexu";
 
-// Cloud connection defaults (production)
-export const DEFAULT_NEXU_CLOUD_URL = "https://nexu.io";
-export const DEFAULT_NEXU_LINK_URL: string | null = null;
-
 /**
  * Read build-time configuration from bundled config file.
  * This allows CI to inject environment-specific values at build time.
  */
 type BuildConfig = {
   NEXU_HOME?: string;
-  NEXU_CLOUD_URL?: string;
-  NEXU_LINK_URL?: string | null;
   NEXU_UPDATE_FEED_URL?: string;
   NEXU_DESKTOP_AUTO_UPDATE_ENABLED?: string;
   NEXU_DESKTOP_APP_VERSION?: string;
@@ -28,6 +23,7 @@ type BuildConfig = {
   NEXU_DESKTOP_BUILD_BRANCH?: string;
   NEXU_DESKTOP_BUILD_COMMIT?: string;
   NEXU_DESKTOP_BUILD_TIME?: string;
+  NEXU_DESKTOP_UPDATE_CHANNEL?: UpdateChannelName;
 };
 
 function readBuildConfigString(
@@ -35,18 +31,6 @@ function readBuildConfigString(
   key: keyof BuildConfig,
 ): string | undefined {
   const value = input[key];
-  return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-function readBuildConfigNullableString(
-  input: Record<string, unknown>,
-  key: keyof BuildConfig,
-): string | null | undefined {
-  const value = input[key];
-  if (value === null) {
-    return null;
-  }
-
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
@@ -65,8 +49,6 @@ function loadBuildConfig(resourcesPath?: string): BuildConfig {
 
     const record = parsed as Record<string, unknown>;
     return {
-      NEXU_CLOUD_URL: readBuildConfigString(record, "NEXU_CLOUD_URL"),
-      NEXU_LINK_URL: readBuildConfigNullableString(record, "NEXU_LINK_URL"),
       NEXU_UPDATE_FEED_URL: readBuildConfigString(
         record,
         "NEXU_UPDATE_FEED_URL",
@@ -99,9 +81,25 @@ function loadBuildConfig(resourcesPath?: string): BuildConfig {
         record,
         "NEXU_DESKTOP_BUILD_TIME",
       ),
+      NEXU_DESKTOP_UPDATE_CHANNEL: readUpdateChannel(
+        readBuildConfigString(record, "NEXU_DESKTOP_UPDATE_CHANNEL"),
+      ),
     };
   } catch {
     return {};
+  }
+}
+
+function readUpdateChannel(
+  value: string | undefined,
+): UpdateChannelName | undefined {
+  switch (value) {
+    case "stable":
+    case "beta":
+    case "nightly":
+      return value;
+    default:
+      return undefined;
   }
 }
 
@@ -179,6 +177,7 @@ export type DesktopRuntimeConfig = {
   buildInfo: DesktopBuildInfo;
   updates: {
     autoUpdateEnabled: boolean;
+    channel: UpdateChannelName;
   };
   ports: {
     controller: number;
@@ -188,8 +187,6 @@ export type DesktopRuntimeConfig = {
     controllerBase: string;
     web: string;
     openclawBase: string;
-    nexuCloud: string;
-    nexuLink: string | null;
     updateFeed: string | null;
   };
   tokens: {
@@ -228,6 +225,10 @@ export function getDesktopRuntimeConfig(
       env.NEXU_DESKTOP_AUTO_UPDATE_ENABLED ??
         buildConfig.NEXU_DESKTOP_AUTO_UPDATE_ENABLED,
     ) ?? true;
+  const updateChannel =
+    readUpdateChannel(env.NEXU_DESKTOP_UPDATE_CHANNEL) ??
+    buildConfig.NEXU_DESKTOP_UPDATE_CHANNEL ??
+    "stable";
   const fallbackPackageVersion =
     readPackagedAppVersion(defaults?.resourcesPath) ??
     readDesktopPackageVersion();
@@ -250,12 +251,6 @@ export function getDesktopRuntimeConfig(
       `http://127.0.0.1:${ports.controller}`,
     web: env.NEXU_WEB_URL ?? `http://127.0.0.1:${ports.web}`,
     openclawBase: env.NEXU_OPENCLAW_BASE_URL ?? DEFAULT_OPENCLAW_BASE_URL,
-    nexuCloud:
-      env.NEXU_CLOUD_URL ??
-      buildConfig.NEXU_CLOUD_URL ??
-      DEFAULT_NEXU_CLOUD_URL,
-    nexuLink:
-      env.NEXU_LINK_URL ?? buildConfig.NEXU_LINK_URL ?? DEFAULT_NEXU_LINK_URL,
     updateFeed:
       env.NEXU_UPDATE_FEED_URL ?? buildConfig.NEXU_UPDATE_FEED_URL ?? null,
   };
@@ -285,6 +280,7 @@ export function getDesktopRuntimeConfig(
     },
     updates: {
       autoUpdateEnabled,
+      channel: updateChannel,
     },
     ports,
     urls,

@@ -9,10 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import * as path from "node:path";
-import {
-  getOpenclawCuratedSkillsDir,
-  getOpenclawSkillsDir,
-} from "../../shared/desktop-paths";
+import { getOpenclawSkillsDir } from "../../shared/desktop-paths";
 import type { DesktopRuntimeConfig } from "../../shared/runtime-config";
 import { getWorkspaceRoot } from "../../shared/workspace-paths";
 import type { RuntimeUnitManifest } from "./types";
@@ -162,7 +159,7 @@ export function buildSkillNodePath(
   );
 }
 
-function ensurePackagedOpenclawSidecar(
+export function ensurePackagedOpenclawSidecar(
   runtimeSidecarBaseRoot: string,
   runtimeRoot: string,
 ): string {
@@ -225,7 +222,6 @@ export function createRuntimeUnitManifests(
   );
   const openclawTempDir = ensureDir(path.resolve(openclawRuntimeRoot, "tmp"));
   ensureDir(getOpenclawSkillsDir(userDataPath));
-  ensureDir(getOpenclawCuratedSkillsDir(userDataPath));
   ensureDir(path.resolve(openclawStateDir, "plugin-docs"));
   ensureDir(path.resolve(openclawStateDir, "agents"));
   const openclawPackageRoot = path.resolve(
@@ -311,14 +307,9 @@ export function createRuntimeUnitManifests(
         HOST: "127.0.0.1",
         WEB_URL: webUrl,
         NEXU_HOME: runtimeConfig.paths.nexuHome,
-        NEXU_CLOUD_URL: runtimeConfig.urls.nexuCloud,
-        ...(runtimeConfig.urls.nexuLink
-          ? { NEXU_LINK_URL: runtimeConfig.urls.nexuLink }
-          : {}),
         OPENCLAW_STATE_DIR: openclawStateDir,
         OPENCLAW_CONFIG_PATH: path.resolve(openclawConfigDir, "openclaw.json"),
         OPENCLAW_SKILLS_DIR: getOpenclawSkillsDir(userDataPath),
-        OPENCLAW_CURATED_SKILLS_DIR: getOpenclawCuratedSkillsDir(userDataPath),
         SKILLHUB_STATIC_SKILLS_DIR: isPackaged
           ? path.resolve(electronRoot, "static/bundled-skills")
           : path.resolve(repoRoot, "apps/desktop/static/bundled-skills"),

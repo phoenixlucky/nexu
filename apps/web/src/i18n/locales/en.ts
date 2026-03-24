@@ -200,6 +200,9 @@ const en = {
   "home.channel.phase.done": "All set! nexu is ready to chat",
   "home.channel.restarting": "Restarting...",
   "home.channel.error": "Error",
+  "home.channel.errorDetail.not configured": "Reconnect required",
+  "home.channel.errorDetail.session expired": "Reconnect required",
+  "home.channel.errorDetail.disabled": "Disabled",
   "home.channel.disconnected": "Disconnected",
   "home.agent.alive": "Agent running",
   "home.agent.starting": "Agent starting...",
@@ -406,6 +409,9 @@ const en = {
   "skills.clawhubDisclaimerAfterLink": ".",
   "skills.recommended": "Recommended",
   "skills.installed": "Installed",
+  "skills.installQueued": "Skill queued for installation",
+  "skills.skillNotFound":
+    '"{{slug}}" is not available on ClawHub. It may have been removed or renamed.',
   "skills.import": "Import",
   "skills.importSkill": "Import Skill",
   "skills.importSkillDesc":
@@ -513,6 +519,9 @@ const en = {
   "sessions.chat.unavailable": "Runtime unavailable",
   "sessions.chat.unavailableDesc": "Cannot connect to the chat runtime.",
   "sessions.chat.loading": "Loading messages...",
+  "sessions.chat.replyLabel": "Reply",
+  "sessions.chat.toolActivity": "Tool",
+  "sessions.chat.toolCompleted": "Completed",
 
   // ── Integrations Page ──
   "integrations.pageTitle": "Integrations",

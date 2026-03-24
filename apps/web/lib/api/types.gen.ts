@@ -240,27 +240,6 @@ export type PostApiV1BotsByBotIdResumeResponses = {
 
 export type PostApiV1BotsByBotIdResumeResponse = PostApiV1BotsByBotIdResumeResponses[keyof PostApiV1BotsByBotIdResumeResponses];
 
-export type PostApiAuthCheckEmailData = {
-    body?: {
-        email?: string;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/auth/check-email';
-};
-
-export type PostApiAuthCheckEmailResponses = {
-    /**
-     * Email check
-     */
-    200: {
-        exists: boolean;
-        verified: boolean;
-    };
-};
-
-export type PostApiAuthCheckEmailResponse = PostApiAuthCheckEmailResponses[keyof PostApiAuthCheckEmailResponses];
-
 export type PostApiV1AuthDesktopAuthorizeData = {
     body?: {
         deviceId: string;
@@ -423,7 +402,7 @@ export type GetApiInternalDesktopReadyResponses = {
             ok: boolean;
             status: number;
         };
-        status: 'active' | 'degraded' | 'unhealthy';
+        status: 'active' | 'starting' | 'degraded' | 'unhealthy';
     };
 };
 
@@ -530,6 +509,20 @@ export type GetApiInternalDesktopCloudStatusResponses = {
             name: string;
             provider?: string;
         }>;
+        cloudUrl: string;
+        linkUrl: string;
+        activeProfileName: string;
+        profiles: Array<{
+            name: string;
+            cloudUrl: string;
+            linkUrl: string;
+            connected: boolean;
+            polling?: boolean;
+            userName?: string;
+            userEmail?: string;
+            connectedAt?: string;
+            modelCount: number;
+        }>;
     };
 };
 
@@ -554,6 +547,54 @@ export type PostApiInternalDesktopCloudConnectResponses = {
 
 export type PostApiInternalDesktopCloudConnectResponse = PostApiInternalDesktopCloudConnectResponses[keyof PostApiInternalDesktopCloudConnectResponses];
 
+export type PostApiInternalDesktopCloudProfileConnectData = {
+    body: {
+        name: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/cloud-profile/connect';
+};
+
+export type PostApiInternalDesktopCloudProfileConnectResponses = {
+    /**
+     * Connect cloud profile
+     */
+    200: {
+        browserUrl?: string;
+        error?: string;
+        status: {
+            connected: boolean;
+            polling?: boolean;
+            userName?: string;
+            userEmail?: string;
+            connectedAt?: string;
+            models?: Array<{
+                id: string;
+                name: string;
+                provider?: string;
+            }>;
+            cloudUrl: string;
+            linkUrl: string;
+            activeProfileName: string;
+            profiles: Array<{
+                name: string;
+                cloudUrl: string;
+                linkUrl: string;
+                connected: boolean;
+                polling?: boolean;
+                userName?: string;
+                userEmail?: string;
+                connectedAt?: string;
+                modelCount: number;
+            }>;
+        };
+        configPushed: boolean;
+    };
+};
+
+export type PostApiInternalDesktopCloudProfileConnectResponse = PostApiInternalDesktopCloudProfileConnectResponses[keyof PostApiInternalDesktopCloudProfileConnectResponses];
+
 export type PostApiInternalDesktopCloudRefreshData = {
     body?: never;
     path?: never;
@@ -576,11 +617,169 @@ export type PostApiInternalDesktopCloudRefreshResponses = {
             name: string;
             provider?: string;
         }>;
+        cloudUrl: string;
+        linkUrl: string;
+        activeProfileName: string;
+        profiles: Array<{
+            name: string;
+            cloudUrl: string;
+            linkUrl: string;
+            connected: boolean;
+            polling?: boolean;
+            userName?: string;
+            userEmail?: string;
+            connectedAt?: string;
+            modelCount: number;
+        }>;
         configPushed: boolean;
     };
 };
 
 export type PostApiInternalDesktopCloudRefreshResponse = PostApiInternalDesktopCloudRefreshResponses[keyof PostApiInternalDesktopCloudRefreshResponses];
+
+export type PostApiInternalDesktopCloudProfileCreateData = {
+    body: {
+        profile: {
+            name: string;
+            cloudUrl: string;
+            linkUrl: string;
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/cloud-profile/create';
+};
+
+export type PostApiInternalDesktopCloudProfileCreateResponses = {
+    /**
+     * Create cloud profile
+     */
+    200: {
+        connected: boolean;
+        polling?: boolean;
+        userName?: string;
+        userEmail?: string;
+        connectedAt?: string;
+        models?: Array<{
+            id: string;
+            name: string;
+            provider?: string;
+        }>;
+        cloudUrl: string;
+        linkUrl: string;
+        activeProfileName: string;
+        profiles: Array<{
+            name: string;
+            cloudUrl: string;
+            linkUrl: string;
+            connected: boolean;
+            polling?: boolean;
+            userName?: string;
+            userEmail?: string;
+            connectedAt?: string;
+            modelCount: number;
+        }>;
+        ok: boolean;
+        configPushed: boolean;
+    };
+};
+
+export type PostApiInternalDesktopCloudProfileCreateResponse = PostApiInternalDesktopCloudProfileCreateResponses[keyof PostApiInternalDesktopCloudProfileCreateResponses];
+
+export type PostApiInternalDesktopCloudProfileUpdateData = {
+    body: {
+        previousName: string;
+        profile: {
+            name: string;
+            cloudUrl: string;
+            linkUrl: string;
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/cloud-profile/update';
+};
+
+export type PostApiInternalDesktopCloudProfileUpdateResponses = {
+    /**
+     * Update cloud profile
+     */
+    200: {
+        connected: boolean;
+        polling?: boolean;
+        userName?: string;
+        userEmail?: string;
+        connectedAt?: string;
+        models?: Array<{
+            id: string;
+            name: string;
+            provider?: string;
+        }>;
+        cloudUrl: string;
+        linkUrl: string;
+        activeProfileName: string;
+        profiles: Array<{
+            name: string;
+            cloudUrl: string;
+            linkUrl: string;
+            connected: boolean;
+            polling?: boolean;
+            userName?: string;
+            userEmail?: string;
+            connectedAt?: string;
+            modelCount: number;
+        }>;
+        ok: boolean;
+        configPushed: boolean;
+    };
+};
+
+export type PostApiInternalDesktopCloudProfileUpdateResponse = PostApiInternalDesktopCloudProfileUpdateResponses[keyof PostApiInternalDesktopCloudProfileUpdateResponses];
+
+export type PostApiInternalDesktopCloudProfileDeleteData = {
+    body: {
+        name: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/cloud-profile/delete';
+};
+
+export type PostApiInternalDesktopCloudProfileDeleteResponses = {
+    /**
+     * Delete cloud profile
+     */
+    200: {
+        connected: boolean;
+        polling?: boolean;
+        userName?: string;
+        userEmail?: string;
+        connectedAt?: string;
+        models?: Array<{
+            id: string;
+            name: string;
+            provider?: string;
+        }>;
+        cloudUrl: string;
+        linkUrl: string;
+        activeProfileName: string;
+        profiles: Array<{
+            name: string;
+            cloudUrl: string;
+            linkUrl: string;
+            connected: boolean;
+            polling?: boolean;
+            userName?: string;
+            userEmail?: string;
+            connectedAt?: string;
+            modelCount: number;
+        }>;
+        ok: boolean;
+        configPushed: boolean;
+    };
+};
+
+export type PostApiInternalDesktopCloudProfileDeleteResponse = PostApiInternalDesktopCloudProfileDeleteResponses[keyof PostApiInternalDesktopCloudProfileDeleteResponses];
 
 export type PostApiInternalDesktopCloudDisconnectData = {
     body?: never;
@@ -599,6 +798,145 @@ export type PostApiInternalDesktopCloudDisconnectResponses = {
 };
 
 export type PostApiInternalDesktopCloudDisconnectResponse = PostApiInternalDesktopCloudDisconnectResponses[keyof PostApiInternalDesktopCloudDisconnectResponses];
+
+export type PostApiInternalDesktopCloudProfileDisconnectData = {
+    body: {
+        name: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/cloud-profile/disconnect';
+};
+
+export type PostApiInternalDesktopCloudProfileDisconnectResponses = {
+    /**
+     * Disconnect cloud profile
+     */
+    200: {
+        connected: boolean;
+        polling?: boolean;
+        userName?: string;
+        userEmail?: string;
+        connectedAt?: string;
+        models?: Array<{
+            id: string;
+            name: string;
+            provider?: string;
+        }>;
+        cloudUrl: string;
+        linkUrl: string;
+        activeProfileName: string;
+        profiles: Array<{
+            name: string;
+            cloudUrl: string;
+            linkUrl: string;
+            connected: boolean;
+            polling?: boolean;
+            userName?: string;
+            userEmail?: string;
+            connectedAt?: string;
+            modelCount: number;
+        }>;
+        ok: boolean;
+        configPushed: boolean;
+    };
+};
+
+export type PostApiInternalDesktopCloudProfileDisconnectResponse = PostApiInternalDesktopCloudProfileDisconnectResponses[keyof PostApiInternalDesktopCloudProfileDisconnectResponses];
+
+export type PostApiInternalDesktopCloudProfileSelectData = {
+    body: {
+        name: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/cloud-profile/select';
+};
+
+export type PostApiInternalDesktopCloudProfileSelectResponses = {
+    /**
+     * Switch cloud profile
+     */
+    200: {
+        connected: boolean;
+        polling?: boolean;
+        userName?: string;
+        userEmail?: string;
+        connectedAt?: string;
+        models?: Array<{
+            id: string;
+            name: string;
+            provider?: string;
+        }>;
+        cloudUrl: string;
+        linkUrl: string;
+        activeProfileName: string;
+        profiles: Array<{
+            name: string;
+            cloudUrl: string;
+            linkUrl: string;
+            connected: boolean;
+            polling?: boolean;
+            userName?: string;
+            userEmail?: string;
+            connectedAt?: string;
+            modelCount: number;
+        }>;
+        ok: boolean;
+        configPushed: boolean;
+    };
+};
+
+export type PostApiInternalDesktopCloudProfileSelectResponse = PostApiInternalDesktopCloudProfileSelectResponses[keyof PostApiInternalDesktopCloudProfileSelectResponses];
+
+export type PostApiInternalDesktopCloudProfilesImportData = {
+    body: {
+        profiles: Array<{
+            name: string;
+            cloudUrl: string;
+            linkUrl: string;
+        }>;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/cloud-profiles/import';
+};
+
+export type PostApiInternalDesktopCloudProfilesImportResponses = {
+    /**
+     * Import cloud profiles
+     */
+    200: {
+        connected: boolean;
+        polling?: boolean;
+        userName?: string;
+        userEmail?: string;
+        connectedAt?: string;
+        models?: Array<{
+            id: string;
+            name: string;
+            provider?: string;
+        }>;
+        cloudUrl: string;
+        linkUrl: string;
+        activeProfileName: string;
+        profiles: Array<{
+            name: string;
+            cloudUrl: string;
+            linkUrl: string;
+            connected: boolean;
+            polling?: boolean;
+            userName?: string;
+            userEmail?: string;
+            connectedAt?: string;
+            modelCount: number;
+        }>;
+        ok: boolean;
+        configPushed: boolean;
+    };
+};
+
+export type PostApiInternalDesktopCloudProfilesImportResponse = PostApiInternalDesktopCloudProfilesImportResponses[keyof PostApiInternalDesktopCloudProfilesImportResponses];
 
 export type PutApiInternalDesktopCloudModelsData = {
     body?: {
@@ -2038,7 +2376,7 @@ export type GetApiV1SkillhubCatalogResponses = {
         installedSlugs: Array<string>;
         installedSkills: Array<{
             slug: string;
-            source: 'curated' | 'managed' | 'custom';
+            source: 'managed' | 'custom';
             name: string;
             description: string;
             installedAt: string;
@@ -2048,6 +2386,16 @@ export type GetApiV1SkillhubCatalogResponses = {
             updatedAt: string;
             skillCount: number;
         };
+        queue: Array<{
+            slug: string;
+            source: 'managed' | 'custom';
+            status: 'queued' | 'downloading' | 'installing-deps' | 'done' | 'failed';
+            position: number;
+            error: string;
+            errorCode: 'skill_not_found' | 'rate_limit' | 'unknown';
+            retries: number;
+            enqueuedAt: string;
+        }>;
     };
 };
 
@@ -2068,6 +2416,10 @@ export type PostApiV1SkillhubInstallResponses = {
      */
     200: {
         ok: boolean;
+        queued?: boolean;
+        slug?: string;
+        status?: 'queued' | 'downloading' | 'installing-deps' | 'done' | 'failed';
+        position?: number;
         error?: string;
     };
 };
