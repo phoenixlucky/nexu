@@ -149,28 +149,21 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
     });
   };
 
-  // Apply to all existing windows
-  for (const win of BrowserWindow.getAllWindows()) {
-    interceptWindowClose(win);
+  // Apply to the main window only (avoid duplicate handlers)
+  const mainWin = BrowserWindow.getAllWindows()[0];
+  if (mainWin) {
+    interceptWindowClose(mainWin);
   }
 
-  // Apply to future windows
-  app.on("browser-window-created", (_event, win) => {
-    interceptWindowClose(win);
-  });
-
-  // Also intercept Cmd+Q / Dock "Quit" which triggers before-quit
+  // Intercept Cmd+Q / Dock "Quit" — redirect to window close handler
+  // which shows the dialog.
   app.on("before-quit", (event) => {
     if ((app as unknown as Record<string, unknown>).__nexuForceQuit) return;
-
-    // In packaged mode, prevent quit and let window close handler show dialog
-    if (app.isPackaged) {
-      event.preventDefault();
-      const win = BrowserWindow.getAllWindows()[0];
-      if (win) {
-        win.show();
-        win.close(); // Triggers the close handler above
-      }
+    event.preventDefault();
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) {
+      if (!win.isVisible()) win.show();
+      win.close();
     }
   });
 }
