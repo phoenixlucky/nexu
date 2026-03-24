@@ -12,6 +12,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { getWorkspaceRoot } from "../../shared/workspace-paths";
+import { ensurePackagedOpenclawSidecar } from "../runtime/manifests";
 import {
   type EmbeddedWebServer,
   startEmbeddedWebServer,
@@ -265,8 +266,14 @@ export function resolveLaunchdPaths(
   openclawCwd: string;
 } {
   if (isPackaged) {
-    // Packaged app: use bundled resources
+    // Packaged app: extract openclaw sidecar from tar archive if needed,
+    // then resolve paths to the extracted location.
     const runtimeDir = path.join(resourcesPath, "runtime");
+    const nexuHome = path.join(os.homedir(), ".nexu");
+    const openclawSidecarRoot = ensurePackagedOpenclawSidecar(
+      runtimeDir,
+      nexuHome,
+    );
     return {
       nodePath: process.execPath,
       controllerEntryPath: path.join(
@@ -276,14 +283,13 @@ export function resolveLaunchdPaths(
         "index.js",
       ),
       openclawPath: path.join(
-        runtimeDir,
-        "openclaw",
+        openclawSidecarRoot,
         "node_modules",
         "openclaw",
         "openclaw.mjs",
       ),
       controllerCwd: path.join(runtimeDir, "controller"),
-      openclawCwd: runtimeDir,
+      openclawCwd: openclawSidecarRoot,
     };
   }
 
