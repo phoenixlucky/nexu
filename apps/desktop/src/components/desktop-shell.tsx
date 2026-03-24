@@ -29,22 +29,23 @@ export function DesktopShell() {
   const [chromeMode, setChromeMode] = useState<DesktopChromeMode>(
     isPackaged ? "immersive" : "full",
   );
-  const [webSurfaceVersion, setWebSurfaceVersion] = useState(0);
+  const webSurfaceVersion = 0;
   const { desktopOpenClawUrl, desktopWebUrl, runtimeConfig } =
     useDesktopRuntimeConfig();
   const update = useAutoUpdate();
+  const { check: checkForUpdates } = update;
 
   useEffect(() => {
     return onDesktopCommand((command) => {
-      if (command.type === "desktop:auth-session-restored") {
-        setWebSurfaceVersion((current) => current + 1);
+      if (command.type === "desktop:check-for-updates") {
+        void checkForUpdates();
         return;
       }
 
       setActiveSurface(command.surface);
       setChromeMode(command.chromeMode);
     });
-  }, []);
+  }, [checkForUpdates]);
 
   return (
     <div
@@ -118,14 +119,6 @@ export function DesktopShell() {
               <div>
                 <dt>Built At</dt>
                 <dd>{formatBuildTimestamp(runtimeConfig.buildInfo.builtAt)}</dd>
-              </div>
-              <div>
-                <dt>Cloud</dt>
-                <dd>{runtimeConfig.urls.nexuCloud}</dd>
-              </div>
-              <div>
-                <dt>Link</dt>
-                <dd>{runtimeConfig.urls.nexuLink ?? "(not set)"}</dd>
               </div>
             </dl>
           </div>

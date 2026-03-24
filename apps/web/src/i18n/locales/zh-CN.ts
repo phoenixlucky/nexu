@@ -388,6 +388,20 @@ const zhCN = {
   "skills.skillNotFound":
     '"{{slug}}" 在 ClawHub 上不可用，可能已被移除或重命名。',
   "skills.import": "导入",
+  "skills.importSkill": "导入技能",
+  "skills.importSkillDesc": "从 zip 文件或 GitHub 仓库添加自定义技能",
+  "skills.uploadZip": "上传 Zip",
+  "skills.githubLink": "GitHub 链接",
+  "skills.importSuccess": "技能导入成功",
+  "skills.dropZipHere": "将 .zip 技能文件拖放到此处",
+  "skills.orClickBrowse": "或点击浏览",
+  "skills.clickToChange": "点击更换文件",
+  "skills.zipHint": "zip 文件中应包含 SKILL.md 清单及相关的提示词或配置文件。",
+  "skills.githubUrlLabel": "GitHub 仓库地址",
+  "skills.githubComingSoon":
+    "GitHub 导入即将推出，请先使用「上传 Zip」标签页。",
+  "skills.importing": "导入中...",
+  "skills.cancel": "取消",
   "skills.loadingCatalog": "正在下载技能目录...",
   "skills.catalogUnavailable": "目录不可用",
   "skills.retrying": "重试中...",
@@ -475,6 +489,9 @@ const zhCN = {
   "sessions.chat.unavailable": "运行时不可用",
   "sessions.chat.unavailableDesc": "无法连接到聊天运行时。",
   "sessions.chat.loading": "加载消息中...",
+  "sessions.chat.replyLabel": "回复",
+  "sessions.chat.toolActivity": "工具",
+  "sessions.chat.toolCompleted": "已完成",
 
   // ── Integrations Page ──
   "integrations.pageTitle": "集成",

@@ -1,8 +1,8 @@
 import { GitHubStarCta } from "@/components/github-star-cta";
+import ImportSkillModal from "@/components/skills/import-skill-modal";
 import { Switch } from "@/components/ui/switch";
 import {
   useCommunitySkills,
-  useImportSkill,
   useInstallSkill,
   useRefreshCatalog,
   useUninstallSkill,
@@ -10,6 +10,7 @@ import {
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { useLocale } from "@/hooks/use-locale";
 import { getTagLabel } from "@/lib/skill-translations";
+import { mapInstalledSkillSource, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import type { InstalledSkill, MinimalSkill } from "@/types/desktop";
 import { Compass, Loader2, Plus, Search, Settings2, Zap } from "lucide-react";
@@ -39,6 +40,7 @@ function SkillCard({
   isInstalled,
   queueStatus,
   categoryLabel,
+  skillSource,
 }: {
   skill: MinimalSkill;
   isInstalled: boolean;
@@ -50,6 +52,7 @@ function SkillCard({
     | "failed"
     | null;
   categoryLabel?: string;
+  skillSource: "builtin" | "explore" | "custom";
 }) {
   const installMutation = useInstallSkill();
   const uninstallMutation = useUninstallSkill();
@@ -67,6 +70,10 @@ function SkillCard({
     setPendingAction("install");
     try {
       await installMutation.mutateAsync(skill.slug);
+      track("workspace_skill_enable", {
+        name: skill.name,
+        skill_source: skillSource,
+      });
     } finally {
       setPendingAction(null);
     }
@@ -77,6 +84,10 @@ function SkillCard({
       setPendingAction("install");
       try {
         await installMutation.mutateAsync(skill.slug);
+        track("workspace_skill_enable", {
+          name: skill.name,
+          skill_source: skillSource,
+        });
       } finally {
         setPendingAction(null);
       }
@@ -84,6 +95,10 @@ function SkillCard({
       setPendingAction("uninstall");
       try {
         await uninstallMutation.mutateAsync(skill.slug);
+        track("workspace_skill_disable", {
+          name: skill.name,
+          skill_source: skillSource,
+        });
       } finally {
         setPendingAction(null);
       }
@@ -93,6 +108,7 @@ function SkillCard({
   return (
     <Link
       to={`/workspace/skills/${skill.slug}`}
+      draggable={false}
       className={cn(
         "card flex flex-col p-4",
         isInstalled && !pendingAction ? "" : "",
@@ -198,24 +214,7 @@ export function SkillsPage() {
   const { locale } = useLocale();
   const { data, isLoading, isError } = useCommunitySkills();
   const refreshMutation = useRefreshCatalog();
-  const importMutation = useImportSkill();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      await importMutation.mutateAsync(file);
-    } catch {
-      // Error handled by mutation state
-    }
-    // Reset input so the same file can be re-selected
-    e.target.value = "";
-  };
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedQuery = useDebounce(searchQuery, 150);
@@ -490,28 +489,18 @@ export function SkillsPage() {
                 className="w-48 pl-9 pr-3 py-1.5 rounded-lg border border-border bg-surface-1 text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-[var(--color-brand-primary)]/30 focus:ring-1 focus:ring-[var(--color-brand-primary)]/20 transition-colors"
               />
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".zip"
-              className="hidden"
-              onChange={handleFileSelected}
-            />
             <button
               type="button"
-              onClick={handleImportClick}
-              disabled={importMutation.isPending}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-text-primary text-white text-[12px] font-medium hover:opacity-85 transition-opacity disabled:opacity-50"
+              onClick={() => setImportModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-text-primary text-white text-[12px] font-medium hover:opacity-85 transition-opacity"
             >
-              {importMutation.isPending ? (
-                <Loader2 size={12} className="animate-spin" />
-              ) : (
-                <Plus size={12} />
-              )}
-              {importMutation.isPending
-                ? t("skills.importing", "Importing...")
-                : t("skills.import")}
+              <Plus size={12} />
+              {t("skills.import")}
             </button>
+            <ImportSkillModal
+              open={importModalOpen}
+              onClose={() => setImportModalOpen(false)}
+            />
           </div>
         </div>
 
@@ -574,7 +563,7 @@ export function SkillsPage() {
                 {
                   id: "all" as const,
                   label: t("skills.all"),
-                  count: yourSkillsList.length,
+                  count: installedSkills.length,
                 },
                 {
                   id: "recommended" as const,
@@ -677,6 +666,14 @@ export function SkillsPage() {
                 skill={skill}
                 isInstalled={installedSlugs.has(skill.slug)}
                 queueStatus={queueBySlug.get(skill.slug)}
+                skillSource={
+                  topTab === "explore"
+                    ? "explore"
+                    : mapInstalledSkillSource(
+                        installedSkills.find((item) => item.slug === skill.slug)
+                          ?.source ?? "managed",
+                      )
+                }
                 categoryLabel={
                   firstTag ? getTagLabel(firstTag, locale) : undefined
                 }

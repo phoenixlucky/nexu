@@ -407,6 +407,22 @@ const en = {
   "skills.skillNotFound":
     '"{{slug}}" is not available on ClawHub. It may have been removed or renamed.',
   "skills.import": "Import",
+  "skills.importSkill": "Import Skill",
+  "skills.importSkillDesc":
+    "Add a custom skill from a zip file or GitHub repository",
+  "skills.uploadZip": "Upload Zip",
+  "skills.githubLink": "GitHub Link",
+  "skills.importSuccess": "Skill imported successfully",
+  "skills.dropZipHere": "Drag & drop a .zip skill file here",
+  "skills.orClickBrowse": "or click to browse",
+  "skills.clickToChange": "Click to change file",
+  "skills.zipHint":
+    "The zip should contain a SKILL.md manifest and any related prompt or config files.",
+  "skills.githubUrlLabel": "GitHub repository URL",
+  "skills.githubComingSoon":
+    "GitHub import is coming soon. Use the Upload Zip tab for now.",
+  "skills.importing": "Importing...",
+  "skills.cancel": "Cancel",
   "skills.loadingCatalog": "Downloading skill catalog...",
   "skills.catalogUnavailable": "Catalog unavailable",
   "skills.retrying": "Retrying...",
@@ -496,6 +512,9 @@ const en = {
   "sessions.chat.unavailable": "Runtime unavailable",
   "sessions.chat.unavailableDesc": "Cannot connect to the chat runtime.",
   "sessions.chat.loading": "Loading messages...",
+  "sessions.chat.replyLabel": "Reply",
+  "sessions.chat.toolActivity": "Tool",
+  "sessions.chat.toolCompleted": "Completed",
 
   // ── Integrations Page ──
   "integrations.pageTitle": "Integrations",

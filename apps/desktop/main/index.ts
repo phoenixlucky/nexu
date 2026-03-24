@@ -10,14 +10,12 @@ import {
   nativeTheme,
   powerMonitor,
   powerSaveBlocker,
-  session,
   shell,
 } from "electron";
 import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { getDesktopAppRoot } from "../shared/workspace-paths";
-import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import { exportDiagnostics } from "./diagnostics-export";
 import {
@@ -27,6 +25,10 @@ import {
 } from "./ipc";
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import { createRuntimeUnitManifests } from "./runtime/manifests";
+import {
+  PortAllocationError,
+  allocateDesktopRuntimePorts,
+} from "./runtime/port-allocation";
 import {
   flushRuntimeLoggers,
   rotateDesktopLogSession,
@@ -44,6 +46,13 @@ const __dirname = dirname(__filename);
 app.setName("Nexu");
 nativeTheme.themeSource = "light";
 
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!hasSingleInstanceLock) {
+  app.quit();
+  process.exit(0);
+}
+
 // Info.plist declares LSUIElement=true so that child processes (spawned with
 // ELECTRON_RUN_AS_NODE) don't create extra Dock icons.  Show the dock icon
 // BEFORE any blocking initialization (tar extraction, directory creation, etc.)
@@ -53,16 +62,30 @@ void app.dock?.show();
 const electronRoot = app.isPackaged
   ? process.resourcesPath
   : getDesktopAppRoot();
-const runtimeConfig = getDesktopRuntimeConfig(process.env, {
+const baseRuntimeConfig = getDesktopRuntimeConfig(process.env, {
   appVersion: app.getVersion(),
   resourcesPath: app.isPackaged ? electronRoot : undefined,
   useBuildConfig: app.isPackaged,
 });
+const { allocations: runtimePortAllocations, runtimeConfig } =
+  await allocateDesktopRuntimePorts(process.env, baseRuntimeConfig).catch(
+    (error: unknown) => {
+      if (error instanceof PortAllocationError) {
+        throw new Error(
+          `[desktop:ports] ${error.code} purpose=${error.purpose} ` +
+            `preferredPort=${error.preferredPort ?? "n/a"} ${error.message}`,
+        );
+      }
+
+      throw error;
+    },
+  );
 const orchestrator = new RuntimeOrchestrator(
   createRuntimeUnitManifests(
     electronRoot,
     app.getPath("userData"),
     app.isPackaged,
+    runtimeConfig,
   ),
 );
 
@@ -193,6 +216,16 @@ let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let sleepGuard: SleepGuard | null = null;
 
+logLaunchTimeline(
+  `runtime ports ${runtimePortAllocations
+    .map(
+      (allocation) =>
+        `${allocation.purpose}=${allocation.preferredPort}->${allocation.port} ` +
+        `strategy=${allocation.strategy} attemptDelta=${allocation.attemptDelta}`,
+    )
+    .join(" ")}`,
+);
+
 function sendDesktopCommand(
   surface: DesktopSurface,
   chromeMode: DesktopChromeMode,
@@ -207,10 +240,9 @@ function sendDesktopCommand(
   });
 }
 
-function notifyDesktopAuthSessionRestored(): void {
+function triggerUpdateCheck(): void {
   mainWindow?.webContents.send("host:desktop-command", {
-    type: "desktop:auth-session-restored",
-    surface: "web",
+    type: "desktop:check-for-updates",
   });
 }
 
@@ -263,7 +295,29 @@ function installApplicationMenu(): void {
 
   const template: MenuItemConstructorOptions[] = [
     ...(process.platform === "darwin"
-      ? ([{ role: "appMenu" }] satisfies MenuItemConstructorOptions[])
+      ? ([
+          {
+            role: "appMenu",
+            submenu: [
+              { role: "about" },
+              {
+                id: "check-for-updates",
+                label: "Check for Updates…",
+                enabled:
+                  app.isPackaged && runtimeConfig.updates.autoUpdateEnabled,
+                click: () => triggerUpdateCheck(),
+              },
+              { type: "separator" },
+              { role: "services" },
+              { type: "separator" },
+              { role: "hide" },
+              { role: "hideOthers" },
+              { role: "unhide" },
+              { type: "separator" },
+              { role: "quit" },
+            ],
+          },
+        ] satisfies MenuItemConstructorOptions[])
       : []),
     { role: "fileMenu" },
     { role: "editMenu" },
@@ -307,17 +361,6 @@ function logLaunchTimeline(message: string): void {
   });
 }
 
-function logAuthRecovery(message: string, stream: "stdout" | "stderr"): void {
-  writeDesktopMainLog({
-    source: "auth-recovery",
-    stream,
-    kind: "lifecycle",
-    message,
-    logFilePath: getDesktopLogFilePath("desktop-main.log"),
-    windowId: getMainWindowId(),
-  });
-}
-
 function logRendererEvent({
   source,
   stream,
@@ -355,10 +398,7 @@ function logSleepGuard(entry: SleepGuardLogEntry): void {
 async function waitForControllerReadiness(): Promise<void> {
   const startedAt = Date.now();
   const timeoutMs = 15_000;
-  const probeUrl = new URL(
-    "/api/auth/get-session",
-    runtimeConfig.urls.controllerBase,
-  );
+  const probeUrl = new URL("/health", runtimeConfig.urls.controllerBase);
 
   while (Date.now() - startedAt < timeoutMs) {
     try {
@@ -395,66 +435,15 @@ async function runDesktopColdStart(): Promise<void> {
   logColdStart("waiting for controller readiness");
   await waitForControllerReadiness();
 
-  diagnosticsReporter?.markColdStartRunning(
-    "bootstrapping desktop auth session",
-  );
-  logColdStart("bootstrapping desktop auth session");
-  await ensureDesktopAuthSession();
-  const sessionId = rotateDesktopLogSession();
-  logColdStart(`desktop auth session ready sessionId=${sessionId}`);
-
   diagnosticsReporter?.markColdStartRunning("starting web");
   logColdStart("starting web");
   await orchestrator.startOne("web");
 
+  const sessionId = rotateDesktopLogSession();
+  logColdStart(`cold start session ready sessionId=${sessionId}`);
+
   logColdStart("cold start complete");
   diagnosticsReporter?.markColdStartSucceeded();
-}
-
-let authRecoveryPromise: Promise<void> | null = null;
-
-function triggerDesktopAuthRecovery(reason: string): void {
-  if (authRecoveryPromise) {
-    return;
-  }
-
-  authRecoveryPromise = (async () => {
-    logAuthRecovery(reason, "stdout");
-
-    try {
-      await ensureDesktopAuthSession({ force: true });
-      const sessionId = rotateDesktopLogSession();
-      logAuthRecovery(
-        `desktop auth session restored sessionId=${sessionId}`,
-        "stdout",
-      );
-      notifyDesktopAuthSessionRestored();
-    } catch (error) {
-      logAuthRecovery(
-        error instanceof Error ? error.message : String(error),
-        "stderr",
-      );
-    } finally {
-      authRecoveryPromise = null;
-    }
-  })();
-}
-
-function installDesktopAuthRecoveryHooks(): void {
-  session.defaultSession.webRequest.onCompleted(
-    {
-      urls: [`${runtimeConfig.urls.controllerBase}/api/auth/*`],
-    },
-    (details) => {
-      if (
-        details.method === "POST" &&
-        details.statusCode < 400 &&
-        details.url.includes("/api/auth/sign-out")
-      ) {
-        triggerDesktopAuthRecovery("detected desktop sign-out");
-      }
-    },
-  );
 }
 
 function focusMainWindow(): void {
@@ -467,12 +456,6 @@ function focusMainWindow(): void {
   }
 
   mainWindow.focus();
-}
-
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
-
-if (!hasSingleInstanceLock) {
-  app.quit();
 }
 
 app.on("second-instance", () => {
@@ -710,7 +693,6 @@ logLaunchTimeline("electron main module evaluated");
 app.whenReady().then(async () => {
   logLaunchTimeline("app.whenReady resolved");
   installApplicationMenu();
-  installDesktopAuthRecoveryHooks();
   registerIpcHandlers(orchestrator, runtimeConfig);
   diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
   const unsubscribeDiagnostics = diagnosticsReporter.start();
@@ -755,6 +737,7 @@ app.whenReady().then(async () => {
 
     if (app.isPackaged && runtimeConfig.updates.autoUpdateEnabled) {
       const updateMgr = new UpdateManager(win, orchestrator, {
+        channel: runtimeConfig.updates.channel,
         feedUrl: runtimeConfig.urls.updateFeed,
       });
       setUpdateManager(updateMgr);
