@@ -182,7 +182,8 @@ async function getElectronVersion() {
 }
 
 async function main() {
-  const dirOnly = process.argv.includes("--dir-only");
+  const rawArgs = new Set(process.argv.slice(2));
+  const dirOnly = rawArgs.has("--dir-only") || rawArgs.has("--target=dir");
   const env = {
     ...process.env,
     NEXU_WORKSPACE_ROOT: repoRoot,

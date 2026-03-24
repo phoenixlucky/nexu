@@ -18,7 +18,7 @@
     "dist:mac": "node ./scripts/dist-mac.mjs",
     "dist:mac:unsigned": "node ./scripts/dist-mac.mjs --unsigned",
     "dist:win": "node ./scripts/dist-win.mjs",
-    "dist:win:dir": "node ./scripts/dist-win.mjs --dir-only",
+    "dist:win:unsigned": "node ./scripts/dist-win.mjs --target=dir",
     "upload:sourcemaps": "node ./scripts/upload-sourcemaps.mjs",
     "typecheck": "tsc --noEmit"
   },
