@@ -1021,7 +1021,7 @@ export class NexuConfigStore {
             enabled: input.enabled ?? existing.enabled,
             baseUrl:
               input.baseUrl === undefined ? existing.baseUrl : input.baseUrl,
-            apiKey: input.apiKey ?? existing.apiKey,
+            apiKey: input.apiKey === undefined ? existing.apiKey : input.apiKey,
             models:
               input.modelsJson === undefined
                 ? existing.models
