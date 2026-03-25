@@ -8,6 +8,7 @@ import type { z } from "zod";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
+import type { OpenClawAuthService } from "./openclaw-auth-service.js";
 
 export interface ModelAutoSelectResult {
   changed: boolean;
@@ -52,11 +53,23 @@ function buildProviderUrl(
 type VerifyProviderBody = z.infer<typeof verifyProviderBodySchema>;
 type VerifyProviderResponse = z.infer<typeof verifyProviderResponseSchema>;
 
+// Providers that support OAuth login (no API key needed).
+const OAUTH_PROVIDER_IDS = new Set(["openai"]);
+
 export class ModelProviderService {
+  private openclawAuthService: OpenClawAuthService | null = null;
+
   constructor(
     private readonly configStore: NexuConfigStore,
     _nodeEnv: ControllerEnv["nodeEnv"],
   ) {}
+
+  /**
+   * Inject the auth service after construction to avoid circular deps.
+   */
+  setAuthService(authService: OpenClawAuthService): void {
+    this.openclawAuthService = authService;
+  }
 
   async listModels() {
     const config = await this.configStore.getConfig();
@@ -69,17 +82,47 @@ export class ModelProviderService {
     }));
 
     const providers = config.providers.filter((provider) => provider.enabled);
-    const byokModels: Model[] = providers.flatMap((provider) =>
-      provider.models.map((modelId) => ({
-        id: `${provider.providerId}/${modelId}`,
-        name: modelId,
-        provider: provider.providerId,
-      })),
-    );
+
+    // Exclude OAuth-only providers whose token has expired
+    const expiredOAuthProviderIds =
+      await this.getExpiredOAuthProviderIds(providers);
+
+    const byokModels: Model[] = providers
+      .filter((provider) => !expiredOAuthProviderIds.has(provider.providerId))
+      .flatMap((provider) =>
+        provider.models.map((modelId) => ({
+          id: `${provider.providerId}/${modelId}`,
+          name: modelId,
+          provider: provider.providerId,
+        })),
+      );
 
     return {
       models: [...cloudModels, ...byokModels],
     };
+  }
+
+  /**
+   * Returns provider IDs that use OAuth (no API key) and whose token is expired.
+   */
+  private async getExpiredOAuthProviderIds(
+    providers: ReadonlyArray<{ providerId: string; apiKey: string | null }>,
+  ): Promise<Set<string>> {
+    if (!this.openclawAuthService) return new Set();
+
+    const expired = new Set<string>();
+    for (const provider of providers) {
+      if (provider.apiKey || !OAUTH_PROVIDER_IDS.has(provider.providerId)) {
+        continue;
+      }
+      const status = await this.openclawAuthService.getProviderOAuthStatus(
+        provider.providerId,
+      );
+      if (!status.connected) {
+        expired.add(provider.providerId);
+      }
+    }
+    return expired;
   }
 
   async listProviders() {
