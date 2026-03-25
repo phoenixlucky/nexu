@@ -179,6 +179,11 @@ describe("provider OAuth routes", () => {
   it("disconnect removes provider models and syncs config", async () => {
     const container = createTestContainer("/tmp/nexu-provider-oauth-routes");
     (
+      container.openclawAuthService.getProviderOAuthStatus as ReturnType<
+        typeof vi.fn
+      >
+    ).mockResolvedValueOnce({ connected: true });
+    (
       container.openclawAuthService.disconnectOAuth as ReturnType<typeof vi.fn>
     ).mockResolvedValueOnce(true);
     const app = createApp(container);
@@ -202,6 +207,11 @@ describe("provider OAuth routes", () => {
   it("disconnect does not delete provider when OAuth disconnect fails", async () => {
     const container = createTestContainer("/tmp/nexu-provider-oauth-routes");
     (
+      container.openclawAuthService.getProviderOAuthStatus as ReturnType<
+        typeof vi.fn
+      >
+    ).mockResolvedValueOnce({ connected: true });
+    (
       container.openclawAuthService.disconnectOAuth as ReturnType<typeof vi.fn>
     ).mockResolvedValueOnce(false);
     const app = createApp(container);
@@ -216,5 +226,33 @@ describe("provider OAuth routes", () => {
     expect(
       container.modelProviderService.deleteProvider,
     ).not.toHaveBeenCalled();
+  });
+
+  it("disconnect does not delete provider when no OAuth profile was connected", async () => {
+    const container = createTestContainer("/tmp/nexu-provider-oauth-routes");
+    (
+      container.openclawAuthService.getProviderOAuthStatus as ReturnType<
+        typeof vi.fn
+      >
+    ).mockResolvedValueOnce({ connected: false });
+    (
+      container.openclawAuthService.disconnectOAuth as ReturnType<typeof vi.fn>
+    ).mockResolvedValueOnce(true);
+    const app = createApp(container);
+
+    const response = await app.request(
+      "/api/v1/providers/openai/oauth/disconnect",
+      { method: "POST" },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true });
+    expect(
+      container.modelProviderService.deleteProvider,
+    ).not.toHaveBeenCalled();
+    expect(
+      container.modelProviderService.ensureValidDefaultModel,
+    ).not.toHaveBeenCalled();
+    expect(container.openclawSyncService.syncAll).not.toHaveBeenCalled();
   });
 });
