@@ -30,7 +30,7 @@
 
 > 🦞 **The smoothest way to connect OpenClaw to WeChat**: Scan, connect, and go.
 >
-> 🎉 **Beta Perk**: During the beta period, top-tier models like Claude, GPT, Gemini, Kimi, GLM, and more are **completely free with unlimited usage**. [Download and try now →](https://nexu.io)
+> 🎉 **Beta Perk**: During the beta period, top-tier models like Gemini and more are **free to use**. [Download and try now →](https://nexu.io)
 
 ---
 
@@ -40,11 +40,13 @@
 
 WeChat + OpenClaw supported — works with WeChat 8.0.7 OpenClaw plugin. Click connect, scan with WeChat, and start chatting with your AI Agent.
 
-Download and go — graphical setup, built-in Feishu Skills, multi-model support (Claude / GPT / Gemini and more), and bring your own API Key.
+Download and go — graphical setup, built-in Feishu Skills, multi-model support (Gemini and more), and bring your own API Key.
 
 Once connected to IM, your Agent is online 24/7 — chat from your phone anytime, anywhere.
 
 All data stays on your machine. Your privacy, fully in your control.
+
+<h3 align="center">🎬 Product Demo</h3>
 
 <p align="center">
   <video src="https://github.com/user-attachments/assets/d7a801e4-6d0c-40f2-aa0c-d28fd78fdcaa" width="100%" autoplay loop muted playsinline>
@@ -58,7 +60,7 @@ All data stays on your machine. Your privacy, fully in your control.
 
 | | OpenClaw (official) | Typical hosted Feishu + agent stacks | **nexu** ✅ |
 |---|---|---|---|
-| **🧠 Models** | BYO, but manual config required ⚠️ | Platform-locked, no switching ❌ | **Pick Claude / GPT / Gemini, etc. — one-click switch in GUI** ✅ |
+| **🧠 Models** | BYO, but manual config required ⚠️ | Platform-locked, no switching ❌ | **Pick Gemini, etc. — one-click switch in GUI** ✅ |
 | **📡 Data path** | Local | Routed through vendor servers, data out of your control ❌ | **Local-first; we don't host your business data** ✅ |
 | **💰 Cost** | Free, but self-deploy required ⚠️ | Subscription / per-seat pricing ❌ | **Client is free; pay providers via your own API keys** ✅ |
 | **📜 Source** | Open source | Closed source, no audit possible ❌ | **MIT — fork and audit** ✅ |
@@ -79,7 +81,7 @@ Native OpenClaw 🦞 Skills and full Feishu Skills ship together. Agents move be
 
 ### 🧠 Top-tier models, out of the box
 
-Use Claude 4.6, ChatGPT 5.4, Minimax 2.5, GLM 5.0, Kimi 2.5, and more directly via your nexu account. No extra config. Switch to your own API Key anytime.
+Use Gemini and more directly via your nexu account. No extra config. Switch to your own API Key anytime.
 
 ### 🔑 Bring your own API Key, no login
 
@@ -216,7 +218,7 @@ Contributions are welcome! The full English guide is [CONTRIBUTING.md](CONTRIBUT
 ## ❓ FAQ
 
 **Q: Is nexu free?**
-A: The client is completely free and open-source (MIT). Built-in top-tier models are available for you to use, and you can also choose to bring your own API Key.
+A: The client is completely free and open-source (MIT). Multiple top-tier models are built in for you to use, and you can also bring your own API Key.
 
 **Q: Which operating systems are supported?**
 A: macOS 12+ (Apple Silicon) is supported today. Windows and macOS Intel are in development — email [support@nexu.ai](mailto:support@nexu.ai) for updates.

@@ -30,7 +30,7 @@
 
 > 🦞 **最丝滑接入微信 OpenClaw**：扫码即连，开箱即用。
 >
-> 🎉 **内测福利**：内测期间，Claude、GPT、Gemini、Kimi、GLM 等顶级模型 **全部免费、无限量使用**。[立即下载体验 →](https://nexu.io)
+> 🎉 **内测福利**：内测期间，Gemini 等顶级模型 **免费使用**。[立即下载体验 →](https://nexu.io)
 
 ---
 
@@ -40,11 +40,13 @@
 
 **已支持微信接入 OpenClaw** —— 适配微信 8.0.7 OpenClaw 插件，点击连接、微信扫码，即可在微信中与 AI Agent 对话。
 
-下载即用，图形化配置，内置飞书 Skills，支持 Claude / GPT / Gemini 等多模型与自带 API Key。
+下载即用，图形化配置，内置飞书 Skills，支持 Gemini 等多模型与自带 API Key。
 
 连接 IM 后，Agent 7×24 小时在线——手机上随时对话，不受桌面限制。
 
 所有数据保存在本机，隐私安全，完全可控。
+
+<h3 align="center">🎬 产品实操演示</h3>
 
 <p align="center">
   <video src="https://github.com/user-attachments/assets/220170ce-b394-44de-8bb2-d71512b0eee1" width="100%" autoplay loop muted playsinline>
@@ -58,7 +60,7 @@
 
 | | OpenClaw 官方 | 典型托管飞书龙虾方案 | **nexu** ✅ |
 |---|---|---|---|
-| **🧠 模型** | 自选，但需手动配置 ⚠️ | 平台指定，不可更换 ❌ | **自选 Claude / GPT / Gemini 等，GUI 一键切换** ✅ |
+| **🧠 模型** | 自选，但需手动配置 ⚠️ | 平台指定，不可更换 ❌ | **自选 Gemini 等，GUI 一键切换** ✅ |
 | **📡 数据路径** | 本地 | 经第三方服务器，数据不可控 ❌ | **本机为主，不托管你的业务数据** ✅ |
 | **💰 费用** | 免费，但需自行部署 ⚠️ | 订阅 / 按席收费 ❌ | **客户端免费，按自备 API Key 计费** ✅ |
 | **📜 源码** | 开源 | 闭源，无法审计 ❌ | **MIT 开源，可 fork、可审计** ✅ |
@@ -79,7 +81,7 @@
 
 ### 🧠 顶级模型，开箱即用
 
-通过 nexu 账号直接使用 Claude 4.6、ChatGPT 5.4、Minimax 2.5、GLM 5.0、Kimi 2.5 等模型，无需额外配置。也可随时切换为自带 API Key。
+通过 nexu 账号直接使用 Gemini 等模型，无需额外配置。也可随时切换为自带 API Key。
 
 ### 🔑 支持自带 API Key，无需登录
 
@@ -216,7 +218,7 @@ pnpm test
 ## ❓ FAQ
 
 **Q: nexu 免费吗？**
-A: 客户端完全免费且开源（MIT）。内置的顶级模型供你使用，并且可以选择自带 API Key 进行使用。
+A: 客户端完全免费且开源（MIT）。内置多款顶级模型供你使用，也可以选择自带 API Key。
 
 **Q: 支持哪些操作系统？**
 A: 目前支持 macOS 12+（Apple Silicon）。Windows 和 macOS Intel 版本正在开发中，可邮件 [support@nexu.ai](mailto:support@nexu.ai) 获取进展。
