@@ -270,6 +270,13 @@ jobs:
             "apps/desktop/release-artifacts/desktop-sha256.txt" \
             --clobber
 
+      - name: Mark release as latest (stable only)
+        if: steps.meta.outputs.prerelease != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.meta.outputs.tag_name }}
+        run: gh release edit "$TAG_NAME" --latest
+
       - name: Patch latest-mac.yml for channel naming
         env:
           VERSION: ${{ steps.meta.outputs.desktop_version }}
