@@ -406,6 +406,8 @@ export function compileOpenClawConfig(
           mode: "safeguard",
           maxHistoryShare: 0.5,
           keepRecentTokens: 20000,
+          recentTurnsPreserve: 5,
+          qualityGuard: { enabled: true },
           memoryFlush: {
             enabled: true,
           },
