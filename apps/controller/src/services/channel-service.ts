@@ -1038,24 +1038,9 @@ export class ChannelService {
   }
 
   async disconnectChannel(channelId: string) {
-    const channel = await this.configStore.getChannel(channelId);
-    if (channel?.channelType === "whatsapp") {
-      try {
-        await this.gatewayService.logoutChannelAccount(
-          channel.channelType,
-          channel.accountId,
-        );
-      } catch (error) {
-        logger.warn(
-          {
-            channelId,
-            accountId: channel.accountId,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "whatsapp_logout_before_disconnect_failed",
-        );
-      }
-    }
+    // Align with OpenClaw's "remove" semantics: disconnect only unbinds the
+    // channel from Nexu config and leaves the linked session intact. Explicit
+    // logout remains a separate operation.
     const removed = await this.configStore.disconnectChannel(channelId);
     if (removed) {
       await this.syncService.syncAll();
@@ -1071,13 +1056,6 @@ export class ChannelService {
     );
     while (Date.now() < deadline) {
       if (lastReadiness.ready) {
-        return lastReadiness;
-      }
-      if (
-        lastReadiness.gatewayConnected &&
-        lastReadiness.lastError &&
-        lastReadiness.configured
-      ) {
         return lastReadiness;
       }
       await sleep(1500);

@@ -122,4 +122,35 @@ describe("OpenClawRuntimePluginWriter", () => {
       access(path.join(env.openclawExtensionsDir, "whatsapp")),
     ).rejects.toMatchObject({ code: "ENOENT" });
   });
+
+  it("removes stale runtime plugin copies when builtin extensions already provide them", async () => {
+    env = {
+      ...env,
+      openclawBuiltinExtensionsDir: path.join(rootDir, "builtin-extensions"),
+    } as ControllerEnv;
+
+    const runtimePluginDir = path.join(
+      env.runtimePluginTemplatesDir,
+      "whatsapp",
+    );
+    const builtinPluginDir = path.join(
+      env.openclawBuiltinExtensionsDir,
+      "whatsapp",
+    );
+    const staleTargetDir = path.join(env.openclawExtensionsDir, "whatsapp");
+
+    await mkdir(runtimePluginDir, { recursive: true });
+    await mkdir(builtinPluginDir, { recursive: true });
+    await mkdir(staleTargetDir, { recursive: true });
+    await writeFile(path.join(runtimePluginDir, "index.ts"), "export {};\n");
+    await writeFile(path.join(builtinPluginDir, "index.ts"), "export {};\n");
+    await writeFile(path.join(staleTargetDir, "stale.txt"), "stale\n");
+
+    const writer = new OpenClawRuntimePluginWriter(env);
+    await writer.ensurePlugins();
+
+    await expect(access(staleTargetDir)).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
 });
