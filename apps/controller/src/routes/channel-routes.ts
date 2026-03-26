@@ -321,7 +321,7 @@ export function registerChannelRoutes(
     },
   );
 
-  // WeChat QR login flow
+  // WhatsApp QR login flow
   app.openapi(
     createRoute({
       method: "post",

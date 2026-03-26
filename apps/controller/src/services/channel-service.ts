@@ -453,12 +453,33 @@ async function loadWhatsappRuntimeModules(
   );
   const sessionModule = (await import(
     pathToFileURL(path.join(distDir, sessionFile)).href
-  )) as {
+  )) as Record<string, unknown> & {
     t: WhatsappRuntimeModules["createWaSocket"];
     i: WhatsappRuntimeModules["waitForWaConnection"];
     r: WhatsappRuntimeModules["getStatusCode"];
     n: WhatsappRuntimeModules["formatError"];
   };
+
+  const invalidExports: string[] = [];
+  if (typeof sessionModule.t !== "function") {
+    invalidExports.push("t:createWaSocket");
+  }
+  if (typeof sessionModule.i !== "function") {
+    invalidExports.push("i:waitForWaConnection");
+  }
+  if (typeof sessionModule.r !== "function") {
+    invalidExports.push("r:getStatusCode");
+  }
+  if (typeof sessionModule.n !== "function") {
+    invalidExports.push("n:formatError");
+  }
+  if (invalidExports.length > 0) {
+    throw new Error(
+      `Invalid OpenClaw WhatsApp session module exports: missing or non-function ${invalidExports.join(
+        ", ",
+      )}; available keys: ${Object.keys(sessionModule).sort().join(", ")}`,
+    );
+  }
 
   return {
     createWaSocket: sessionModule.t,
@@ -776,6 +797,10 @@ export class ChannelService {
   }
 
   async whatsappQrStart() {
+    // Force a clean auth dir before creating a new QR login session.
+    // This avoids stale or corrupted default credentials from mismatching the
+    // new socket/auth state; the user-visible consequence is that QR login
+    // always requires a fresh scan for DEFAULT_WHATSAPP_ACCOUNT_ID.
     await this.resetWhatsAppDefaultLoginState(DEFAULT_WHATSAPP_ACCOUNT_ID);
     const existing = activeWhatsappLogins.get(DEFAULT_WHATSAPP_ACCOUNT_ID);
     if (existing && isWhatsappLoginFresh(existing) && existing.qrDataUrl) {
