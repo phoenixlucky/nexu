@@ -313,7 +313,7 @@ describe("compileOpenClawConfig", () => {
     expect(compiled.models?.providers?.ollama).toEqual({
       baseUrl: "http://127.0.0.1:11434",
       apiKey: "ollama-local",
-      api: "ollama",
+      api: "openai-completions",
       models: [
         expect.objectContaining({
           id: "qwen2.5-coder:7b",

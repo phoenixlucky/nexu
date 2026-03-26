@@ -474,6 +474,8 @@ const BYOK_PROVIDER_IDS = [
   "glm",
 ] as const;
 
+const OLLAMA_DUMMY_API_KEY = "ollama-local";
+
 type ConfigurableProviderId =
   PutApiV1ProvidersByProviderIdData["path"]["providerId"];
 type ByokProviderId = Extract<
@@ -1351,7 +1353,7 @@ function ByokProviderDetail({
   const isMiniMax = providerId === "minimax";
   const isOllama = providerId === "ollama";
   const hostBridge = getModelsHostInvokeBridge();
-  const effectiveApiKey = isOllama ? "ollama-local" : apiKey;
+  const effectiveApiKey = isOllama ? OLLAMA_DUMMY_API_KEY : apiKey;
 
   const { data: minimaxOauthStatus } = useQuery({
     queryKey: ["minimax-oauth-status"],
@@ -2271,15 +2273,11 @@ function ByokProviderDetail({
           </div>
           <button
             type="button"
-            disabled={
-              refreshModelsMutation.isPending ||
-              (!isOllama && !apiKey && !dbProvider?.hasApiKey)
-            }
+            disabled={refreshModelsMutation.isPending || (!isOllama && !apiKey)}
             onClick={() => refreshModelsMutation.mutate()}
             className={cn(
               "inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[10px] font-medium transition-colors",
-              !refreshModelsMutation.isPending &&
-                (isOllama || apiKey || dbProvider?.hasApiKey)
+              !refreshModelsMutation.isPending && (isOllama || apiKey)
                 ? "text-text-secondary hover:bg-surface-2"
                 : "text-text-muted cursor-not-allowed",
             )}

@@ -506,12 +506,18 @@ export class ModelProviderService {
 
     try {
       if (providerId === "ollama") {
+        const headers: Record<string, string> = {};
+        if (input.apiKey && input.apiKey !== OLLAMA_DUMMY_API_KEY) {
+          headers.Authorization = `Bearer ${input.apiKey}`;
+        }
+
         const response = await fetch(
           buildProviderUrl(
             input.baseUrl ?? PROVIDER_BASE_URLS[providerId] ?? null,
             "/api/tags",
           ) ?? verifyUrl,
           {
+            headers: Object.keys(headers).length > 0 ? headers : undefined,
             signal: AbortSignal.timeout(10000),
           },
         );

@@ -68,7 +68,7 @@ function resolveOpenClawProviderApi(providerId: string): string {
     case "minimax":
       return "anthropic-messages";
     case "ollama":
-      return "ollama";
+      return "openai-completions";
     default:
       return "openai-completions";
   }
