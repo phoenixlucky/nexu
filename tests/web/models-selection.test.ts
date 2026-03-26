@@ -11,9 +11,13 @@ describe("isModelSelected", () => {
     );
   });
 
-  it("does not treat a short list item as selected when the current id is fully qualified", () => {
+  it("treats qualified current ids as selected for matching short provider rows", () => {
     expect(
       isModelSelected("claude-sonnet-4", "anthropic/claude-sonnet-4"),
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  it("does not cross-match fully qualified ids from different providers", () => {
+    expect(isModelSelected("openai/gpt-4.1", "ollama/gpt-4.1")).toBe(false);
   });
 });

@@ -189,11 +189,11 @@ export function isModelSelected(
     return true;
   }
 
-  if (!currentModelId.includes("/")) {
-    return getModelDisplayLabel(modelId) === currentModelId;
+  if (getModelDisplayLabel(modelId) !== getModelDisplayLabel(currentModelId)) {
+    return false;
   }
 
-  return false;
+  return modelId.includes("/") !== currentModelId.includes("/");
 }
 
 function getProviderIdFromModelId(
