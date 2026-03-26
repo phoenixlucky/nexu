@@ -42,13 +42,10 @@ const envSchema = z.object({
     .default("development"),
   PORT: z.coerce.number().int().positive().default(3010),
   HOST: z.string().default("127.0.0.1"),
-  NEXU_CLOUD_URL: z.string().default("https://nexu.io"),
-  NEXU_LINK_URL: z.string().optional(),
   NEXU_HOME: z.string().default("~/.nexu"),
-  OPENCLAW_STATE_DIR: z.string().default("~/.nexu/runtime/openclaw/state"),
+  OPENCLAW_STATE_DIR: z.string().optional(),
   OPENCLAW_CONFIG_PATH: z.string().optional(),
   OPENCLAW_SKILLS_DIR: z.string().optional(),
-  OPENCLAW_CURATED_SKILLS_DIR: z.string().optional(),
   SKILLHUB_STATIC_SKILLS_DIR: z.string().optional(),
   PLATFORM_TEMPLATES_DIR: z.string().optional(),
   OPENCLAW_GATEWAY_PORT: z.coerce.number().int().positive().default(18789),
@@ -62,20 +59,23 @@ const envSchema = z.object({
   RUNTIME_HEALTH_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
   DEFAULT_MODEL_ID: z.string().default("anthropic/claude-sonnet-4"),
   WEB_URL: z.string().default("http://localhost:5173"),
+  AMPLITUDE_API_KEY: z.string().optional(),
+  VITE_AMPLITUDE_API_KEY: z.string().optional(),
 });
 
 const parsed = envSchema.parse(process.env);
 
 const nexuHomeDir = expandHomeDir(parsed.NEXU_HOME);
-const openclawStateDir = expandHomeDir(parsed.OPENCLAW_STATE_DIR);
+const openclawStateDir = expandHomeDir(
+  parsed.OPENCLAW_STATE_DIR ??
+    path.join(nexuHomeDir, "runtime", "openclaw", "state"),
+);
 
 export const env = {
   nodeEnv: parsed.NODE_ENV,
   port: parsed.PORT,
   host: parsed.HOST,
   webUrl: parsed.WEB_URL,
-  nexuCloudUrl: parsed.NEXU_CLOUD_URL,
-  nexuLinkUrl: parsed.NEXU_LINK_URL ?? null,
   nexuHomeDir,
   nexuConfigPath: path.join(nexuHomeDir, "config.json"),
   artifactsIndexPath: path.join(nexuHomeDir, "artifacts", "index.json"),
@@ -100,19 +100,18 @@ export const env = {
         "runtime-plugins",
       )
     : path.resolve(process.cwd(), "static", "runtime-plugins"),
-  openclawCuratedSkillsDir: expandHomeDir(
-    parsed.OPENCLAW_CURATED_SKILLS_DIR ??
-      path.join(openclawStateDir, "bundled-skills"),
-  ),
   openclawRuntimeModelStatePath: path.join(
     openclawStateDir,
     "nexu-runtime-model.json",
   ),
   skillhubCacheDir: path.join(nexuHomeDir, "skillhub-cache"),
   skillDbPath: path.join(nexuHomeDir, "skill-ledger.json"),
+  analyticsStatePath: path.join(nexuHomeDir, "analytics-state.json"),
   staticSkillsDir: parsed.SKILLHUB_STATIC_SKILLS_DIR
     ? expandHomeDir(parsed.SKILLHUB_STATIC_SKILLS_DIR)
-    : undefined,
+    : workspaceRoot
+      ? path.join(workspaceRoot, "apps", "desktop", "static", "bundled-skills")
+      : undefined,
   platformTemplatesDir: parsed.PLATFORM_TEMPLATES_DIR
     ? expandHomeDir(parsed.PLATFORM_TEMPLATES_DIR)
     : undefined,
@@ -130,6 +129,8 @@ export const env = {
   runtimeSyncIntervalMs: parsed.RUNTIME_SYNC_INTERVAL_MS,
   runtimeHealthIntervalMs: parsed.RUNTIME_HEALTH_INTERVAL_MS,
   defaultModelId: parsed.DEFAULT_MODEL_ID,
+  amplitudeApiKey:
+    parsed.AMPLITUDE_API_KEY?.trim() || parsed.VITE_AMPLITUDE_API_KEY,
 };
 
 export type ControllerEnv = typeof env;

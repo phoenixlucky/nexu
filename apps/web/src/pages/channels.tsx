@@ -4,6 +4,7 @@ import { SlackOAuthView } from "@/components/channel-setup/slack-oauth-view";
 import { WechatSetupView } from "@/components/channel-setup/wechat-setup-view";
 import { useBotQuota } from "@/hooks/use-bot-quota";
 import { useCountdown } from "@/hooks/use-countdown";
+import { track } from "@/lib/tracking";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -88,6 +89,9 @@ export function ChannelsPage() {
   const showGuide = !isConfigured || forceGuide;
 
   const handlePlatformChange = (p: Platform) => {
+    if (!channels.some((ch) => ch.channelType === p)) {
+      track("workspace_channel_connect_click", { channel: p });
+    }
     setPlatform(p);
     setForceGuide(false);
   };
@@ -142,7 +146,10 @@ export function ChannelsPage() {
                 </div>
               </div>
               {connected ? (
-                <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                <CheckCircle2
+                  size={14}
+                  className="text-[var(--color-success)] shrink-0"
+                />
               ) : (
                 <Circle size={14} className="text-text-muted/30 shrink-0" />
               )}
@@ -307,9 +314,9 @@ function ConfiguredView({
     <>
       <div className="space-y-4 sm:space-y-5">
         {/* Status banner */}
-        <div className="flex flex-col items-start gap-3 p-4 rounded-xl border bg-emerald-500/5 border-emerald-500/15 sm:flex-row sm:items-center">
-          <div className="flex justify-center items-center w-9 h-9 rounded-lg bg-emerald-500/10 shrink-0">
-            <CheckCircle2 size={18} className="text-emerald-500" />
+        <div className="flex flex-col items-start gap-3 p-4 rounded-xl border bg-[var(--color-success-subtle)] border-[var(--color-success-border)] sm:flex-row sm:items-center">
+          <div className="flex justify-center items-center w-9 h-9 rounded-lg bg-[var(--color-success-muted)] shrink-0">
+            <CheckCircle2 size={18} className="text-[var(--color-success)]" />
           </div>
           <div className="flex-1">
             <div className="text-[13px] font-semibold text-text-primary">
@@ -327,7 +334,10 @@ function ConfiguredView({
           </div>
           <button
             type="button"
-            onClick={onShowGuide}
+            onClick={() => {
+              track("workspace_change_config_click");
+              onShowGuide();
+            }}
             className="flex gap-1.5 items-center px-3 py-1.5 text-[11px] text-text-muted rounded-lg border border-border hover:border-border-hover hover:text-text-secondary transition-all shrink-0"
           >
             <BookOpen size={11} /> {t("channels.setupGuide")}
@@ -435,7 +445,7 @@ function ConfiguredView({
                 title="Copy"
               >
                 {copied ? (
-                  <Check size={13} className="text-emerald-500" />
+                  <Check size={13} className="text-[var(--color-success)]" />
                 ) : (
                   <Copy size={13} />
                 )}
@@ -561,7 +571,12 @@ function ConfiguredView({
                 </button>
                 <button
                   type="button"
-                  onClick={() => disconnectMutation.mutate()}
+                  onClick={() => {
+                    track("workspace_channel_disconnect_click", {
+                      channel: platform,
+                    });
+                    disconnectMutation.mutate();
+                  }}
                   disabled={disconnectMutation.isPending}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12px] font-medium text-white rounded-lg bg-red-500 hover:bg-red-600 transition-all disabled:opacity-60"
                 >

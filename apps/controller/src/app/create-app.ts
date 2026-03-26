@@ -2,7 +2,6 @@ import crypto from "node:crypto";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { registerArtifactRoutes } from "../routes/artifact-routes.js";
-import { registerAuthRoutes } from "../routes/auth-routes.js";
 import { registerBotRoutes } from "../routes/bot-routes.js";
 import { registerChannelRoutes } from "../routes/channel-routes.js";
 import { registerDesktopCompatRoutes } from "../routes/desktop-compat-routes.js";
@@ -10,6 +9,7 @@ import { registerDesktopRoutes } from "../routes/desktop-routes.js";
 import { registerIntegrationRoutes } from "../routes/integration-routes.js";
 import { registerMiscCompatRoutes } from "../routes/misc-compat-routes.js";
 import { registerModelRoutes } from "../routes/model-routes.js";
+import { registerProviderOAuthRoutes } from "../routes/provider-oauth-routes.js";
 import { registerRuntimeConfigRoutes } from "../routes/runtime-config-routes.js";
 import { registerSessionRoutes } from "../routes/session-routes.js";
 import { registerSkillhubRoutes } from "../routes/skillhub-routes.js";
@@ -34,13 +34,13 @@ export function createApp(container: ControllerContainer) {
   );
 
   registerBotRoutes(app, container);
-  registerAuthRoutes(app, container);
   registerMiscCompatRoutes(app, container);
   registerDesktopRoutes(app, container);
   registerDesktopCompatRoutes(app, container);
   registerChannelRoutes(app, container);
   registerSessionRoutes(app, container);
   registerModelRoutes(app, container);
+  registerProviderOAuthRoutes(app, container);
   registerIntegrationRoutes(app, container);
   registerArtifactRoutes(app, container);
   registerSkillhubRoutes(app, container);
@@ -51,7 +51,7 @@ export function createApp(container: ControllerContainer) {
   app.doc("/openapi.json", {
     openapi: "3.1.0",
     info: {
-      title: "Nexu Controller API",
+      title: "nexu Controller API",
       version: "0.1.0",
     },
   });

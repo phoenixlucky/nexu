@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Nexu Controller API",
+    "title": "nexu Controller API",
     "version": "1.0.0"
   },
   "components": {
@@ -617,51 +617,6 @@
         }
       }
     },
-    "/api/auth/check-email": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "email": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Email check",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "exists": {
-                      "type": "boolean"
-                    },
-                    "verified": {
-                      "type": "boolean"
-                    }
-                  },
-                  "required": [
-                    "exists",
-                    "verified"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/auth/desktop-authorize": {
       "post": {
         "tags": [
@@ -1023,6 +978,7 @@
                       "type": "string",
                       "enum": [
                         "active",
+                        "starting",
                         "degraded",
                         "unhealthy"
                       ]
@@ -1308,10 +1264,73 @@
                           "name"
                         ]
                       }
+                    },
+                    "cloudUrl": {
+                      "type": "string"
+                    },
+                    "linkUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "activeProfileName": {
+                      "type": "string"
+                    },
+                    "profiles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "cloudUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "linkUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "connected": {
+                            "type": "boolean"
+                          },
+                          "polling": {
+                            "type": "boolean"
+                          },
+                          "userName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "userEmail": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "connectedAt": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "modelCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "cloudUrl",
+                          "linkUrl",
+                          "connected",
+                          "modelCount"
+                        ]
+                      }
                     }
                   },
                   "required": [
-                    "connected"
+                    "connected",
+                    "cloudUrl",
+                    "linkUrl",
+                    "activeProfileName",
+                    "profiles"
                   ]
                 }
               }
@@ -1340,6 +1359,169 @@
                       "type": "string"
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/cloud-profile/connect": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connect cloud profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "browserUrl": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "object",
+                      "properties": {
+                        "connected": {
+                          "type": "boolean"
+                        },
+                        "polling": {
+                          "type": "boolean"
+                        },
+                        "userName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "userEmail": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "connectedAt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "models": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "provider": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ]
+                          }
+                        },
+                        "cloudUrl": {
+                          "type": "string"
+                        },
+                        "linkUrl": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "activeProfileName": {
+                          "type": "string"
+                        },
+                        "profiles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "cloudUrl": {
+                                "type": "string",
+                                "format": "uri"
+                              },
+                              "linkUrl": {
+                                "type": "string",
+                                "format": "uri"
+                              },
+                              "connected": {
+                                "type": "boolean"
+                              },
+                              "polling": {
+                                "type": "boolean"
+                              },
+                              "userName": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "userEmail": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "connectedAt": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "modelCount": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "cloudUrl",
+                              "linkUrl",
+                              "connected",
+                              "modelCount"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "connected",
+                        "cloudUrl",
+                        "linkUrl",
+                        "activeProfileName",
+                        "profiles"
+                      ]
+                    },
+                    "configPushed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "configPushed"
+                  ]
                 }
               }
             }
@@ -1399,12 +1581,575 @@
                         ]
                       }
                     },
+                    "cloudUrl": {
+                      "type": "string"
+                    },
+                    "linkUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "activeProfileName": {
+                      "type": "string"
+                    },
+                    "profiles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "cloudUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "linkUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "connected": {
+                            "type": "boolean"
+                          },
+                          "polling": {
+                            "type": "boolean"
+                          },
+                          "userName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "userEmail": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "connectedAt": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "modelCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "cloudUrl",
+                          "linkUrl",
+                          "connected",
+                          "modelCount"
+                        ]
+                      }
+                    },
                     "configPushed": {
                       "type": "boolean"
                     }
                   },
                   "required": [
                     "connected",
+                    "cloudUrl",
+                    "linkUrl",
+                    "activeProfileName",
+                    "profiles",
+                    "configPushed"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/cloud-profile/create": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "profile": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "cloudUrl": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "linkUrl": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "cloudUrl",
+                      "linkUrl"
+                    ]
+                  }
+                },
+                "required": [
+                  "profile"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Create cloud profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "polling": {
+                      "type": "boolean"
+                    },
+                    "userName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "userEmail": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "connectedAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "provider": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      }
+                    },
+                    "cloudUrl": {
+                      "type": "string"
+                    },
+                    "linkUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "activeProfileName": {
+                      "type": "string"
+                    },
+                    "profiles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "cloudUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "linkUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "connected": {
+                            "type": "boolean"
+                          },
+                          "polling": {
+                            "type": "boolean"
+                          },
+                          "userName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "userEmail": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "connectedAt": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "modelCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "cloudUrl",
+                          "linkUrl",
+                          "connected",
+                          "modelCount"
+                        ]
+                      }
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "configPushed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "cloudUrl",
+                    "linkUrl",
+                    "activeProfileName",
+                    "profiles",
+                    "ok",
+                    "configPushed"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/cloud-profile/update": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "previousName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "profile": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "cloudUrl": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "linkUrl": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "cloudUrl",
+                      "linkUrl"
+                    ]
+                  }
+                },
+                "required": [
+                  "previousName",
+                  "profile"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update cloud profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "polling": {
+                      "type": "boolean"
+                    },
+                    "userName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "userEmail": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "connectedAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "provider": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      }
+                    },
+                    "cloudUrl": {
+                      "type": "string"
+                    },
+                    "linkUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "activeProfileName": {
+                      "type": "string"
+                    },
+                    "profiles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "cloudUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "linkUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "connected": {
+                            "type": "boolean"
+                          },
+                          "polling": {
+                            "type": "boolean"
+                          },
+                          "userName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "userEmail": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "connectedAt": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "modelCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "cloudUrl",
+                          "linkUrl",
+                          "connected",
+                          "modelCount"
+                        ]
+                      }
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "configPushed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "cloudUrl",
+                    "linkUrl",
+                    "activeProfileName",
+                    "profiles",
+                    "ok",
+                    "configPushed"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/cloud-profile/delete": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Delete cloud profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "polling": {
+                      "type": "boolean"
+                    },
+                    "userName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "userEmail": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "connectedAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "provider": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      }
+                    },
+                    "cloudUrl": {
+                      "type": "string"
+                    },
+                    "linkUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "activeProfileName": {
+                      "type": "string"
+                    },
+                    "profiles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "cloudUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "linkUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "connected": {
+                            "type": "boolean"
+                          },
+                          "polling": {
+                            "type": "boolean"
+                          },
+                          "userName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "userEmail": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "connectedAt": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "modelCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "cloudUrl",
+                          "linkUrl",
+                          "connected",
+                          "modelCount"
+                        ]
+                      }
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "configPushed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "cloudUrl",
+                    "linkUrl",
+                    "activeProfileName",
+                    "profiles",
+                    "ok",
                     "configPushed"
                   ]
                 }
@@ -1433,6 +2178,486 @@
                   },
                   "required": [
                     "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/cloud-profile/disconnect": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Disconnect cloud profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "polling": {
+                      "type": "boolean"
+                    },
+                    "userName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "userEmail": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "connectedAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "provider": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      }
+                    },
+                    "cloudUrl": {
+                      "type": "string"
+                    },
+                    "linkUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "activeProfileName": {
+                      "type": "string"
+                    },
+                    "profiles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "cloudUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "linkUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "connected": {
+                            "type": "boolean"
+                          },
+                          "polling": {
+                            "type": "boolean"
+                          },
+                          "userName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "userEmail": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "connectedAt": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "modelCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "cloudUrl",
+                          "linkUrl",
+                          "connected",
+                          "modelCount"
+                        ]
+                      }
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "configPushed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "cloudUrl",
+                    "linkUrl",
+                    "activeProfileName",
+                    "profiles",
+                    "ok",
+                    "configPushed"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/cloud-profile/select": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Switch cloud profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "polling": {
+                      "type": "boolean"
+                    },
+                    "userName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "userEmail": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "connectedAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "provider": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      }
+                    },
+                    "cloudUrl": {
+                      "type": "string"
+                    },
+                    "linkUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "activeProfileName": {
+                      "type": "string"
+                    },
+                    "profiles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "cloudUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "linkUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "connected": {
+                            "type": "boolean"
+                          },
+                          "polling": {
+                            "type": "boolean"
+                          },
+                          "userName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "userEmail": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "connectedAt": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "modelCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "cloudUrl",
+                          "linkUrl",
+                          "connected",
+                          "modelCount"
+                        ]
+                      }
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "configPushed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "cloudUrl",
+                    "linkUrl",
+                    "activeProfileName",
+                    "profiles",
+                    "ok",
+                    "configPushed"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/cloud-profiles/import": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "profiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "cloudUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "linkUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "cloudUrl",
+                        "linkUrl"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "profiles"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import cloud profiles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "polling": {
+                      "type": "boolean"
+                    },
+                    "userName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "userEmail": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "connectedAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "provider": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      }
+                    },
+                    "cloudUrl": {
+                      "type": "string"
+                    },
+                    "linkUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "activeProfileName": {
+                      "type": "string"
+                    },
+                    "profiles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "cloudUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "linkUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "connected": {
+                            "type": "boolean"
+                          },
+                          "polling": {
+                            "type": "boolean"
+                          },
+                          "userName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "userEmail": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "connectedAt": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "modelCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "cloudUrl",
+                          "linkUrl",
+                          "connected",
+                          "modelCount"
+                        ]
+                      }
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "configPushed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "cloudUrl",
+                    "linkUrl",
+                    "activeProfileName",
+                    "profiles",
+                    "ok",
+                    "configPushed"
                   ]
                 }
               }
@@ -3563,8 +4788,30 @@
                             "type": "string",
                             "nullable": true
                           },
+                          "authMode": {
+                            "type": "string",
+                            "enum": [
+                              "apiKey",
+                              "oauth"
+                            ]
+                          },
                           "hasApiKey": {
                             "type": "boolean"
+                          },
+                          "hasOauthCredential": {
+                            "type": "boolean"
+                          },
+                          "oauthRegion": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "global",
+                              "cn"
+                            ]
+                          },
+                          "oauthEmail": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "modelsJson": {
                             "type": "string",
@@ -3607,7 +4854,20 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "anthropic",
+                "openai",
+                "google",
+                "siliconflow",
+                "ppio",
+                "openrouter",
+                "minimax",
+                "kimi",
+                "glm",
+                "moonshot",
+                "zai"
+              ]
             },
             "required": true,
             "name": "providerId",
@@ -3621,7 +4881,8 @@
                 "type": "object",
                 "properties": {
                   "apiKey": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "baseUrl": {
                     "type": "string",
@@ -3632,6 +4893,13 @@
                   },
                   "displayName": {
                     "type": "string"
+                  },
+                  "authMode": {
+                    "type": "string",
+                    "enum": [
+                      "apiKey",
+                      "oauth"
+                    ]
                   },
                   "modelsJson": {
                     "type": "string"
@@ -3669,8 +4937,30 @@
                           "type": "string",
                           "nullable": true
                         },
+                        "authMode": {
+                          "type": "string",
+                          "enum": [
+                            "apiKey",
+                            "oauth"
+                          ]
+                        },
                         "hasApiKey": {
                           "type": "boolean"
+                        },
+                        "hasOauthCredential": {
+                          "type": "boolean"
+                        },
+                        "oauthRegion": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "global",
+                            "cn"
+                          ]
+                        },
+                        "oauthEmail": {
+                          "type": "string",
+                          "nullable": true
                         },
                         "modelsJson": {
                           "type": "string",
@@ -3728,8 +5018,30 @@
                           "type": "string",
                           "nullable": true
                         },
+                        "authMode": {
+                          "type": "string",
+                          "enum": [
+                            "apiKey",
+                            "oauth"
+                          ]
+                        },
                         "hasApiKey": {
                           "type": "boolean"
+                        },
+                        "hasOauthCredential": {
+                          "type": "boolean"
+                        },
+                        "oauthRegion": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "global",
+                            "cn"
+                          ]
+                        },
+                        "oauthEmail": {
+                          "type": "string",
+                          "nullable": true
                         },
                         "modelsJson": {
                           "type": "string",
@@ -3769,7 +5081,20 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "anthropic",
+                "openai",
+                "google",
+                "siliconflow",
+                "ppio",
+                "openrouter",
+                "minimax",
+                "kimi",
+                "glm",
+                "moonshot",
+                "zai"
+              ]
             },
             "required": true,
             "name": "providerId",
@@ -3798,6 +5123,165 @@
         }
       }
     },
+    "/api/v1/providers/minimax/oauth/status": {
+      "get": {
+        "tags": [
+          "Providers"
+        ],
+        "responses": {
+          "200": {
+            "description": "MiniMax OAuth status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "inProgress": {
+                      "type": "boolean"
+                    },
+                    "region": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "global",
+                        "cn"
+                      ]
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "inProgress"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers/minimax/oauth/login": {
+      "post": {
+        "tags": [
+          "Providers"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "region": {
+                    "type": "string",
+                    "enum": [
+                      "global",
+                      "cn"
+                    ]
+                  }
+                },
+                "required": [
+                  "region"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Start MiniMax OAuth login",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "inProgress": {
+                      "type": "boolean"
+                    },
+                    "region": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "global",
+                        "cn"
+                      ]
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "started": {
+                      "type": "boolean"
+                    },
+                    "browserUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "inProgress",
+                    "started"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Providers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancel MiniMax OAuth login",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "inProgress": {
+                      "type": "boolean"
+                    },
+                    "region": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "global",
+                        "cn"
+                      ]
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "cancelled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "inProgress",
+                    "cancelled"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/providers/{providerId}/verify": {
       "post": {
         "tags": [
@@ -3806,7 +5290,20 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "anthropic",
+                "openai",
+                "google",
+                "siliconflow",
+                "ppio",
+                "openrouter",
+                "minimax",
+                "kimi",
+                "glm",
+                "moonshot",
+                "zai"
+              ]
             },
             "required": true,
             "name": "providerId",
@@ -3856,6 +5353,178 @@
                   },
                   "required": [
                     "valid"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers/{providerId}/oauth/start": {
+      "post": {
+        "tags": [
+          "Provider OAuth"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "providerId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth flow started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "browserUrl": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers/{providerId}/oauth/status": {
+      "get": {
+        "tags": [
+          "Provider OAuth"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "providerId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current OAuth flow status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "idle",
+                        "pending",
+                        "completed",
+                        "failed"
+                      ]
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers/{providerId}/oauth/provider-status": {
+      "get": {
+        "tags": [
+          "Provider OAuth"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "providerId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth provider connection status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "provider": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "number"
+                    },
+                    "remainingMs": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "connected"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers/{providerId}/oauth/disconnect": {
+      "post": {
+        "tags": [
+          "Provider OAuth"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "providerId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth provider disconnected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
                   ]
                 }
               }
@@ -5361,7 +7030,6 @@
                           "source": {
                             "type": "string",
                             "enum": [
-                              "curated",
                               "managed",
                               "custom"
                             ]
@@ -5405,13 +7073,74 @@
                         "updatedAt",
                         "skillCount"
                       ]
+                    },
+                    "queue": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "managed",
+                              "custom"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "downloading",
+                              "installing-deps",
+                              "done",
+                              "failed"
+                            ]
+                          },
+                          "position": {
+                            "type": "number"
+                          },
+                          "error": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "errorCode": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "skill_not_found",
+                              "rate_limit",
+                              "unknown"
+                            ]
+                          },
+                          "retries": {
+                            "type": "number"
+                          },
+                          "enqueuedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "source",
+                          "status",
+                          "position",
+                          "error",
+                          "errorCode",
+                          "retries",
+                          "enqueuedAt"
+                        ]
+                      }
                     }
                   },
                   "required": [
                     "skills",
                     "installedSlugs",
                     "installedSkills",
-                    "meta"
+                    "meta",
+                    "queue"
                   ]
                 }
               }
@@ -5433,7 +7162,7 @@
                 "properties": {
                   "slug": {
                     "type": "string",
-                    "minLength": 1
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
                   }
                 },
                 "required": [
@@ -5453,6 +7182,25 @@
                   "properties": {
                     "ok": {
                       "type": "boolean"
+                    },
+                    "queued": {
+                      "type": "boolean"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "downloading",
+                        "installing-deps",
+                        "done",
+                        "failed"
+                      ]
+                    },
+                    "position": {
+                      "type": "number"
                     },
                     "error": {
                       "type": "string"
@@ -5481,7 +7229,7 @@
                 "properties": {
                   "slug": {
                     "type": "string",
-                    "minLength": 1
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
                   }
                 },
                 "required": [
@@ -5559,7 +7307,7 @@
           {
             "schema": {
               "type": "string",
-              "minLength": 1
+              "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
             },
             "required": true,
             "name": "slug",

@@ -93,6 +93,7 @@ jobs:
         if: matrix.os == 'macos'
         env:
           NEXU_DESKTOP_CHECK_CAPTURE_DIR: ${{ runner.temp }}/desktop-ci
+          NEXU_USE_LAUNCHD: "0"
         run: pnpm check:dev
 
       - name: Verify Windows desktop build pipeline

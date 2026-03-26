@@ -13,10 +13,7 @@ import { chmod, mkdir, rename, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import * as path from "node:path";
 import { pipeline } from "node:stream/promises";
-import {
-  getOpenclawCuratedSkillsDir,
-  getOpenclawSkillsDir,
-} from "../../shared/desktop-paths";
+import { getOpenclawSkillsDir } from "../../shared/desktop-paths";
 import type { DesktopRuntimeConfig } from "../../shared/runtime-config";
 import { getWorkspaceRoot } from "../../shared/workspace-paths";
 import type { RuntimeUnitManifest } from "./types";
@@ -310,6 +307,65 @@ async function extractZipArchive(
   });
 }
 
+export function ensurePackagedOpenclawSidecarSync(
+  runtimeSidecarBaseRoot: string,
+  runtimeRoot: string,
+): string {
+  const packagedSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "openclaw");
+  const archiveMetadata = readPackagedArchiveMetadata(packagedSidecarRoot);
+  const archivePath = archiveMetadata
+    ? path.resolve(packagedSidecarRoot, archiveMetadata.path)
+    : path.resolve(packagedSidecarRoot, "payload.tar.gz");
+
+  if (!existsSync(archivePath)) {
+    return packagedSidecarRoot;
+  }
+
+  const extractedSidecarRoot = ensureDir(
+    path.resolve(runtimeRoot, "openclaw-sidecar"),
+  );
+  const stampPath = path.resolve(extractedSidecarRoot, ".archive-stamp");
+  const archiveStamp = resolveArchiveStamp(archivePath, archiveMetadata);
+  const extractedOpenclawEntry = path.resolve(
+    extractedSidecarRoot,
+    "node_modules/openclaw/openclaw.mjs",
+  );
+
+  if (
+    existsSync(stampPath) &&
+    existsSync(extractedOpenclawEntry) &&
+    readFileSync(stampPath, "utf8") === archiveStamp
+  ) {
+    return extractedSidecarRoot;
+  }
+
+  if (archiveMetadata?.format === "zip") {
+    throw new Error(
+      "Synchronous packaged OpenClaw extraction does not support zip archives.",
+    );
+  }
+
+  const maxRetries = 3;
+  for (let attempt = 0; attempt < maxRetries; attempt += 1) {
+    try {
+      if (existsSync(extractedSidecarRoot)) {
+        execFileSync("rm", ["-rf", extractedSidecarRoot]);
+      }
+      mkdirSync(extractedSidecarRoot, { recursive: true });
+      execFileSync("tar", ["-xzf", archivePath, "-C", extractedSidecarRoot]);
+      writeFileSync(stampPath, archiveStamp);
+      break;
+    } catch (error) {
+      if (attempt === maxRetries - 1) {
+        throw error;
+      }
+      execFileSync("sleep", ["1"]);
+    }
+  }
+
+  return extractedSidecarRoot;
+}
+
 async function ensurePackagedOpenclawSidecar(
   runtimeSidecarBaseRoot: string,
   runtimeRoot: string,
@@ -398,7 +454,6 @@ export async function createRuntimeUnitManifests(
   );
   const openclawTempDir = ensureDir(path.resolve(openclawRuntimeRoot, "tmp"));
   ensureDir(getOpenclawSkillsDir(userDataPath));
-  ensureDir(getOpenclawCuratedSkillsDir(userDataPath));
   ensureDir(path.resolve(openclawStateDir, "plugin-docs"));
   ensureDir(path.resolve(openclawStateDir, "agents"));
   const openclawPackageRoot = path.resolve(
@@ -432,7 +487,7 @@ export async function createRuntimeUnitManifests(
   return [
     {
       id: "web",
-      label: "Nexu Web Surface",
+      label: "nexu Web Surface",
       kind: "surface",
       launchStrategy: "managed",
       runner: "spawn",
@@ -461,7 +516,7 @@ export async function createRuntimeUnitManifests(
     },
     {
       id: "controller",
-      label: "Nexu Controller",
+      label: "nexu Controller",
       kind: "service",
       launchStrategy: "managed",
       // Use spawn instead of utility-process due to Electron bugs:
@@ -484,14 +539,9 @@ export async function createRuntimeUnitManifests(
         HOST: "127.0.0.1",
         WEB_URL: webUrl,
         NEXU_HOME: runtimeConfig.paths.nexuHome,
-        NEXU_CLOUD_URL: runtimeConfig.urls.nexuCloud,
-        ...(runtimeConfig.urls.nexuLink
-          ? { NEXU_LINK_URL: runtimeConfig.urls.nexuLink }
-          : {}),
         OPENCLAW_STATE_DIR: openclawStateDir,
         OPENCLAW_CONFIG_PATH: path.resolve(openclawConfigDir, "openclaw.json"),
         OPENCLAW_SKILLS_DIR: getOpenclawSkillsDir(userDataPath),
-        OPENCLAW_CURATED_SKILLS_DIR: getOpenclawCuratedSkillsDir(userDataPath),
         SKILLHUB_STATIC_SKILLS_DIR: isPackaged
           ? path.resolve(electronRoot, "static/bundled-skills")
           : path.resolve(repoRoot, "apps/desktop/static/bundled-skills"),

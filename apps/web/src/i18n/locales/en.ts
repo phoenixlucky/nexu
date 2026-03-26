@@ -3,7 +3,7 @@ const en = {
   "brand.title.line1": "OpenClaw,",
   "brand.title.line2": "ready to use.",
   "brand.body":
-    "Nexu turns OpenClaw into a truly ready-to-use product experience, bringing Feishu tools and top-tier model access into one unified workspace.",
+    "nexu turns OpenClaw into a truly ready-to-use product experience, bringing Feishu tools and top-tier model access into one unified workspace.",
   "brand.bullet.openclaw":
     "Turns OpenClaw into a truly out-of-the-box experience",
   "brand.bullet.feishu": "Deep support for Feishu tools and workflows",
@@ -11,13 +11,13 @@ const en = {
   "brand.github": "Star us on GitHub",
 
   // ── Welcome ──
-  "welcome.pageTitle": "Welcome to Nexu",
+  "welcome.pageTitle": "Welcome to nexu",
   "welcome.mobileLabel": "Client",
   "welcome.title": "Choose how to start",
-  "welcome.option.login.title": "Use your Nexu account",
+  "welcome.option.login.title": "Use your nexu account",
   "welcome.option.login.badge": "Recommended",
   "welcome.option.login.description":
-    "Complete browser-based sign in and instantly access Nexu hosted premium models and the full product experience.",
+    "Complete browser-based sign in and instantly access nexu hosted premium models and the full product experience.",
   "welcome.option.login.meta.1": "Google / GitHub / Email",
   "welcome.option.login.meta.2": "Browser OAuth",
   "welcome.option.login.meta.3": "Best for most users",
@@ -34,17 +34,16 @@ const en = {
   "welcome.byok.subtitle":
     "No account required. Choose a provider and enter your API key. Every configuration stays under your control.",
   "welcome.byok.note":
-    "Your API key is used only for this client configuration. You do not need to create a Nexu account first.",
+    "Your API key is used only for this client configuration. You do not need to create a nexu account first.",
   "welcome.byok.verify.loading": "Verifying...",
   "welcome.byok.verify.idle": "Verify connection",
-  "welcome.byok.success": "Connected, enter Nexu",
-  "welcome.customEndpoint": "API Base URL (e.g. http://localhost:11434/v1)",
+  "welcome.byok.success": "Connected, enter nexu",
   "welcome.waitingLogin": "Waiting for browser login...",
   "welcome.waitingLoginHint":
     "Please complete login in the browser. This page will redirect automatically.",
   "welcome.cancel": "Cancel",
   "welcome.connectFailed": "Connection failed, please try again",
-  "welcome.cloudConnectError": "Unable to connect to Nexu cloud service",
+  "welcome.cloudConnectError": "Unable to connect to nexu cloud service",
   "welcome.cloudConnectInProgress":
     "Browser sign-in is already in progress. Please finish it in your browser.",
   "welcome.browserOpened":
@@ -54,12 +53,12 @@ const en = {
   // ── Auth ──
   "auth.terms": "Terms of Service",
   "auth.privacy": "Privacy Policy",
-  "auth.copyright": "© 2026 Nexu by Refly",
-  "auth.desktopConnectPrompt": "Log in to connect your Nexu Desktop app",
+  "auth.copyright": "© 2026 nexu by Refly",
+  "auth.desktopConnectPrompt": "Log in to connect your nexu Desktop app",
   "auth.welcomeBack": "Welcome back",
   "auth.createAccount": "Create your account",
   "auth.loginSubtitle": "Log in to your digital clone",
-  "auth.signupSubtitle": "Sign up to get your Nexu digital clone",
+  "auth.signupSubtitle": "Sign up to get your nexu digital clone",
   "auth.continueGoogle": "Continue with Google",
   "auth.chooseMethod": "Choose how you'd like to get started",
   "auth.loginToContinue": "Log in to continue to your workspace",
@@ -88,7 +87,7 @@ const en = {
   "auth.backToSignup": "Back to sign up",
   "auth.connected": "Connected!",
   "auth.desktopConnected":
-    "Your Nexu Desktop app is now connected to your cloud account. You can close this tab and return to the desktop app.",
+    "Your nexu Desktop app is now connected to your cloud account. You can close this tab and return to the desktop app.",
   "auth.autoCloseIn": "Closing in {{seconds}}s",
   "auth.connectingDesktop": "Connecting your desktop app...",
   "auth.heroTitle.line1": "Your digital",
@@ -103,15 +102,15 @@ const en = {
   "auth.capability.automation": "Automation",
 
   // ── Document Titles ──
-  "title.signIn": "Sign In · Nexu",
-  "title.claim": "Claim · Nexu",
-  "title.home": "Home · Nexu",
-  "title.integrations": "Integrations · Nexu",
-  "title.skills": "Skills · Nexu",
-  "title.settings": "Settings · Nexu",
-  "title.linkFeishu": "Link Feishu · Nexu",
-  "title.connecting": "Connecting · Nexu",
-  "title.default": "Nexu",
+  "title.signIn": "Sign In · nexu",
+  "title.claim": "Claim · nexu",
+  "title.home": "Home · nexu",
+  "title.integrations": "Integrations · nexu",
+  "title.skills": "Skills · nexu",
+  "title.settings": "Settings · nexu",
+  "title.linkFeishu": "Link Feishu · nexu",
+  "title.connecting": "Connecting · nexu",
+  "title.default": "nexu",
 
   // ── Workspace Layout ──
   "layout.brand": "Your digital coworker",
@@ -145,10 +144,10 @@ const en = {
   "layout.mobile.conversations": "Conversations",
   "layout.empty.title": "No conversations yet",
   "layout.empty.description":
-    "Set up a platform bot first, then mention @Nexu or DM the lobster 🦞 in Slack / Discord / WhatsApp — conversations will appear here automatically.",
+    "Set up a platform bot first, then mention @nexu or DM the lobster 🦞 in Slack / Discord / WhatsApp — conversations will appear here automatically.",
   "layout.empty.setupBot": "Set up Bot",
   "layout.empty.step1": "Connect a platform",
-  "layout.empty.step2": "Mention @Nexu",
+  "layout.empty.step2": "Mention @nexu",
   "layout.empty.step3": "Conversations appear",
 
   // ── Home Page ──
@@ -200,6 +199,9 @@ const en = {
   "home.channel.phase.done": "All set! nexu is ready to chat",
   "home.channel.restarting": "Restarting...",
   "home.channel.error": "Error",
+  "home.channel.errorDetail.not configured": "Reconnect required",
+  "home.channel.errorDetail.session expired": "Reconnect required",
+  "home.channel.errorDetail.disabled": "Disabled",
   "home.channel.disconnected": "Disconnected",
   "home.agent.alive": "Agent running",
   "home.agent.starting": "Agent starting...",
@@ -215,7 +217,7 @@ const en = {
   "home.manageSkills": "Manage skills",
   "home.manageSkillsDesc": "Tools and capabilities",
   "home.starGithub": "Star on GitHub",
-  "home.starNexu": "Star nexu on GitHub",
+  "home.starNexu": "Star Nexu on GitHub",
   "home.starCta":
     "Help us grow the open-source community — your star makes a difference",
   "home.recentActivity": "Recent Activity",
@@ -251,7 +253,7 @@ const en = {
   "settings.general.githubBody":
     "Follow releases and support the project in public.",
   "settings.general.githubBadge": "GitHub",
-  "settings.general.githubStarred": "Thanks for starring Nexu",
+  "settings.general.githubStarred": "Thanks for starring nexu",
   "settings.general.githubStarredBody":
     "You are helping shape the desktop and workspace experience.",
   "settings.general.githubStarredBadge": "Starred",
@@ -273,29 +275,30 @@ const en = {
   "models.modelSwitchedSyncFailed": "Model switched (sync to bot pending)",
   "models.modelSwitchFailed": "Failed to switch model",
   "models.switchingModel": "Switching model…",
-  "models.provider.nexu.name": "Nexu Official",
+  "models.provider.nexu.name": "nexu Official",
   "models.provider.nexu.description":
-    "Use Nexu official premium models after login, no API key needed",
+    "Use nexu official premium models after login, no API key needed",
   "models.provider.anthropic.description": "Claude series AI models",
   "models.provider.openai.description": "GPT series AI models",
   "models.provider.google.description": "Gemini series AI models",
   "models.provider.openaiCompatible.description":
     "OpenAI-compatible API provider",
-  "models.provider.custom.name": "Custom Provider",
-  "models.provider.custom.description":
-    "Any endpoint compatible with OpenAI API",
-  "models.managed.connected": "Connected",
+  "models.managed.connected": "Log out",
+  "models.managed.notConnected": "Not connected",
+  "models.managed.cloudConnectAria": "Connect to nexu cloud",
+  "models.managed.cloudDisconnectAria": "Disconnect from nexu cloud",
   "models.managed.loginRequired": "Login required",
-  "models.managed.cloudConnected": "Connected to Nexu Cloud",
+  "models.managed.cloudConnected": "Connected to nexu Cloud",
   "models.managed.cloudModelsAvailable":
     "Cloud models are now available. View and manage below.",
   "models.managed.refresh": "Refresh",
+  "models.managed.refreshModelList": "Refresh model list",
   "models.managed.disconnect": "Disconnect",
-  "models.managed.loginPrompt": "Sign in to use Nexu official models",
+  "models.managed.loginPrompt": "Sign in to use nexu official models",
   "models.managed.loginDescription":
-    "Sign in with your Nexu account to access unlimited premium models like Claude Opus 4.6, GPT-5.4, and more — no API key needed.",
+    "Sign in with your nexu account to access unlimited premium models like Claude Opus 4.6, GPT-5.4, and more — no API key needed.",
   "models.managed.waitingLogin": "Waiting for browser login...",
-  "models.managed.loginButton": "Sign in to Nexu",
+  "models.managed.loginButton": "Sign in to nexu",
   "models.managed.availableModels": "Available models",
   "models.managed.refreshSucceeded": "Models refreshed",
   "models.managed.refreshFailed": "Could not refresh models",
@@ -326,11 +329,37 @@ const en = {
     "Are you sure you want to remove this provider configuration?",
   "models.byok.saveSuccess": "Saved successfully",
   "models.byok.saveFailed": "Save failed, please retry",
+  "models.byok.oauthLoginChatGPT": "Login with ChatGPT",
+  "models.byok.oauthConnected": "Connected via ChatGPT",
+  "models.byok.oauthDisconnect": "Disconnect",
+  "models.byok.oauthPending": "Waiting for ChatGPT login...",
+  "models.byok.oauthSuccess": "ChatGPT connected successfully",
+  "models.byok.oauthFailed": "ChatGPT login failed",
+  "models.byok.oauthOrApiKey": "Or enter an API key manually",
+  "models.byok.oauthDescription": "Use your ChatGPT Plus/Pro subscription",
+  "models.byok.minimax.authModeOauth": "OAuth Login",
+  "models.byok.minimax.authModeApiKey": "API Key",
+  "models.byok.minimax.oauthTitle": "MiniMax Coding Plan OAuth",
+  "models.byok.minimax.oauthDescription":
+    "Use MiniMax OAuth for Coding Plan access without manually pasting an API key.",
+  "models.byok.minimax.regionGlobal": "Global",
+  "models.byok.minimax.regionCn": "CN",
+  "models.byok.minimax.endpoint": "Endpoint: {{endpoint}}",
+  "models.byok.minimax.connected": "Connected via OAuth",
+  "models.byok.minimax.dismissError": "Dismiss error",
+  "models.byok.minimax.waitingLogin": "Waiting for MiniMax login",
+  "models.byok.minimax.cancel": "Cancel",
+  "models.byok.minimax.reconnect": "Reconnect",
+  "models.byok.minimax.login": "Login with MiniMax",
+  "models.byok.zaiCodingPlan": "Z.AI Coding Plan",
+  "models.byok.zaiCodingPlanDesc":
+    "Free models with your Z.AI Coding Plan subscription",
+  "models.byok.zaiOrGeneralApi": "Or use General API key",
 
   // ── Channels Page ──
   "channels.pageTitle": "Channels",
   "channels.pageSubtitle":
-    "Connect your messaging platforms and let Nexu 🦞 join your workspace",
+    "Connect your messaging platforms and let nexu 🦞 join your workspace",
   "channels.comingSoon": "Telegram, Microsoft Teams, Line and more coming soon",
   "channels.backToConfig": "Back to configuration",
   "channels.statusConnected": "{{platform}} Bot Connected",
@@ -361,7 +390,7 @@ const en = {
   "channels.confirmReset": "Confirm reset",
   "channels.confirmResetDesc": "{{platform}} will be disconnected.",
   "channels.confirmResetBody":
-    "This will remove your current {{platform}} Bot configuration. You will need to complete setup again before Nexu can receive messages from this platform.",
+    "This will remove your current {{platform}} Bot configuration. You will need to complete setup again before nexu can receive messages from this platform.",
   "channels.cancel": "Cancel",
   "channels.quotaTitle": "We're experiencing high demand",
   "channels.quotaBody":
@@ -399,11 +428,34 @@ const en = {
   "skills.official": "Official",
   "skills.custom": "Custom",
   "skills.all": "All",
-  "skills.explore": "Explore",
+  "skills.explore": "ClawHub",
   "skills.yours": "Yours",
+  "skills.clawhubDisclaimer":
+    "Skills come from ClawHub \u2014 network or service may occasionally be unstable. If you encounter issues, please report on",
+  "skills.clawhubDisclaimerAfterLink": ".",
   "skills.recommended": "Recommended",
   "skills.installed": "Installed",
+  "skills.installQueued": "Skill queued for installation",
+  "skills.skillNotFound":
+    '"{{slug}}" is not available on ClawHub. It may have been removed or renamed.',
   "skills.import": "Import",
+  "skills.importSkill": "Import Skill",
+  "skills.importSkillDesc":
+    "Add a custom skill from a zip file or GitHub repository",
+  "skills.uploadZip": "Upload Zip",
+  "skills.githubLink": "GitHub Link",
+  "skills.importSuccess": "Skill imported successfully",
+  "skills.importFailed": "Import failed",
+  "skills.dropZipHere": "Drag & drop a .zip skill file here",
+  "skills.orClickBrowse": "or click to browse",
+  "skills.clickToChange": "Click to change file",
+  "skills.zipHint":
+    "The zip should contain a SKILL.md manifest and any related prompt or config files.",
+  "skills.githubUrlLabel": "GitHub repository URL",
+  "skills.githubComingSoon":
+    "GitHub import is coming soon. Use the Upload Zip tab for now.",
+  "skills.importing": "Importing...",
+  "skills.cancel": "Cancel",
   "skills.loadingCatalog": "Downloading skill catalog...",
   "skills.catalogUnavailable": "Catalog unavailable",
   "skills.retrying": "Retrying...",
@@ -429,7 +481,7 @@ const en = {
   "skills.tabCommunity": "Community",
   "skills.tabInstalled": "Installed",
   "skills.sourceRecommended": "Recommended",
-  "skills.sourceRecommendedDesc": "Pre-installed skills recommended by Nexu",
+  "skills.sourceRecommendedDesc": "Pre-installed skills recommended by nexu",
   "skills.sourceInstalled": "Installed",
   "skills.sourceInstalledDesc": "Community skills you installed",
   "skills.justNow": "just now",
@@ -453,7 +505,7 @@ const en = {
   "skillDetail.examples": "Examples",
   "skillDetail.tryPrompts": "Try these prompts",
   "skillDetail.tryPromptsDesc":
-    "Copy a prompt and send it to your Nexu bot to try this skill.",
+    "Copy a prompt and send it to your nexu bot to try this skill.",
   "skillDetail.copy": "Copy",
   "skillDetail.explore": "Explore",
   "skillDetail.relatedSkills": "Related Skills",
@@ -493,6 +545,9 @@ const en = {
   "sessions.chat.unavailable": "Runtime unavailable",
   "sessions.chat.unavailableDesc": "Cannot connect to the chat runtime.",
   "sessions.chat.loading": "Loading messages...",
+  "sessions.chat.replyLabel": "Reply",
+  "sessions.chat.toolActivity": "Tool",
+  "sessions.chat.toolCompleted": "Completed",
 
   // ── Integrations Page ──
   "integrations.pageTitle": "Integrations",
@@ -551,63 +606,63 @@ const en = {
     "This link is not valid. Please check your {{platform}} message for the correct link.",
   "claim.linkExpired": "Link expired",
   "claim.linkExpiredDesc":
-    "This claim link has expired. Send a message to the Nexu bot in {{platform}} to get a new one.",
+    "This claim link has expired. Send a message to the nexu bot in {{platform}} to get a new one.",
   "claim.linkUsed": "Link already used",
   "claim.linkUsedDesc":
     "This claim link has already been used. If this was you, your account is already set up.",
   "claim.open": "Open {{platform}}",
   "claim.goToSignIn": "Go to sign in",
-  "claim.getStarted": "Get started with Nexu",
-  "claim.joinTeam": "Join your team on Nexu",
+  "claim.getStarted": "Get started with nexu",
+  "claim.joinTeam": "Join your team on nexu",
   "claim.joinTeamDesc":
-    "Sign in to connect your {{platform}} identity and start using Nexu with your team.",
+    "Sign in to connect your {{platform}} identity and start using nexu with your team.",
   "claim.createAccountDesc":
     "Create an account to claim your {{platform}} access and unlock AI-powered workflows.",
   "claim.teammatesAlready":
-    "{{count}} teammates already using Nexu — no additional configuration needed",
+    "{{count}} teammates already using nexu — no additional configuration needed",
   "claim.createAccount": "Create account",
   "claim.alreadyHaveAccount": "Already have an account?",
-  "claim.teamUsesNexu.line1": "Your team",
-  "claim.teamUsesNexu.line2": "already uses",
-  "claim.teamUsesNexu.line3": "Nexu",
+  "claim.teamUsesnexu.line1": "Your team",
+  "claim.teamUsesnexu.line2": "already uses",
+  "claim.teamUsesnexu.line3": "nexu",
   "claim.teammatesHere": "{{count}} teammate{{s}} already here",
   "claim.noConfigNeeded":
-    "Your team has already connected Nexu — no additional configuration needed. Just sign in to get started.",
+    "Your team has already connected nexu — no additional configuration needed. Just sign in to get started.",
   "claim.claimAccess": "Claim your {{platform}} access",
   "claim.claimAccessDescExisting":
-    "Connect your {{platform}} identity to your Nexu account and join {{team}}.",
+    "Connect your {{platform}} identity to your nexu account and join {{team}}.",
   "claim.claimAccessDescNew":
-    "Link your {{platform}} identity to your Nexu account to unlock AI-powered workflows.",
+    "Link your {{platform}} identity to your nexu account to unlock AI-powered workflows.",
   "claim.signedInAs": "Signed in as",
   "claim.claimButton": "Claim your {{platform}} access",
   "claim.useDifferentAccount": "Use a different account",
   "claim.claiming": "Claiming your {{platform}} access...",
   "claim.claimingDesc":
-    "Linking your {{platform}} identity to your Nexu account.",
+    "Linking your {{platform}} identity to your nexu account.",
   "claim.allSet": "You're all set!",
-  "claim.allSetDesc": "Your {{platform}} account has been linked to Nexu.",
+  "claim.allSetDesc": "Your {{platform}} account has been linked to nexu.",
   "claim.nowPartOf": "You're now part of",
   "claim.backTo": "Back to {{platform}}",
-  "claim.exploreNexu": "Explore Nexu",
+  "claim.explorenexu": "Explore nexu",
 
   // ── Feishu Bind Page ──
   "feishuBind.linked": "Feishu account linked!",
   "feishuBind.linkedDesc":
-    "Your Feishu identity has been linked to your Nexu account. You can now use the bot normally.",
+    "Your Feishu identity has been linked to your nexu account. You can now use the bot normally.",
   "feishuBind.backToFeishu": "Back to Feishu",
-  "feishuBind.exploreNexu": "Explore Nexu",
+  "feishuBind.explorenexu": "Explore nexu",
   "feishuBind.bindFailed": "Binding failed",
   "feishuBind.tryAgain": "Try again",
   "feishuBind.linkTitle.line1": "Link your",
   "feishuBind.linkTitle.line2": "Feishu",
   "feishuBind.linkTitle.line3": "identity",
   "feishuBind.linkDesc":
-    "Connect your Feishu account to Nexu to unlock AI-powered workflows directly in your chats.",
+    "Connect your Feishu account to nexu to unlock AI-powered workflows directly in your chats.",
   "feishuBind.linkAccount": "Link your Feishu account",
   "feishuBind.signInFirst":
-    "Sign in to Nexu first, then bind your Feishu identity.",
+    "Sign in to nexu first, then bind your Feishu identity.",
   "feishuBind.authorizeDesc":
-    "Authorize with Feishu to link your identity to your Nexu account.",
+    "Authorize with Feishu to link your identity to your nexu account.",
   "feishuBind.signedInAs": "Signed in as",
   "feishuBind.bindButton": "Bind Feishu Account",
   "feishuBind.redirecting": "Redirecting to Feishu...",
@@ -655,8 +710,7 @@ const en = {
 
   // ── WeChat Setup ──
   "wechatSetup.title": "Connect WeChat",
-  "wechatSetup.desc":
-    "Scan a QR code with your WeChat mobile app to connect your personal WeChat account.",
+  "wechatSetup.desc": "Scan with WeChat on your phone to connect.",
   "wechatSetup.scanQr": "Scan QR to Connect",
   "wechatSetup.scanning": "Waiting for scan...",
   "wechatSetup.scanHint":
@@ -677,9 +731,9 @@ const en = {
   "slackSetup.stepBotToken": "Bot Token",
   "slackSetup.stepEnableDMs": "Enable DMs",
   "slackSetup.step": "Step {{number}}",
-  "slackSetup.addNexuTitle": "Add Nexu to Slack",
-  "slackSetup.addNexuDesc":
-    "One-click install \u2014 authorize Nexu Bot to your Slack workspace via OAuth",
+  "slackSetup.addnexuTitle": "Add nexu to Slack",
+  "slackSetup.addnexuDesc":
+    "One-click install \u2014 authorize nexu Bot to your Slack workspace via OAuth",
   "slackSetup.addToSlack": "Add to Slack",
   "slackSetup.orConnectManually": "Or connect manually",
   "slackSetup.authorizing": "Authorizing...",

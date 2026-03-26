@@ -25,7 +25,19 @@ export const controllerProviderSchema = z.object({
   displayName: z.string().nullable(),
   enabled: z.boolean(),
   baseUrl: z.string().nullable(),
+  authMode: z.enum(["apiKey", "oauth"]).default("apiKey"),
   apiKey: z.string().nullable(),
+  oauthRegion: z.enum(["global", "cn"]).nullable().default(null),
+  oauthCredential: z
+    .object({
+      provider: z.string(),
+      access: z.string(),
+      refresh: z.string().optional(),
+      expires: z.number().int().optional(),
+      email: z.string().optional(),
+    })
+    .nullable()
+    .default(null),
   models: z.array(z.string()).default([]),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -36,6 +48,7 @@ export const controllerProviderInputSchema = z.object({
   baseUrl: z.string().nullable().optional(),
   enabled: z.boolean().optional(),
   displayName: z.string().optional(),
+  authMode: z.enum(["apiKey", "oauth"]).optional(),
   modelsJson: z.string().optional(),
 });
 
@@ -154,6 +167,17 @@ export const compiledOpenClawSnapshotSchema = z.object({
   config: z.record(z.unknown()),
 });
 
+export const cloudProfileEntrySchema = z.object({
+  name: z.string().min(1),
+  cloudUrl: z.string().min(1),
+  linkUrl: z.string().min(1),
+});
+
+export const cloudProfilesFileSchema = z.object({
+  schemaVersion: z.number().int().positive(),
+  profiles: z.array(cloudProfileEntrySchema).default([]),
+});
+
 export type NexuConfig = z.infer<typeof nexuConfigSchema>;
 export type ControllerRuntimeConfig = z.infer<
   typeof controllerRuntimeConfigSchema
@@ -161,3 +185,5 @@ export type ControllerRuntimeConfig = z.infer<
 export type ControllerProvider = z.infer<typeof controllerProviderSchema>;
 export type ControllerArtifact = z.infer<typeof controllerArtifactSchema>;
 export type ArtifactsIndex = z.infer<typeof artifactsIndexSchema>;
+export type CloudProfileEntry = z.infer<typeof cloudProfileEntrySchema>;
+export type CloudProfilesFile = z.infer<typeof cloudProfilesFileSchema>;

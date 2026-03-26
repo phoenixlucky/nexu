@@ -60,9 +60,11 @@ const plugin = {
           modelOverride: state.selectedModelRef,
         };
       }
+      const providerOverride = state.selectedModelRef.slice(0, slashIndex);
+      const modelOverride = state.selectedModelRef.slice(slashIndex + 1);
       return {
-        providerOverride: state.selectedModelRef.slice(0, slashIndex),
-        modelOverride: state.selectedModelRef.slice(slashIndex + 1),
+        providerOverride,
+        modelOverride,
       };
     });
 

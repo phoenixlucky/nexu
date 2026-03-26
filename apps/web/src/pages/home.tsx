@@ -3,11 +3,20 @@ import { ChannelConnectModal } from "@/components/channel-connect-modal";
 import { WechatSetupView } from "@/components/channel-setup/wechat-setup-view";
 import { GitHubStarCta } from "@/components/github-star-cta";
 import { InlineModelSelector } from "@/components/inline-model-selector";
+import { WechatIcon } from "@/components/platform-icons";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { getChannelChatUrl } from "@/lib/channel-links";
+import { normalizeChannel, track } from "@/lib/tracking";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowUpRight, Cable, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import "@/lib/api";
@@ -101,25 +110,23 @@ const FEISHU_ICON = (
     style={{ objectFit: "contain" }}
   />
 );
-const WECHAT_ICON = (
-  <svg width="16" height="16" viewBox="0 0 1024 1024" role="img">
-    <title>WeChat</title>
-    <path
-      d="M704 397.92c-15.04-140.96-151.04-251.36-316.48-251.36-176 0-317.92 124.16-317.92 277.28a267.36 267.36 0 0 0 129.12 224c8.8 5.6-29.12 85.28-19.68 90.08s28.48-11.2 48.8-26.56 39.52-29.76 48-26.88a362.56 362.56 0 0 0 112 17.44 376.16 376.16 0 0 0 57.44-4.48c36.96 84.8 133.44 145.44 246.56 145.44a305.12 305.12 0 0 0 88.16-12.96c4.48-1.28 21.76 11.36 39.2 24.16s35.36 25.76 39.68 24c13.76-5.76-25.44-69.92-12.96-77.44 65.76-40.48 108.48-105.92 108.48-180-0.16-120-111.04-217.12-250.4-222.72z m-109.12 167.2a28 28 0 1 1 27.68-28 27.84 27.84 0 0 1-27.68 28z m-165.76 54.72a204.64 204.64 0 0 0 1.44 24.32 314.72 314.72 0 0 1-42.88 2.88 302.08 302.08 0 0 1-103.36-17.76c-3.2-1.12-14.4-4.64-20.48 0a265.28 265.28 0 0 0-32 32 142.4 142.4 0 0 0 8.96-38.4c1.12-10.24-14.56-17.6-17.76-19.68a220 220 0 0 1-98.08-178.4c0-122.88 117.6-222.4 262.72-222.4 135.36 0 246.88 86.72 260.96 198.24-124.48 17.44-219.52 108.96-219.52 219.2z m331.68-54.72a28 28 0 1 1 27.68-28 27.68 27.68 0 0 1-27.68 28z"
-      fill="#8DC81B"
-    />
-    <path
-      d="M498.24 286.08a41.92 41.92 0 1 0 41.44 41.92 41.76 41.76 0 0 0-41.44-41.92zM276.96 286.08a41.92 41.92 0 1 0 41.6 41.92 41.6 41.6 0 0 0-41.6-41.92z"
-      fill="#8DC81B"
-    />
-  </svg>
-);
+/** WeChat mark uses a wide viewBox; bump px so it matches visual weight of 16px square logos. */
+type HomeChannelIconBox = "standard" | "compact";
+
+function homeChannelIcon(
+  ch: { id: string; icon?: ReactNode },
+  box: HomeChannelIconBox = "standard",
+) {
+  if (ch.id === "wechat") {
+    return <WechatIcon size={box === "compact" ? 18 : 22} />;
+  }
+  return ch.icon ?? null;
+}
 
 const ONBOARDING_CHANNELS = [
   {
     id: "wechat",
     name: "WeChat",
-    icon: WECHAT_ICON,
     recommended: true,
   },
   {
@@ -147,7 +154,6 @@ function getChannelOptions(t: (key: string) => string) {
     {
       id: "wechat",
       name: t("home.channel.wechat"),
-      icon: WECHAT_ICON,
       recommended: true,
     },
     {
@@ -174,6 +180,7 @@ function getChannelOptions(t: (key: string) => string) {
 function getChannelStatusMeta(
   status: ChannelLiveStatus | undefined,
   t: (key: string) => string,
+  lastError?: string | null,
 ): { colorClass: string; pulse: boolean; label: string } {
   switch (status) {
     case "connected":
@@ -194,12 +201,17 @@ function getChannelStatusMeta(
         pulse: true,
         label: t("home.channel.restarting"),
       };
-    case "error":
+    case "error": {
+      const errorKey = lastError ? `home.channel.errorDetail.${lastError}` : "";
+      const hasDetail = lastError && t(errorKey) !== errorKey;
       return {
-        colorClass: "bg-[var(--color-danger)]",
+        colorClass: hasDetail
+          ? "bg-[var(--color-warning)]"
+          : "bg-[var(--color-danger)]",
         pulse: false,
-        label: t("home.channel.error"),
+        label: hasDetail ? t(errorKey) : t("home.channel.error"),
       };
+    }
     default:
       return {
         colorClass: "bg-text-muted/40",
@@ -247,7 +259,6 @@ export function HomePage() {
 
   const runtimeDisplay = useMemo(() => {
     if (!runtimeData) {
-      // Still loading — show starting
       return {
         label: t("home.status.starting"),
         color: "var(--color-warning)",
@@ -260,6 +271,12 @@ export function HomePage() {
           label: t("home.running"),
           color: "var(--color-success)",
           pulse: false,
+        } as const;
+      case "starting":
+        return {
+          label: t("home.status.starting"),
+          color: "var(--color-warning)",
+          pulse: true,
         } as const;
       case "degraded":
         return {
@@ -299,6 +316,13 @@ export function HomePage() {
           subtitle: t("home.status.subtitle.idle"),
           color: "var(--color-success)",
           pulse: false,
+        } as const;
+      case "starting":
+        return {
+          label: t("home.status.starting"),
+          subtitle: t("home.status.subtitle.starting"),
+          color: "var(--color-warning)",
+          pulse: true,
         } as const;
       case "degraded":
         return {
@@ -393,6 +417,14 @@ export function HomePage() {
     queryKey: ["channels-live-status"],
     queryFn: async () => {
       const { data } = await getApiV1ChannelsLiveStatus();
+      console.log(
+        "[home:live-status]",
+        data?.gatewayConnected,
+        data?.channels?.map(
+          (c: { channelType: string; status: string }) =>
+            `${c.channelType}=${c.status}`,
+        ),
+      );
       return data as LiveStatusResponse | undefined;
     },
     refetchInterval: hasChannel ? 3000 : false,
@@ -598,7 +630,7 @@ export function HomePage() {
                   >
                     <div className="flex items-start gap-2.5">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center border border-border bg-white shrink-0">
-                        {ch.icon}
+                        {homeChannelIcon(ch)}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="text-[13px] font-medium text-text-primary">
@@ -697,6 +729,9 @@ export function HomePage() {
                 stars={stars}
                 variant="inline"
                 className="ml-auto shrink-0"
+                onClick={() =>
+                  track("workspace_github_click", { source: "home_card" })
+                }
               />
             </div>
             <div className="flex items-center gap-2 mt-1.5">
@@ -750,6 +785,7 @@ export function HomePage() {
                     const statusMeta = getChannelStatusMeta(
                       statusEntry?.status,
                       t,
+                      statusEntry?.lastError,
                     );
                     const channelChatUrl = connectedChannel
                       ? getChannelChatUrl(
@@ -760,9 +796,14 @@ export function HomePage() {
                         )
                       : "";
                     const handleOpenChannel = () => {
-                      if (!channelChatUrl) {
+                      const channel = normalizeChannel(ch.id);
+                      if (!channelChatUrl || !channel) {
                         return;
                       }
+                      track("workspace_chat_in_im_click", {
+                        channel,
+                        where: "home",
+                      });
                       window.open(
                         channelChatUrl,
                         "_blank",
@@ -788,7 +829,7 @@ export function HomePage() {
                         }}
                       >
                         <div className="w-8 h-8 rounded-[10px] flex items-center justify-center border border-border bg-white shrink-0">
-                          {ch.icon}
+                          {homeChannelIcon(ch)}
                         </div>
                         <div className="flex-1 min-w-0 flex items-center gap-2">
                           <span className="text-[13px] font-semibold text-text-primary">
@@ -804,6 +845,10 @@ export function HomePage() {
                           onClick={(e) => {
                             e.stopPropagation();
                             if (connectedChannel) {
+                              const channel = normalizeChannel(ch.id);
+                              track("workspace_channel_disconnect_click", {
+                                channel: channel ?? ch.id,
+                              });
                               disconnectChannel.mutate(connectedChannel.id);
                             }
                           }}
@@ -818,6 +863,16 @@ export function HomePage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
+                            onClickCapture={() => {
+                              const channel = normalizeChannel(ch.id);
+                              if (!channel) {
+                                return;
+                              }
+                              track("workspace_chat_in_im_click", {
+                                channel,
+                                where: "home",
+                              });
+                            }}
                             className="inline-flex items-center gap-1 text-[12px] font-medium text-text-secondary hover:text-text-primary transition-colors ml-3 shrink-0 leading-none"
                           >
                             Chat
@@ -841,6 +896,10 @@ export function HomePage() {
                       key={ch.id}
                       type="button"
                       onClick={() => {
+                        const channel = normalizeChannel(ch.id);
+                        if (channel) {
+                          track("workspace_channel_connect_click", { channel });
+                        }
                         if (ch.id === "wechat") {
                           setWechatQrOpen(true);
                         } else {
@@ -852,7 +911,7 @@ export function HomePage() {
                       className="group flex items-center gap-2.5 rounded-lg border border-dashed border-border bg-surface-0 px-3 py-2 text-left hover:border-solid hover:border-border-hover hover:bg-surface-1 transition-all"
                     >
                       <div className="w-6 h-6 rounded-md flex items-center justify-center bg-surface-1 shrink-0">
-                        {ch.icon}
+                        {homeChannelIcon(ch, "compact")}
                       </div>
                       <span className="text-[12px] font-medium text-text-muted group-hover:text-text-secondary flex-1 truncate">
                         {ch.name}
@@ -878,6 +937,9 @@ export function HomePage() {
           badgeLabel="GitHub"
           stars={stars}
           variant="banner"
+          onClick={() =>
+            track("workspace_github_click", { source: "home_card" })
+          }
         />
       </div>
 
@@ -938,17 +1000,17 @@ function WechatQrModal({
         className="relative w-full max-w-md mx-4 rounded-2xl border border-border bg-surface-0 shadow-2xl overflow-hidden"
       >
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center border border-border bg-surface-1">
-              {WECHAT_ICON}
+          <div className="flex min-w-0 flex-1 items-center gap-3 pr-2">
+            <div className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center border border-border bg-surface-1">
+              <WechatIcon size={24} />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-[14px] font-semibold text-text-primary">
                 {t("wechatSetup.title")}
               </div>
-              <div className="text-[11px] text-text-muted">
+              <p className="mt-0.5 text-[11px] leading-snug text-text-muted line-clamp-1">
                 {t("wechatSetup.desc")}
-              </div>
+              </p>
             </div>
           </div>
           <button
@@ -960,7 +1022,7 @@ function WechatQrModal({
             <X size={16} />
           </button>
         </div>
-        <div className="px-4 py-2">
+        <div className="px-4 pt-1 pb-5">
           <WechatSetupView
             onConnected={onConnected}
             gatewayReady={gatewayReady}

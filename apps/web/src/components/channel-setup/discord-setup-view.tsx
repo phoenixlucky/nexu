@@ -68,9 +68,17 @@ export function DiscordSetupView({
         body: { botToken: botToken.trim(), appId: appId.trim() },
       });
       if (error) {
+        track("workspace_channel_config_submit", {
+          channel: "discord",
+          success: false,
+        });
         toast.error(error.message ?? t("discordSetup.connectFailed"));
         return;
       }
+      track("workspace_channel_config_submit", {
+        channel: "discord",
+        success: true,
+      });
       toast.success(
         t("discordSetup.connectSuccess", { teamName: data?.teamName ?? "" }),
       );
@@ -81,6 +89,10 @@ export function DiscordSetupView({
       identify({ channels_connected: 1 });
       onConnected();
     } catch {
+      track("workspace_channel_config_submit", {
+        channel: "discord",
+        success: false,
+      });
       toast.error(t("discordSetup.connectFailed"));
     } finally {
       setConnecting(false);
@@ -270,7 +282,7 @@ export function DiscordSetupView({
                 >
                   <CheckCircle2
                     size={12}
-                    className="text-emerald-500 shrink-0"
+                    className="text-[var(--color-success)] shrink-0"
                   />
                   <code className="text-[11px] font-mono text-[#5865F2] bg-[#5865F2]/8 px-1.5 py-0.5 rounded font-medium">
                     {s.scope}
@@ -290,7 +302,7 @@ export function DiscordSetupView({
                   <div key={perm} className="flex gap-1.5 items-center">
                     <CheckCircle2
                       size={10}
-                      className="text-emerald-500 shrink-0"
+                      className="text-[var(--color-success)] shrink-0"
                     />
                     <span className="text-[11px] text-text-muted">{perm}</span>
                   </div>

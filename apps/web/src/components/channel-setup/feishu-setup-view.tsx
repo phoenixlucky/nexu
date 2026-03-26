@@ -2,7 +2,6 @@ import { Input } from "@/components/ui/input";
 import { identify, track } from "@/lib/tracking";
 import {
   ArrowLeft,
-  BookOpen,
   Check,
   ChevronRight,
   Copy,
@@ -141,9 +140,17 @@ export function FeishuSetupView({
         body: { appId: appId.trim(), appSecret: appSecret.trim() },
       });
       if (error) {
+        track("workspace_channel_config_submit", {
+          channel: "feishu",
+          success: false,
+        });
         toast.error(error.message ?? t("feishuSetup.connectFailed"));
         return;
       }
+      track("workspace_channel_config_submit", {
+        channel: "feishu",
+        success: true,
+      });
       toast.success(t("feishuSetup.connectSuccess"));
       track("channel_ready", {
         channel: "feishu",
@@ -152,6 +159,10 @@ export function FeishuSetupView({
       identify({ channels_connected: 1 });
       onConnected();
     } catch {
+      track("workspace_channel_config_submit", {
+        channel: "feishu",
+        success: false,
+      });
       toast.error(t("feishuSetup.connectFailed"));
     } finally {
       setConnecting(false);
@@ -272,8 +283,11 @@ export function FeishuSetupView({
                 >
                   {jsonCopied ? (
                     <>
-                      <Check size={11} className="text-emerald-500" />
-                      <span className="text-emerald-500">
+                      <Check
+                        size={11}
+                        className="text-[var(--color-success)]"
+                      />
+                      <span className="text-[var(--color-success)]">
                         {t("feishuSetup.copied")}
                       </span>
                     </>
@@ -415,20 +429,17 @@ export function FeishuSetupView({
       </div>
 
       {/* Help link */}
-      <div className="flex gap-3 items-center p-4 mt-5 rounded-xl border bg-surface-1 border-border">
-        <BookOpen size={14} className="text-[#3370FF] shrink-0" />
-        <p className="text-[11px] text-text-muted leading-relaxed">
-          {t("feishuSetup.helpText")}{" "}
-          <a
-            href="https://open.feishu.cn/document/home/introduction-to-custom-app-development/self-built-application-development-process"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[#3370FF] hover:underline underline-offset-2 font-medium"
-          >
-            {t("feishuSetup.helpLinkText")}
-          </a>{" "}
+      <div className="mt-5">
+        <a
+          href="https://open.feishu.cn/document/home/introduction-to-custom-app-development/self-built-application-development-process"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-link text-[11px]"
+        >
+          {t("feishuSetup.helpText")} {t("feishuSetup.helpLinkText")}{" "}
           {t("feishuSetup.helpSuffix")}
-        </p>
+          <ExternalLink size={10} />
+        </a>
       </div>
     </div>
   );

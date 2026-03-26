@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ControllerEnv } from "#controller/app/env";
+import { OpenClawAuthProfilesStore } from "#controller/runtime/openclaw-auth-profiles-store";
 import { OpenClawAuthProfilesWriter } from "#controller/runtime/openclaw-auth-profiles-writer";
 
 function makeTempDir(): string {
@@ -32,7 +33,6 @@ function createEnv(homeDir: string): ControllerEnv {
       "/Users/elian/Documents/refly/nexu",
       "apps/controller/static/runtime-plugins",
     ),
-    openclawCuratedSkillsDir: resolve(openclawStateDir, "bundled-skills"),
     openclawRuntimeModelStatePath: resolve(
       openclawStateDir,
       "nexu-runtime-model.json",
@@ -55,6 +55,7 @@ function createEnv(homeDir: string): ControllerEnv {
     runtimeSyncIntervalMs: 2000,
     runtimeHealthIntervalMs: 5000,
     defaultModelId: "anthropic/claude-sonnet-4",
+    amplitudeApiKey: undefined,
   };
 }
 
@@ -71,7 +72,9 @@ describe("OpenClawAuthProfilesWriter", () => {
 
   it("writes provider api keys into each agent auth-profiles store", async () => {
     const env = createEnv(tempDir);
-    const writer = new OpenClawAuthProfilesWriter(env);
+    const writer = new OpenClawAuthProfilesWriter(
+      new OpenClawAuthProfilesStore(env),
+    );
 
     await writer.writeForAgents({
       agents: {

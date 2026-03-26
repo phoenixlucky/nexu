@@ -14,7 +14,7 @@ import type {
 } from "@shared/host";
 function getHostBridge() {
   if (typeof window === "undefined" || !window.nexuHost) {
-    throw new Error("Nexu host bridge is unavailable.");
+    throw new Error("nexu host bridge is unavailable.");
   }
 
   return window.nexuHost;
@@ -90,13 +90,60 @@ export async function queryRuntimeEvents(
   return result;
 }
 
-export async function ensureDesktopAuthSession(
-  force = false,
-): Promise<boolean> {
-  const result = await getHostBridge().invoke("desktop:ensure-auth-session", {
-    force,
+export async function getDesktopCloudStatus() {
+  return getHostBridge().invoke("desktop:get-cloud-status", undefined);
+}
+
+export async function createCloudProfile(profile: {
+  name: string;
+  cloudUrl: string;
+  linkUrl: string;
+}) {
+  return getHostBridge().invoke("desktop:create-cloud-profile", { profile });
+}
+
+export async function connectCloudProfile(name: string) {
+  return getHostBridge().invoke("desktop:connect-cloud-profile", { name });
+}
+
+export async function disconnectCloudProfile(name: string) {
+  return getHostBridge().invoke("desktop:disconnect-cloud-profile", { name });
+}
+
+export async function switchCloudProfile(name: string) {
+  return getHostBridge().invoke("desktop:switch-cloud-profile", { name });
+}
+
+export async function importCloudProfiles(
+  profiles: Array<{ name: string; cloudUrl: string; linkUrl: string }>,
+) {
+  return getHostBridge().invoke("desktop:import-cloud-profiles", { profiles });
+}
+
+export async function updateCloudProfile(
+  previousName: string,
+  profile: { name: string; cloudUrl: string; linkUrl: string },
+) {
+  return getHostBridge().invoke("desktop:update-cloud-profile", {
+    previousName,
+    profile,
   });
-  return result.ok;
+}
+
+export async function deleteCloudProfile(name: string) {
+  return getHostBridge().invoke("desktop:delete-cloud-profile", { name });
+}
+
+export async function getMiniMaxOauthStatus() {
+  return getHostBridge().invoke("desktop:get-minimax-oauth-status", undefined);
+}
+
+export async function startMiniMaxOauth(region: "global" | "cn") {
+  return getHostBridge().invoke("desktop:start-minimax-oauth", { region });
+}
+
+export async function cancelMiniMaxOauth() {
+  return getHostBridge().invoke("desktop:cancel-minimax-oauth", undefined);
 }
 
 export function onDesktopCommand(

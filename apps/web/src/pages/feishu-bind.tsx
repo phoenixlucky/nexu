@@ -61,8 +61,8 @@ export function FeishuBindPage() {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
         <div className="w-full max-w-md rounded-xl border border-border bg-surface-1 p-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 mb-5">
-            <CheckCircle2 className="h-7 w-7 text-emerald-500" />
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-success-muted)] mb-5">
+            <CheckCircle2 className="h-7 w-7 text-[var(--color-success)]" />
           </div>
           <h1 className="text-xl font-bold text-text-primary">
             {t("feishuBind.linked")}
@@ -137,9 +137,6 @@ export function FeishuBindPage() {
 
   // ── Not logged in ──
   if (!session?.user) {
-    const returnTo = encodeURIComponent(
-      `/feishu/bind?ws=${encodeURIComponent(ws)}&bot=${encodeURIComponent(bot)}`,
-    );
     return (
       <div className="flex min-h-screen">
         {/* Left panel */}
@@ -192,7 +189,7 @@ export function FeishuBindPage() {
               </div>
 
               <Link
-                to={`/auth?mode=signup&source=feishu_bind&returnTo=${returnTo}`}
+                to="/"
                 className="w-full flex items-center justify-center gap-2.5 py-3 rounded-lg text-[14px] font-medium bg-accent text-accent-fg hover:bg-accent-hover transition-all"
               >
                 {t("claim.createAccount")}
@@ -203,7 +200,7 @@ export function FeishuBindPage() {
                   {t("claim.alreadyHaveAccount")}{" "}
                 </span>
                 <Link
-                  to={`/auth?source=feishu_bind&returnTo=${returnTo}`}
+                  to="/"
                   className="text-[13px] text-accent font-medium hover:underline underline-offset-2"
                 >
                   {t("auth.logIn")}
@@ -266,7 +263,7 @@ export function FeishuBindPage() {
 
         <div className="text-center mt-4">
           <Link
-            to="/auth"
+            to="/"
             className="text-[13px] text-text-muted hover:text-text-secondary transition-colors"
           >
             {t("claim.useDifferentAccount")}

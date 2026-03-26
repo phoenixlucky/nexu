@@ -50,11 +50,15 @@ jobs:
       matrix:
         include:
           - os: macos
-            runs_on: macos-14
+            runner: macos-14
+            arch: arm64
+          - os: macos
+            runner: macos-15-intel
+            arch: x64
           - os: windows
-            runs_on: windows-latest
-
-    runs-on: ${{ matrix.runs_on }}
+            runner: windows-latest
+            arch: x64
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
 
     steps:
@@ -81,7 +85,9 @@ jobs:
         run: pnpm exec electron --version
 
       - name: Build unsigned desktop bundle
-        run: ${{ matrix.os == 'macos' && 'pnpm dist:mac:unsigned' || 'pnpm --filter @nexu/desktop dist:win:unsigned' }}
+        env:
+          NEXU_DESKTOP_TARGET_ARCH: ${{ matrix.arch }}
+        run: ${{ matrix.os == 'windows' && 'pnpm --filter @nexu/desktop dist:win:unsigned' || 'pnpm dist:mac:unsigned' }}
 
       - name: Set packaged app paths
         shell: pwsh
@@ -93,7 +99,7 @@ jobs:
 
           if ("${{ matrix.os }}" -eq "macos") {
             $packagedUserDataDir = Join-Path $packagedHome "Library/Application Support/@nexu/desktop"
-            $packagedApp = "apps/desktop/release/mac-arm64/Nexu.app"
+            $packagedApp = "apps/desktop/release/mac-${{ matrix.arch }}/Nexu.app"
             $packagedExecutable = "$packagedApp/Contents/MacOS/Nexu"
           } else {
             $packagedUserDataDir = Join-Path $packagedHome "nexu-desktop"
@@ -131,6 +137,17 @@ jobs:
           if (-not (Test-Path $env:PACKAGED_APP)) { throw "Packaged app path missing: $env:PACKAGED_APP" }
           if (-not (Test-Path $env:PACKAGED_EXECUTABLE)) { throw "Packaged executable missing: $env:PACKAGED_EXECUTABLE" }
 
+      - name: Upload desktop build artifacts
+        if: success() && matrix.os == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-ci-dist-${{ matrix.os }}-${{ matrix.arch }}
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+          if-no-files-found: error
+          retention-days: 3
+
       - name: Verify packaged runtime unit health
         if: matrix.os == 'macos'
         env:
@@ -161,7 +178,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-ci-logs-${{ matrix.os }}
+          name: desktop-ci-logs-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ runner.temp }}/desktop-ci
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 3

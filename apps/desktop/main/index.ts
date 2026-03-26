@@ -10,14 +10,12 @@ import {
   nativeTheme,
   powerMonitor,
   powerSaveBlocker,
-  session,
   shell,
 } from "electron";
 import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { getDesktopAppRoot } from "../shared/workspace-paths";
-import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import { exportDiagnostics } from "./diagnostics-export";
 import {
@@ -25,17 +23,19 @@ import {
   setComponentUpdater,
   setUpdateManager,
 } from "./ipc";
+import { getDesktopRuntimePlatformAdapter } from "./platforms";
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import { createRuntimeUnitManifests } from "./runtime/manifests";
-import {
-  PortAllocationError,
-  allocateDesktopRuntimePorts,
-} from "./runtime/port-allocation";
 import {
   flushRuntimeLoggers,
   rotateDesktopLogSession,
   writeDesktopMainLog,
 } from "./runtime/runtime-logger";
+import {
+  type LaunchdBootstrapResult,
+  getDefaultPlistDir,
+  installLaunchdQuitHandler,
+} from "./services";
 import { SleepGuard, type SleepGuardLogEntry } from "./sleep-guard";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
@@ -47,9 +47,15 @@ const startupEpochMs = Date.now();
 let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let sleepGuard: SleepGuard | null = null;
+let launchdResult: LaunchdBootstrapResult | null = null;
+
+let resolveColdStartReady: () => void;
+const coldStartReady = new Promise<void>((resolve) => {
+  resolveColdStartReady = resolve;
+});
 
 // Set display name early (matches productName in package.json).
-app.setName("Nexu");
+app.setName("nexu");
 nativeTheme.themeSource = "light";
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -77,20 +83,14 @@ const baseRuntimeConfig = getDesktopRuntimeConfig(process.env, {
   useBuildConfig: app.isPackaged,
 });
 logStartupStep("base runtime config created");
+const runtimePlatform = getDesktopRuntimePlatformAdapter();
 const { allocations: runtimePortAllocations, runtimeConfig } =
-  await measureStartupStep("allocateDesktopRuntimePorts", () =>
-    allocateDesktopRuntimePorts(process.env, baseRuntimeConfig),
-  ).catch((error: unknown) => {
-    if (error instanceof PortAllocationError) {
-      throw new Error(
-        `[desktop:ports] ${error.code} purpose=${error.purpose} ` +
-          `preferredPort=${error.preferredPort ?? "n/a"} ${error.message}`,
-      );
-    }
-
-    throw error;
+  await runtimePlatform.prepareRuntimeConfig({
+    baseRuntimeConfig,
+    env: process.env,
+    logStartupStep,
   });
-logStartupStep("runtime config ready");
+logStartupStep(`runtime config ready platform=${runtimePlatform.id}`);
 const orchestrator = new RuntimeOrchestrator(
   await measureStartupStep("createRuntimeUnitManifests", () =>
     createRuntimeUnitManifests(
@@ -214,7 +214,7 @@ if (sentryDsn) {
   Sentry.setContext("build", sentryBuildMetadata.buildContext);
 } else {
   crashReporter.start({
-    companyName: "Nexu",
+    companyName: "nexu",
     productName: app.getName(),
     submitURL: "https://127.0.0.1/desktop-crash-reporter-disabled",
     uploadToServer: false,
@@ -250,10 +250,9 @@ function sendDesktopCommand(
   });
 }
 
-function notifyDesktopAuthSessionRestored(): void {
+function triggerUpdateCheck(): void {
   mainWindow?.webContents.send("host:desktop-command", {
-    type: "desktop:auth-session-restored",
-    surface: "web",
+    type: "desktop:check-for-updates",
   });
 }
 
@@ -306,7 +305,29 @@ function installApplicationMenu(): void {
 
   const template: MenuItemConstructorOptions[] = [
     ...(process.platform === "darwin"
-      ? ([{ role: "appMenu" }] satisfies MenuItemConstructorOptions[])
+      ? ([
+          {
+            role: "appMenu",
+            submenu: [
+              { role: "about" },
+              {
+                id: "check-for-updates",
+                label: "Check for Updates…",
+                enabled:
+                  app.isPackaged && runtimeConfig.updates.autoUpdateEnabled,
+                click: () => triggerUpdateCheck(),
+              },
+              { type: "separator" },
+              { role: "services" },
+              { type: "separator" },
+              { role: "hide" },
+              { role: "hideOthers" },
+              { role: "unhide" },
+              { type: "separator" },
+              { role: "quit" },
+            ],
+          },
+        ] satisfies MenuItemConstructorOptions[])
       : []),
     { role: "fileMenu" },
     { role: "editMenu" },
@@ -370,18 +391,6 @@ async function measureStartupStep<T>(
     throw error;
   }
 }
-
-function logAuthRecovery(message: string, stream: "stdout" | "stderr"): void {
-  writeDesktopMainLog({
-    source: "auth-recovery",
-    stream,
-    kind: "lifecycle",
-    message,
-    logFilePath: getDesktopLogFilePath("desktop-main.log"),
-    windowId: getMainWindowId(),
-  });
-}
-
 function logRendererEvent({
   source,
   stream,
@@ -419,10 +428,8 @@ function logSleepGuard(entry: SleepGuardLogEntry): void {
 async function waitForControllerReadiness(): Promise<void> {
   const startedAt = Date.now();
   const timeoutMs = 15_000;
-  const probeUrl = new URL(
-    "/api/auth/get-session",
-    runtimeConfig.urls.controllerBase,
-  );
+  const probeUrl = new URL("/health", runtimeConfig.urls.controllerBase);
+  let attempt = 0;
 
   while (Date.now() - startedAt < timeoutMs) {
     try {
@@ -434,7 +441,7 @@ async function waitForControllerReadiness(): Promise<void> {
 
       if (response.status < 500) {
         logColdStart(
-          `controller ready via ${probeUrl.pathname} status=${response.status}`,
+          `controller ready via ${probeUrl.pathname} status=${response.status} after ${Date.now() - startedAt}ms`,
         );
         return;
       }
@@ -442,84 +449,14 @@ async function waitForControllerReadiness(): Promise<void> {
       // Ignore transient startup failures while the controller starts.
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    // Adaptive polling: start aggressive (50ms), increase to 250ms
+    const delay = Math.min(50 + attempt * 50, 250);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    attempt++;
   }
 
   throw new Error(
     `Controller readiness probe timed out for ${probeUrl.toString()}`,
-  );
-}
-
-async function runDesktopColdStart(): Promise<void> {
-  logStartupStep("runDesktopColdStart:start");
-  diagnosticsReporter?.markColdStartRunning("starting controller");
-  logColdStart("starting controller");
-  await orchestrator.startOne("controller");
-
-  diagnosticsReporter?.markColdStartRunning("waiting for controller readiness");
-  logColdStart("waiting for controller readiness");
-  await waitForControllerReadiness();
-
-  diagnosticsReporter?.markColdStartRunning(
-    "bootstrapping desktop auth session",
-  );
-  logColdStart("bootstrapping desktop auth session");
-  await ensureDesktopAuthSession({ runtimeConfig });
-  const sessionId = rotateDesktopLogSession();
-  logColdStart(`desktop auth session ready sessionId=${sessionId}`);
-
-  diagnosticsReporter?.markColdStartRunning("starting web");
-  logColdStart("starting web");
-  await orchestrator.startOne("web");
-
-  logColdStart("cold start complete");
-  diagnosticsReporter?.markColdStartSucceeded();
-  logStartupStep("runDesktopColdStart:done");
-}
-
-let authRecoveryPromise: Promise<void> | null = null;
-
-function triggerDesktopAuthRecovery(reason: string): void {
-  if (authRecoveryPromise) {
-    return;
-  }
-
-  authRecoveryPromise = (async () => {
-    logAuthRecovery(reason, "stdout");
-
-    try {
-      await ensureDesktopAuthSession({ force: true, runtimeConfig });
-      const sessionId = rotateDesktopLogSession();
-      logAuthRecovery(
-        `desktop auth session restored sessionId=${sessionId}`,
-        "stdout",
-      );
-      notifyDesktopAuthSessionRestored();
-    } catch (error) {
-      logAuthRecovery(
-        error instanceof Error ? error.message : String(error),
-        "stderr",
-      );
-    } finally {
-      authRecoveryPromise = null;
-    }
-  })();
-}
-
-function installDesktopAuthRecoveryHooks(): void {
-  session.defaultSession.webRequest.onCompleted(
-    {
-      urls: [`${runtimeConfig.urls.controllerBase}/api/auth/*`],
-    },
-    (details) => {
-      if (
-        details.method === "POST" &&
-        details.statusCode < 400 &&
-        details.url.includes("/api/auth/sign-out")
-      ) {
-        triggerDesktopAuthRecovery("detected desktop sign-out");
-      }
-    },
   );
 }
 
@@ -528,6 +465,9 @@ function focusMainWindow(): void {
     return;
   }
 
+  if (!mainWindow.isVisible()) {
+    mainWindow.show();
+  }
   if (mainWindow.isMinimized()) {
     mainWindow.restore();
   }
@@ -549,7 +489,7 @@ function createMainWindow(): BrowserWindow {
     minWidth: 1120,
     minHeight: 760,
     backgroundColor: isMacOS ? "#00000000" : "#0B1020",
-    title: "Nexu",
+    title: "nexu",
     autoHideMenuBar: !isMacOS,
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 18, y: 18 },
@@ -786,11 +726,8 @@ app.whenReady().then(async () => {
   logStartupStep("installApplicationMenu:start");
   installApplicationMenu();
   logStartupStep("installApplicationMenu:done");
-  logStartupStep("installDesktopAuthRecoveryHooks:start");
-  installDesktopAuthRecoveryHooks();
-  logStartupStep("installDesktopAuthRecoveryHooks:done");
   logStartupStep("registerIpcHandlers:start");
-  registerIpcHandlers(orchestrator, runtimeConfig);
+  registerIpcHandlers(orchestrator, runtimeConfig, coldStartReady);
   logStartupStep("registerIpcHandlers:done");
   diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
   logStartupStep("DesktopDiagnosticsReporter:created");
@@ -821,7 +758,19 @@ app.whenReady().then(async () => {
     }
 
     try {
-      await runDesktopColdStart();
+      logColdStart(`bootstrap mode: ${runtimePlatform.mode}`);
+      const coldStartResult = await runtimePlatform.runColdStart({
+        app,
+        electronRoot,
+        runtimeConfig,
+        orchestrator,
+        diagnosticsReporter,
+        logColdStart,
+        logStartupStep,
+        rotateDesktopLogSession,
+        waitForControllerReadiness,
+      });
+      launchdResult = coldStartResult.launchdResult;
       healthCheck.recordSuccess();
     } catch (error) {
       healthCheck.recordFailure();
@@ -836,10 +785,30 @@ app.whenReady().then(async () => {
         logFilePath: getDesktopLogFilePath("cold-start.log"),
         windowId: getMainWindowId(),
       });
+    } finally {
+      // Unblock renderer — it will get the final config (or show error state)
+      resolveColdStartReady();
+    }
+
+    // Install launchd quit handler regardless of cold-start success/failure
+    // so services can always be stopped cleanly on quit.
+    if (launchdResult) {
+      installLaunchdQuitHandler({
+        launchd: launchdResult.launchd,
+        labels: launchdResult.labels,
+        webServer: launchdResult.webServer,
+        plistDir: getDefaultPlistDir(!app.isPackaged),
+        onBeforeQuit: async () => {
+          sleepGuard?.dispose("launchd-quit");
+          await diagnosticsReporter?.flushNow().catch(() => undefined);
+          flushRuntimeLoggers();
+        },
+      });
     }
 
     if (app.isPackaged && runtimeConfig.updates.autoUpdateEnabled) {
       const updateMgr = new UpdateManager(win, orchestrator, {
+        channel: runtimeConfig.updates.channel,
         feedUrl: runtimeConfig.urls.updateFeed,
       });
       setUpdateManager(updateMgr);
@@ -877,9 +846,15 @@ app.on("before-quit", (event) => {
   void diagnosticsReporter?.flushNow().catch(() => undefined);
   flushRuntimeLoggers();
 
-  // Prevent Electron from quitting until child processes are cleaned up.
-  // orchestrator.dispose() sends SIGTERM then escalates to SIGKILL, so this
-  // blocks for at most ~5 seconds per managed unit.
+  // If using launchd mode, the quit handler is installed separately
+  // and shows a dialog for quit options
+  if (launchdResult) {
+    // Launchd quit handler is already installed via installLaunchdQuitHandler
+    // This handler just does cleanup; actual quit logic is in quit-handler.ts
+    return;
+  }
+
+  // Legacy orchestrator mode: clean up child processes
   event.preventDefault();
   orchestrator
     .dispose()
