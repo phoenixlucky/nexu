@@ -30,7 +30,7 @@ The CodeRabbit workflow only needs these two sources:
 2. **PR reviews**
 
    ```bash
-   gh api repos/<owner>/<repo>/pulls/<pr_number>/reviews
+   gh api --paginate repos/<owner>/<repo>/pulls/<pr_number>/reviews
    ```
 
    This is only used to identify and exclude review summaries / nitpick summaries. It is not used to extract the final result.
@@ -75,7 +75,7 @@ This is the candidate set.
 #### 2. Fetch reviews to exclude review summaries / nitpicks
 
 ```bash
-gh api repos/<owner>/<repo>/pulls/<pr_number>/reviews
+gh api --paginate repos/<owner>/<repo>/pulls/<pr_number>/reviews
 ```
 
 Identify CodeRabbit review summaries. Common characteristics include:
