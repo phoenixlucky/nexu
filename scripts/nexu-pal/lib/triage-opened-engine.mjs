@@ -77,7 +77,8 @@ function buildTranslationComment({ englishTitle, englishBody }) {
 
   const titleAllowance = Math.max(
     0,
-    maxCommentLength - buildComment({ titleText: "", bodyText: truncationMarker }).length,
+    maxCommentLength -
+      buildComment({ titleText: "", bodyText: truncationMarker }).length,
   );
 
   return buildComment({
