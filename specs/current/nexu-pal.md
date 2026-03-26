@@ -9,6 +9,7 @@ GitHub issue/discussion automation around **nexu-pal** issue processing and Feis
 | `nexu-pal: issue opened` | `issues: [opened]` | `scripts/nexu-pal/process-issue-opened.mjs` |
 | `nexu-pal: issue assigned` | `issues: [assigned]` | `scripts/nexu-pal/process-issue-assignment.mjs` |
 | `Feishu Issue Notification` | `issues: [opened]` | `scripts/notify/feishu-notify.mjs` |
+| `nexu-pal: needs-triage notify` | `issues: [labeled]` (when label is `needs-triage`) | `scripts/notify/feishu-triage-notify.mjs` |
 | `Feishu Discussion Notification` | `discussion: [created]` | `scripts/notify/feishu-notify.mjs` |
 
 ## On issue opened
@@ -29,12 +30,13 @@ Removes the `needs-triage` label (no-op if the label is already absent).
 
 ## Feishu notifications
 
-Two separate GitHub Actions send Feishu webhook notifications for newly created GitHub content:
+Three GitHub Actions send Feishu webhook notifications for GitHub content:
 
-1. **Issue notification** — On `issues: [opened]`, sends an interactive Feishu card with repo, issue number, title, author, labels, body snippet, and a link to the issue.
-2. **Discussion notification** — On `discussion: [created]`, sends the same card format using the discussion category in place of labels.
+1. **Issue notification** — On `issues: [opened]`, sends the existing issue card to the legacy webhook without changing the current chain.
+2. **Needs-triage issue notification** — On `issues: [labeled]`, when the added label is `needs-triage`, sends a triage card to either the bug or non-bug webhook based on the issue's current labels. The workflow maps GitHub secrets to internal env vars `BUG_WEBHOOK` and `REQ_WEBHOOK`.
+3. **Discussion notification** — On `discussion: [created]`, sends the existing discussion card format using the discussion category in place of labels.
 
-Both workflows sparse-checkout `scripts/notify` and run `node scripts/notify/feishu-notify.mjs`.
+The legacy issue/discussion workflows continue to run `node scripts/notify/feishu-notify.mjs`. The new triage workflow runs `node scripts/notify/feishu-triage-notify.mjs`.
 
 ## Labels managed
 
@@ -47,7 +49,7 @@ Both workflows sparse-checkout `scripts/notify` and run `node scripts/notify/fei
 
 The two **nexu-pal** workflows create a short-lived token via `actions/create-github-app-token@v1` using secrets `NEXU_PAL_APP_ID` and `NEXU_PAL_PRIVATE_KEY_PEM`. All GitHub API calls and the first-interaction action use this App token.
 
-The two Feishu notification workflows do not use the GitHub App. They use the default GitHub Actions context plus a Feishu incoming-webhook secret.
+The Feishu notification workflows do not use the GitHub App. They use the default GitHub Actions context plus Feishu incoming-webhook secrets.
 
 ## Secrets
 
@@ -57,7 +59,9 @@ The two Feishu notification workflows do not use the GitHub App. They use the de
 | `NEXU_PAL_PRIVATE_KEY_PEM` | GitHub App private key |
 | `OPENAI_BASE_URL` | OpenRouter base URL |
 | `OPENAI_API_KEY` | OpenRouter API key |
-| `ISSUE_SYNC_FEISHU_BOT_WEBHOOK` | Feishu bot incoming webhook URL |
+| `ISSUE_SYNC_FEISHU_BOT_WEBHOOK` | Feishu incoming webhook URL for the existing issue-opened and discussion notifications |
+| `ISSUE_TRIAGE_BUG_FEISHU_WEBHOOK` | Feishu incoming webhook URL for bug triage notifications |
+| `ISSUE_TRIAGE_REQ_FEISHU_WEBHOOK` | Feishu incoming webhook URL for non-bug triage notifications |
 
 ## File map
 
@@ -66,10 +70,12 @@ The two Feishu notification workflows do not use the GitHub App. They use the de
   nexu-pal-issue-opened.yml
   nexu-pal-issue-assigned.yml
   feishu-issue-notify.yml
+  nexu-pal-needs-triage-notify.yml
   feishu-discussion-notify.yml
 scripts/nexu-pal/
   process-issue-opened.mjs # opened-issue triage pipeline with bug-only labeling
   process-issue-assignment.mjs  # remove needs-triage on assignment
 scripts/notify/
-  feishu-notify.mjs        # issue/discussion Feishu webhook card notification
+  feishu-triage-notify.mjs # route needs-triage issue notifications via BUG_WEBHOOK / REQ_WEBHOOK
+  feishu-notify.mjs        # legacy issue-opened and discussion Feishu webhook card notification
 ```
