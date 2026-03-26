@@ -764,8 +764,7 @@ export function ModelsPage() {
       const providerName =
         PROVIDER_META[matched?.provider ?? ""]?.name ?? matched?.provider;
       const rawName = matched?.name ?? newId;
-      const segments = rawName.split("/");
-      const shortName = segments[segments.length - 1] ?? rawName;
+      const shortName = getModelDisplayLabel(rawName);
       const label = providerName ? `${shortName} (${providerName})` : shortName;
       toast.info(t("models.autoSwitched", { model: label }));
     }
@@ -1689,7 +1688,7 @@ function ByokProviderDetail({
                   href={meta.apiDocsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-link text-[12px]"
+                  className="inline-flex items-center gap-1 text-link text-[12px]"
                 >
                   {t("models.byok.getApiKey")}
                   <ArrowUpRight size={12} />

@@ -61,35 +61,12 @@ function mapDbSession(s: {
   };
 }
 
-type Platform =
-  | "slack"
-  | "discord"
-  | "whatsapp"
-  | "telegram"
-  | "feishu"
-  | "openclaw-weixin"
-  | "web";
-
-const PLATFORM_LABELS: Record<Platform, string> = {
-  discord: "Discord",
-  slack: "Slack",
-  feishu: "Feishu",
-  "openclaw-weixin": "WeChat",
-  whatsapp: "WhatsApp",
-  telegram: "Telegram",
-  web: "Web",
-};
-
 function SidebarPlatformIcon({ platform }: { platform: string }) {
   return (
     <span className="flex justify-center items-center w-7 h-7 rounded-xl border border-border bg-surface-1 shrink-0 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
       <PlatformIcon platform={platform} size={15} />
     </span>
   );
-}
-
-function getPlatformLabel(platform: string): string {
-  return PLATFORM_LABELS[platform as Platform] ?? "Web";
 }
 
 function formatTime(iso: string | null): string {
@@ -735,14 +712,21 @@ function WorkspaceLayoutInner() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
-                      <div
-                        className={cn(
-                          "w-2 h-2 rounded-full shrink-0",
-                          s.status === "active"
-                            ? "bg-[var(--color-success)]"
-                            : "bg-[var(--color-warning)]",
-                        )}
-                      />
+                      <span
+                        role="img"
+                        aria-label={`Status: ${s.status === "active" ? "active" : "inactive"}`}
+                        className="shrink-0"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "block w-2 h-2 rounded-full",
+                            s.status === "active"
+                              ? "bg-[var(--color-success)]"
+                              : "bg-[var(--color-warning)]",
+                          )}
+                        />
+                      </span>
                     </div>
                   </button>
                 );
@@ -1091,14 +1075,21 @@ function WorkspaceLayoutInner() {
                               <span>{formatTime(s.lastTime)}</span>
                             </div>
                           </div>
-                          <div
-                            className={cn(
-                              "w-1.5 h-1.5 rounded-full shrink-0",
-                              s.status === "active"
-                                ? "bg-[var(--color-success)]"
-                                : "bg-[var(--color-warning)]",
-                            )}
-                          />
+                          <span
+                            role="img"
+                            aria-label={`Status: ${s.status === "active" ? "active" : "inactive"}`}
+                            className="shrink-0"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className={cn(
+                                "block w-1.5 h-1.5 rounded-full",
+                                s.status === "active"
+                                  ? "bg-[var(--color-success)]"
+                                  : "bg-[var(--color-warning)]",
+                              )}
+                            />
+                          </span>
                         </button>
                       );
                     })}

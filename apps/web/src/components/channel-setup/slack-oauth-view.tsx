@@ -11,7 +11,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import {
   getApiV1ChannelsSlackOauthUrl,
@@ -681,10 +681,12 @@ export function SlackOAuthView({
           href="https://api.slack.com/authentication/basics"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-link text-[12px]"
+          className="inline-flex items-center gap-1 text-link text-[12px]"
         >
-          {t("slackSetup.helpText")} {t("slackSetup.helpLinkText")}{" "}
-          {t("slackSetup.helpSuffix")}
+          <Trans i18nKey="slackSetup.helpCta">
+            Need help? Read the <span>Slack Authentication Guide</span> for
+            detailed instructions.
+          </Trans>
           <ArrowUpRight size={12} />
         </a>
       </div>

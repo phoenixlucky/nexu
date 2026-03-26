@@ -10,7 +10,7 @@ import {
   Lock,
 } from "lucide-react";
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { postApiV1ChannelsDiscordConnect } from "../../../lib/api/sdk.gen";
 
@@ -428,10 +428,12 @@ export function DiscordSetupView({
           href="https://discord.com/developers/docs/getting-started"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-link text-[12px]"
+          className="inline-flex items-center gap-1 text-link text-[12px]"
         >
-          {t("discordSetup.helpText")} {t("discordSetup.helpLinkText")}{" "}
-          {t("discordSetup.helpSuffix")}
+          <Trans i18nKey="discordSetup.helpCta">
+            Need help? Read the <span>Discord Getting Started Guide</span> for
+            detailed instructions.
+          </Trans>
           <ArrowUpRight size={12} />
         </a>
       </div>

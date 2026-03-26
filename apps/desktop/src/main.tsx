@@ -1127,7 +1127,6 @@ function DesktopShell() {
           onDismiss={update.dismiss}
           onInstall={() => void update.install()}
           onRetry={() => void update.check()}
-          percent={update.percent}
           phase={update.phase}
           version={update.version}
         />
