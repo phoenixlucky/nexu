@@ -12,6 +12,13 @@ const desktopPackageJsonPath = resolve(electronRoot, "package.json");
 const require = createRequire(import.meta.url);
 const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 
+function createWebBuildEnv(baseEnv) {
+  return {
+    ...baseEnv,
+    VITE_DESKTOP_PLATFORM: process.platform,
+  };
+}
+
 function createCommandSpec(command, args) {
   if (
     process.platform === "win32" &&
@@ -248,6 +255,7 @@ async function main() {
     ...process.env,
     NEXU_WORKSPACE_ROOT: repoRoot,
   };
+  const webBuildEnv = createWebBuildEnv(env);
   const releaseRoot = process.env.NEXU_DESKTOP_RELEASE_DIR
     ? resolve(process.env.NEXU_DESKTOP_RELEASE_DIR)
     : resolve(electronRoot, "release");
@@ -271,7 +279,7 @@ async function main() {
   await run(
     pnpmCommand,
     ["--dir", repoRoot, "--filter", "@nexu/web", "build"],
-    { env },
+    { env: webBuildEnv },
   );
   await run(pnpmCommand, ["run", "build"], { cwd: electronRoot, env });
   await run(

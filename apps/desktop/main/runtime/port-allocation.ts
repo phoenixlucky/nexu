@@ -132,13 +132,15 @@ async function probeIdlePort(options: {
     } catch (error) {
       server.close();
 
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        error.code === "EADDRINUSE"
-      ) {
-        continue;
+      if (typeof error === "object" && error !== null && "code" in error) {
+        const errorCode = error.code;
+
+        if (
+          errorCode === "EADDRINUSE" ||
+          (process.platform === "win32" && errorCode === "EACCES")
+        ) {
+          continue;
+        }
       }
 
       throw error;

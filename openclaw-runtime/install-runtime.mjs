@@ -21,13 +21,7 @@ function createCommandSpec(command, args) {
 }
 
 function getPrunedInstallArgs() {
-  const args = ["--omit=peer", "--no-audit", "--no-fund"];
-
-  if (process.platform === "win32") {
-    args.push("--omit=optional");
-  }
-
-  return args;
+  return ["--omit=peer", "--no-audit", "--no-fund"];
 }
 
 async function run(command, args) {
