@@ -170,6 +170,87 @@ function readNativeCrashTestKind(event: Sentry.Event): string | null {
   return typeof crashpadKind === "string" ? crashpadKind : null;
 }
 
+function readElectronCrashpadSwitches(event: Sentry.Event): string[] {
+  const electronContext = event.contexts?.electron as
+    | Record<string, unknown>
+    | undefined;
+
+  if (!electronContext) {
+    return [];
+  }
+
+  return Object.entries(electronContext)
+    .filter(([key, value]) => key.startsWith("crashpad.switch-") && typeof value === "string")
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+    .map(([, value]) => value as string);
+}
+
+function readNativeCrashCodeFile(event: Sentry.Event): string | null {
+  const eventRecord = event as Record<string, unknown>;
+  const entries = eventRecord["entries"];
+
+  if (!Array.isArray(entries)) {
+    return null;
+  }
+
+  for (const entry of entries) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+
+    const entryRecord = entry as Record<string, unknown>;
+
+    if (entryRecord["type"] !== "debugmeta") {
+      continue;
+    }
+
+    const data = entryRecord["data"];
+
+    if (!data || typeof data !== "object") {
+      continue;
+    }
+
+    const images = (data as Record<string, unknown>)["images"];
+
+    if (!Array.isArray(images)) {
+      continue;
+    }
+
+    for (const image of images) {
+      if (!image || typeof image !== "object") {
+        continue;
+      }
+
+      const codeFile = (image as Record<string, unknown>)["code_file"];
+
+      if (typeof codeFile === "string") {
+        return codeFile;
+      }
+    }
+  }
+
+  return null;
+}
+
+function shouldIgnoreExternalBrowserCrash(event: Sentry.Event): boolean {
+  if (event.tags?.mechanism !== "minidump") {
+    return false;
+  }
+
+  const crashpadSwitches = new Set(readElectronCrashpadSwitches(event));
+  const codeFile = readNativeCrashCodeFile(event);
+  const isRodChromiumCrash =
+    typeof codeFile === "string" &&
+    (codeFile.includes("/.cache/rod/browser/") ||
+      codeFile.endsWith("/Chromium.app/Contents/MacOS/Chromium"));
+
+  return (
+    isRodChromiumCrash &&
+    crashpadSwitches.has("--headless") &&
+    crashpadSwitches.has("--dump-dom")
+  );
+}
+
 if (sentryDsn) {
   const sentryBuildMetadata = getDesktopSentryBuildMetadata(
     runtimeConfig.buildInfo,
@@ -181,6 +262,10 @@ if (sentryDsn) {
     release: sentryBuildMetadata.release,
     ...(sentryBuildMetadata.dist ? { dist: sentryBuildMetadata.dist } : {}),
     beforeSend(event) {
+      if (shouldIgnoreExternalBrowserCrash(event)) {
+        return null;
+      }
+
       const testTitle = readNativeCrashTestTitle(event);
 
       if (!testTitle) {
