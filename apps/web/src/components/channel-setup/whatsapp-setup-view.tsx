@@ -13,11 +13,7 @@ type Phase = "idle" | "loading-qr" | "scanning" | "connecting" | "error";
 
 function isQrImageSource(value: string): boolean {
   const trimmed = value.trim();
-  return (
-    trimmed.startsWith("data:image/") ||
-    trimmed.startsWith("http://") ||
-    trimmed.startsWith("https://")
-  );
+  return trimmed.startsWith("data:image/");
 }
 
 export interface WhatsappSetupViewProps {
