@@ -43,9 +43,7 @@ function buildTranslationComment({ translatedTitle, translatedSections }) {
     : [];
 
   const body = sections
-    .map(
-      (section) => `**${section.heading}:**\n\n${section.translatedText}`,
-    )
+    .map((section) => `**${section.heading}:**\n\n${section.translatedText}`)
     .join("\n\n---\n\n");
 
   const buildComment = ({ titleText, bodyText }) =>
@@ -53,9 +51,7 @@ function buildTranslationComment({ translatedTitle, translatedSections }) {
       "# AI Translation",
       "",
       "Only the non-English parts are translated below.",
-      ...(titleText
-        ? ["", "**Title:**", "", titleText]
-        : []),
+      ...(titleText ? ["", "**Title:**", "", titleText] : []),
       ...(bodyText ? ["", "**Translated sections:**", "", bodyText] : []),
     ].join("\n");
 
