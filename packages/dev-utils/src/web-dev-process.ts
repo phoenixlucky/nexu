@@ -1,7 +1,5 @@
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
 
 import { ensure } from "@nexu/shared";
 
@@ -11,15 +9,15 @@ import {
   ensureParentDirectory,
   getWebDevLogPath,
   repoRootPath,
-} from "./dev-paths.js";
+  resolveTsxPaths,
+  webSupervisorPath,
+} from "./paths.js";
 import { spawnHiddenProcess } from "./spawn-hidden-process.js";
 import {
   readWebDevLock,
   removeWebDevLock,
   writeWebDevLock,
 } from "./web-dev-lock.js";
-
-const require = createRequire(import.meta.url);
 
 export type WebDevSnapshot = {
   service: "web";
@@ -31,21 +29,11 @@ export type WebDevSnapshot = {
 };
 
 function createWebCommand(): { command: string; args: string[] } {
-  const tsxPackageJsonPath = require.resolve("tsx/package.json", {
-    paths: [repoRootPath],
-  });
-  const tsxCliPath = join(dirname(tsxPackageJsonPath), "dist", "cli.mjs");
-  const supervisorPath = join(
-    repoRootPath,
-    "scripts",
-    "dev",
-    "src",
-    "web-supervisor.ts",
-  );
+  const { cliPath } = resolveTsxPaths();
 
   return {
     command: process.execPath,
-    args: [tsxCliPath, supervisorPath],
+    args: [cliPath, webSupervisorPath],
   };
 }
 

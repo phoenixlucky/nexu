@@ -1,7 +1,29 @@
-export { formatSmokeMessage } from "./smoke/format-smoke-message.js";
-export { isSupportedDevCommand } from "./smoke/is-supported-dev-command.js";
+export { isSupportedDevCommand, supportedDevCommandList } from "./commands.js";
+export {
+  controllerSourceDirectoryPath,
+  controllerSupervisorPath,
+  controllerWorkingDirectoryPath,
+  controllerDevLockPath,
+  createRunId,
+  devLogsPath,
+  devTmpPath,
+  ensureDirectory,
+  ensureParentDirectory,
+  getControllerDevLogPath,
+  getDevLauncherTempPrefix,
+  getWebDevLogPath,
+  getWindowsLauncherBatchPath,
+  getWindowsLauncherScriptPath,
+  repoRootPath,
+  resolveTsxPaths,
+  resolveViteBinPath,
+  scriptsDevPath,
+  scriptsDevSourcePath,
+  webDevLockPath,
+  webSupervisorPath,
+  webWorkingDirectoryPath,
+} from "./paths.js";
 export { spawnHiddenProcess } from "./spawn-hidden-process.js";
-export { supportedDevCommands } from "./smoke/supported-dev-commands.js";
 export {
   readControllerDevLock,
   removeControllerDevLock,
@@ -27,4 +49,4 @@ export {
   startWebDevProcess,
   stopWebDevProcess,
 } from "./web-dev-process.js";
-export type { DevCommand } from "./smoke/supported-dev-commands.js";
+export type { DevCommand } from "./commands.js";

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 
 import { type DevLock, removeDevLock, writeDevLock } from "./dev-lock.js";
-import { controllerDevLockPath } from "./dev-paths.js";
+import { controllerDevLockPath } from "./paths.js";
 
 export function readControllerDevLock(): Promise<DevLock> {
   return readDevLock(controllerDevLockPath);

@@ -1,18 +1,12 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 
-import { removeWebDevLock, writeWebDevLock } from "@nexu/dev-utils";
+import {
+  removeWebDevLock,
+  resolveViteBinPath,
+  webWorkingDirectoryPath,
+  writeWebDevLock,
+} from "@nexu/dev-utils";
 
-const require = createRequire(import.meta.url);
-const repoRootPath = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "..",
-  "..",
-);
-const webWorkingDirectory = join(repoRootPath, "apps", "web");
 const runId = process.env.NEXU_DEV_WEB_RUN_ID;
 
 if (!runId) {
@@ -32,14 +26,9 @@ function createNodeOptions(): string {
 }
 
 function createWebWorkerCommand(): { command: string; args: string[] } {
-  const vitePackageJsonPath = require.resolve("vite/package.json", {
-    paths: [webWorkingDirectory],
-  });
-  const viteBinPath = join(dirname(vitePackageJsonPath), "bin", "vite.js");
-
   return {
     command: process.execPath,
-    args: [viteBinPath, "--strictPort"],
+    args: [resolveViteBinPath(), "--strictPort"],
   };
 }
 
@@ -97,7 +86,7 @@ async function removeRunningLock(): Promise<void> {
 async function startWorker(): Promise<void> {
   const commandSpec = createWebWorkerCommand();
   const child = spawn(commandSpec.command, commandSpec.args, {
-    cwd: webWorkingDirectory,
+    cwd: webWorkingDirectoryPath,
     env: {
       ...process.env,
       NODE_OPTIONS: createNodeOptions(),

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 
 import { type DevLock, removeDevLock, writeDevLock } from "./dev-lock.js";
-import { webDevLockPath } from "./dev-paths.js";
+import { webDevLockPath } from "./paths.js";
 
 export function readWebDevLock(): Promise<DevLock> {
   return readDevLock(webDevLockPath);

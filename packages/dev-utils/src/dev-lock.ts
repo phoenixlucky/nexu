@@ -1,6 +1,6 @@
 import { rm, writeFile } from "node:fs/promises";
 
-import { ensureParentDirectory } from "./dev-paths.js";
+import { ensureParentDirectory } from "./paths.js";
 
 export type DevLock = {
   pid: number;

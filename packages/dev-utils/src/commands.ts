@@ -7,6 +7,10 @@ export const supportedDevCommandList = [
   "help",
 ] as const;
 
-export const supportedDevCommands = new Set<string>(supportedDevCommandList);
-
 export type DevCommand = (typeof supportedDevCommandList)[number];
+
+const supportedDevCommands = new Set<string>(supportedDevCommandList);
+
+export function isSupportedDevCommand(command: string): boolean {
+  return supportedDevCommands.has(command);
+}

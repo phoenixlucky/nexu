@@ -1,23 +1,15 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
 import chokidar from "chokidar";
 
 import {
+  controllerSourceDirectoryPath,
+  controllerWorkingDirectoryPath,
   getControllerPortPid,
   removeControllerDevLock,
+  resolveTsxPaths,
   writeControllerDevLock,
 } from "@nexu/dev-utils";
 
-const require = createRequire(import.meta.url);
-const repoRootPath = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "..",
-  "..",
-);
-const controllerWorkingDirectory = join(repoRootPath, "apps", "controller");
 const runId = process.env.NEXU_DEV_CONTROLLER_RUN_ID;
 const logFilePath = process.env.NEXU_DEV_CONTROLLER_LOG_PATH;
 
@@ -41,22 +33,11 @@ function createNodeOptions(): string {
 }
 
 function createControllerWorkerCommand(): { command: string; args: string[] } {
-  const tsxPackageJsonPath = require.resolve("tsx/package.json", {
-    paths: [repoRootPath],
-  });
-  const tsxDistPath = join(dirname(tsxPackageJsonPath), "dist");
-  const tsxPreflightPath = join(tsxDistPath, "preflight.cjs");
-  const tsxLoaderPath = pathToFileURL(join(tsxDistPath, "loader.mjs")).href;
+  const { loaderUrl, preflightPath } = resolveTsxPaths();
 
   return {
     command: process.execPath,
-    args: [
-      "--require",
-      tsxPreflightPath,
-      "--import",
-      tsxLoaderPath,
-      "src/index.ts",
-    ],
+    args: ["--require", preflightPath, "--import", loaderUrl, "src/index.ts"],
   };
 }
 
@@ -139,7 +120,7 @@ async function removeRunningLock(): Promise<void> {
 async function startWorker(): Promise<void> {
   const commandSpec = createControllerWorkerCommand();
   const child = spawn(commandSpec.command, commandSpec.args, {
-    cwd: controllerWorkingDirectory,
+    cwd: controllerWorkingDirectoryPath,
     env: {
       ...process.env,
       NODE_OPTIONS: createNodeOptions(),
@@ -171,7 +152,7 @@ async function restartWorker(): Promise<void> {
   await startWorker();
 }
 
-const watcher = chokidar.watch(join(controllerWorkingDirectory, "src"), {
+const watcher = chokidar.watch(controllerSourceDirectoryPath, {
   ignoreInitial: true,
 });
 

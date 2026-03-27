@@ -1,7 +1,5 @@
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
 
 import { ensure } from "@nexu/shared";
 
@@ -11,14 +9,14 @@ import {
   writeControllerDevLock,
 } from "./controller-dev-lock.js";
 import {
+  controllerSupervisorPath,
   createRunId,
   ensureParentDirectory,
   getControllerDevLogPath,
   repoRootPath,
-} from "./dev-paths.js";
+  resolveTsxPaths,
+} from "./paths.js";
 import { spawnHiddenProcess } from "./spawn-hidden-process.js";
-
-const require = createRequire(import.meta.url);
 
 export type ControllerDevSnapshot = {
   service: "controller";
@@ -40,21 +38,11 @@ function createNodeOptions(): string {
 }
 
 function createControllerCommand(): { command: string; args: string[] } {
-  const tsxPackageJsonPath = require.resolve("tsx/package.json", {
-    paths: [repoRootPath],
-  });
-  const tsxCliPath = join(dirname(tsxPackageJsonPath), "dist", "cli.mjs");
-  const supervisorPath = join(
-    repoRootPath,
-    "scripts",
-    "dev",
-    "src",
-    "controller-supervisor.ts",
-  );
+  const { cliPath } = resolveTsxPaths();
 
   return {
     command: process.execPath,
-    args: [tsxCliPath, supervisorPath],
+    args: [cliPath, controllerSupervisorPath],
   };
 }
 

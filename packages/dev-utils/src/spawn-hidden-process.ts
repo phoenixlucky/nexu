@@ -1,10 +1,14 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { closeSync, openSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 
 import { ensure } from "@nexu/shared";
+
+import {
+  getDevLauncherTempPrefix,
+  getWindowsLauncherBatchPath,
+  getWindowsLauncherScriptPath,
+} from "./paths.js";
 
 type SpawnHiddenProcessArgs = {
   command: string;
@@ -31,9 +35,9 @@ async function spawnWindowsHiddenProcess({
   env,
   logFilePath,
 }: SpawnHiddenProcessArgs): Promise<HiddenProcessHandle> {
-  const launcherDirectory = await mkdtemp(join(tmpdir(), "nexu-dev-"));
-  const batchPath = join(launcherDirectory, "launcher.cmd");
-  const launcherPath = join(launcherDirectory, "launcher.vbs");
+  const launcherDirectory = await mkdtemp(getDevLauncherTempPrefix());
+  const batchPath = getWindowsLauncherBatchPath(launcherDirectory);
+  const launcherPath = getWindowsLauncherScriptPath(launcherDirectory);
   const commandText = [command, ...args].map(quoteForCmd).join(" ");
   const batchSource = [
     "@echo off",
