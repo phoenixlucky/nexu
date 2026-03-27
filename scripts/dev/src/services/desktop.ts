@@ -1,33 +1,30 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { closeSync, existsSync, openSync } from "node:fs";
+import { createRequire } from "node:module";
+import { join } from "node:path";
 
 import {
   createNodeOptions,
+  ensureParentDirectory,
   readDevLock,
   removeDevLock,
+  repoRootPath,
+  terminateProcess,
+  waitForProcessStart,
   writeDevLock,
 } from "@nexu/dev-utils";
 import { ensure } from "@nexu/shared";
 
 import { createDesktopInjectedEnv } from "../shared/dev-runtime-config.js";
+import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
 import {
-  type DevLogTail,
-  readDesktopSessionLogTailFromFile,
-} from "../shared/logs.js";
-import {
-  desktopDevCliPath,
   desktopDevLockPath,
+  desktopWorkingDirectoryPath,
   getDesktopDevLogPath,
-  getDesktopDevStatePath,
+  getDesktopRuntimeRootPath,
 } from "../shared/paths.js";
 
-type DesktopManagerState = {
-  launchId?: string;
-  electronPid?: number | null;
-  startedAt?: string;
-  runtimeRoot?: string;
-  platform?: string;
-};
+const require = createRequire(import.meta.url);
 
 export type DesktopDevSnapshot = {
   service: "desktop";
@@ -48,32 +45,44 @@ function isPidRunning(pid: number): boolean {
   }
 }
 
-async function readDesktopManagerState(): Promise<DesktopManagerState | null> {
-  try {
-    const content = await readFile(getDesktopDevStatePath(), "utf8");
-    return JSON.parse(content) as DesktopManagerState;
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
-      return null;
-    }
+function resolveElectronExecutablePath(): string {
+  const electronEntryPath = require.resolve("electron", {
+    paths: [desktopWorkingDirectoryPath, repoRootPath],
+  });
+  const electronExecutablePath = require(electronEntryPath) as string;
 
-    throw error;
-  }
+  ensure(
+    typeof electronExecutablePath === "string" &&
+      electronExecutablePath.length > 0,
+  ).orThrow(() => new Error("unable to resolve electron executable path"));
+
+  return electronExecutablePath;
 }
 
-async function runDesktopDevCli(
-  command: "start" | "stop" | "restart",
-): Promise<void> {
+function hasDesktopBuildArtifacts(): boolean {
+  return [
+    join(desktopWorkingDirectoryPath, "dist", "index.html"),
+    join(desktopWorkingDirectoryPath, "dist-electron", "main", "bootstrap.js"),
+  ].every((filePath) => existsSync(filePath));
+}
+
+async function runDesktopBuild(logFilePath: string): Promise<void> {
+  const stdoutFd = openSync(logFilePath, "a");
+
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(process.execPath, [desktopDevCliPath, command], {
-      env: {
-        ...process.env,
-        NODE_OPTIONS: createNodeOptions(),
-        ...createDesktopInjectedEnv(),
+    const child = spawn(
+      process.platform === "win32" ? "pnpm.cmd" : "pnpm",
+      ["--dir", desktopWorkingDirectoryPath, "build"],
+      {
+        cwd: repoRootPath,
+        env: {
+          ...process.env,
+          NODE_OPTIONS: createNodeOptions(),
+        },
+        stdio: ["ignore", stdoutFd, stdoutFd],
+        windowsHide: true,
       },
-      stdio: "inherit",
-      windowsHide: true,
-    });
+    );
 
     child.once("error", reject);
     child.once("exit", (code) => {
@@ -82,13 +91,62 @@ async function runDesktopDevCli(
         return;
       }
 
-      reject(
-        new Error(
-          `desktop dev command failed: ${command} (exit ${String(code ?? 1)})`,
-        ),
-      );
+      reject(new Error(`desktop build failed (exit ${String(code ?? 1)})`));
     });
+  }).finally(() => {
+    closeSync(stdoutFd);
   });
+}
+
+function createDesktopLaunchEnv(launchId: string): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    NODE_OPTIONS: createNodeOptions(),
+    ...createDesktopInjectedEnv(),
+    NEXU_WORKSPACE_ROOT: repoRootPath,
+    NEXU_DESKTOP_APP_ROOT: desktopWorkingDirectoryPath,
+    NEXU_DESKTOP_RUNTIME_ROOT: getDesktopRuntimeRootPath(),
+    NEXU_DESKTOP_BUILD_SOURCE:
+      process.env.NEXU_DESKTOP_BUILD_SOURCE ?? "local-dev",
+    NEXU_DESKTOP_BUILD_BRANCH:
+      process.env.NEXU_DESKTOP_BUILD_BRANCH ?? "unknown",
+    NEXU_DESKTOP_BUILD_COMMIT:
+      process.env.NEXU_DESKTOP_BUILD_COMMIT ?? "unknown",
+    NEXU_DESKTOP_BUILD_TIME:
+      process.env.NEXU_DESKTOP_BUILD_TIME ?? new Date().toISOString(),
+    NEXU_DESKTOP_LAUNCH_ID: launchId,
+  };
+}
+
+async function launchDesktopProcess(options: {
+  launchId: string;
+  logFilePath: string;
+}): Promise<number> {
+  const stdoutFd = openSync(options.logFilePath, "a");
+  const child = spawn(
+    resolveElectronExecutablePath(),
+    [desktopWorkingDirectoryPath],
+    {
+      cwd: repoRootPath,
+      env: createDesktopLaunchEnv(options.launchId),
+      detached: true,
+      stdio: ["ignore", stdoutFd, stdoutFd],
+      windowsHide: true,
+    },
+  );
+
+  try {
+    await waitForProcessStart(child, "desktop dev process");
+  } finally {
+    child.unref();
+    closeSync(stdoutFd);
+  }
+
+  ensure(Boolean(child.pid)).orThrow(
+    () => new Error("desktop dev process did not expose an electron pid"),
+  );
+
+  return child.pid as number;
 }
 
 export async function startDesktopDevProcess(options: {
@@ -103,32 +161,34 @@ export async function startDesktopDevProcess(options: {
       ),
   );
 
-  await runDesktopDevCli("start");
-
-  const state = await readDesktopManagerState();
-  const pid = state?.electronPid;
-
-  ensure(Boolean(pid)).orThrow(
-    () => new Error("desktop dev process did not expose an electron pid"),
-  );
-
   const runId = options.sessionId;
   const sessionId = options.sessionId;
+  const launchId = `desktop-launch-${Date.now()}`;
+  const logFilePath = getDesktopDevLogPath(runId);
+
+  await ensureParentDirectory(logFilePath);
+
+  if (!hasDesktopBuildArtifacts()) {
+    await runDesktopBuild(logFilePath);
+  }
+
+  const pid = await launchDesktopProcess({ launchId, logFilePath });
 
   await writeDevLock(desktopDevLockPath, {
-    pid: pid as number,
+    pid,
     runId,
     sessionId,
+    launchId,
   });
 
   return {
     service: "desktop",
     status: "running",
-    pid: pid as number,
-    launchId: state?.launchId,
+    pid,
+    launchId,
     runId,
     sessionId,
-    logFilePath: getDesktopDevLogPath(),
+    logFilePath,
   };
 }
 
@@ -139,7 +199,7 @@ export async function stopDesktopDevProcess(): Promise<DesktopDevSnapshot> {
     () => new Error("desktop dev process is not running"),
   );
 
-  await runDesktopDevCli("stop");
+  await terminateProcess(snapshot.pid as number);
   await removeDevLock(desktopDevLockPath);
 
   return snapshot;
@@ -148,93 +208,59 @@ export async function stopDesktopDevProcess(): Promise<DesktopDevSnapshot> {
 export async function restartDesktopDevProcess(options: {
   sessionId: string;
 }): Promise<DesktopDevSnapshot> {
-  await runDesktopDevCli("restart");
+  const snapshot = await getCurrentDesktopDevSnapshot();
 
-  const state = await readDesktopManagerState();
-  const pid = state?.electronPid;
+  if (snapshot.status === "running") {
+    await stopDesktopDevProcess();
+  }
 
-  ensure(Boolean(pid)).orThrow(
-    () => new Error("desktop dev process did not expose an electron pid"),
-  );
-
-  const runId = options.sessionId;
-  const sessionId = options.sessionId;
-
-  await writeDevLock(desktopDevLockPath, {
-    pid: pid as number,
-    runId,
-    sessionId,
-  });
-
-  return {
-    service: "desktop",
-    status: "running",
-    pid: pid as number,
-    launchId: state?.launchId,
-    runId,
-    sessionId,
-    logFilePath: getDesktopDevLogPath(),
-  };
+  return startDesktopDevProcess(options);
 }
 
 export async function getCurrentDesktopDevSnapshot(): Promise<DesktopDevSnapshot> {
-  const logFilePath = getDesktopDevLogPath();
-  const state = await readDesktopManagerState();
-
-  if (!state?.electronPid) {
-    return {
-      service: "desktop",
-      status: "stopped",
-    };
-  }
-
-  let lockRunId: string | undefined;
-  let lockSessionId: string | undefined;
-
   try {
     const lock = await readDevLock(desktopDevLockPath);
-    lockRunId = lock.runId;
-    lockSessionId = lock.sessionId;
-  } catch (error) {
-    if (
-      !(error instanceof Error && "code" in error && error.code === "ENOENT")
-    ) {
-      throw error;
-    }
-  }
+    const logFilePath = getDesktopDevLogPath(lock.runId);
 
-  if (!isPidRunning(state.electronPid)) {
+    if (!isPidRunning(lock.pid)) {
+      return {
+        service: "desktop",
+        status: "stale",
+        pid: lock.pid,
+        launchId: lock.launchId,
+        runId: lock.runId,
+        sessionId: lock.sessionId,
+        logFilePath,
+      };
+    }
+
     return {
       service: "desktop",
-      status: "stale",
-      pid: state.electronPid,
-      launchId: state.launchId,
-      runId: lockRunId,
-      sessionId: lockSessionId,
+      status: "running",
+      pid: lock.pid,
+      launchId: lock.launchId,
+      runId: lock.runId,
+      sessionId: lock.sessionId,
       logFilePath,
     };
-  }
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return {
+        service: "desktop",
+        status: "stopped",
+      };
+    }
 
-  return {
-    service: "desktop",
-    status: "running",
-    pid: state.electronPid,
-    launchId: state.launchId,
-    runId: lockRunId,
-    sessionId: lockSessionId,
-    logFilePath,
-  };
+    throw error;
+  }
 }
 
 export async function readDesktopDevLog(): Promise<DevLogTail> {
   const snapshot = await getCurrentDesktopDevSnapshot();
 
-  ensure(Boolean(snapshot.logFilePath) && Boolean(snapshot.launchId)).orThrow(
-    () => new Error("desktop dev session log is unavailable"),
+  ensure(Boolean(snapshot.logFilePath)).orThrow(
+    () => new Error("desktop dev log is unavailable"),
   );
 
-  return readDesktopSessionLogTailFromFile({
-    launchId: snapshot.launchId as string,
-    logFilePath: snapshot.logFilePath as string,
-  });
+  return readLogTailFromFile(snapshot.logFilePath as string);
 }

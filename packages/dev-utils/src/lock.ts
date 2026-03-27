@@ -6,6 +6,7 @@ export type DevLock = {
   pid: number;
   runId: string;
   sessionId?: string;
+  launchId?: string;
 };
 
 export async function writeDevLock(
