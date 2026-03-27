@@ -180,6 +180,22 @@ export function createOpenclawInjectedEnv(): NodeJS.ProcessEnv {
   };
 }
 
+export function createDesktopInjectedEnv(): NodeJS.ProcessEnv {
+  const config = getScriptsDevRuntimeConfig();
+
+  return {
+    NEXU_DESKTOP_RUNTIME_MODE: "external",
+    NEXU_DESKTOP_EXTERNAL_RUNTIME: "1",
+    NEXU_CONTROLLER_PORT: String(config.controllerPort),
+    NEXU_CONTROLLER_URL: config.controllerUrl,
+    NEXU_WEB_PORT: String(config.webPort),
+    NEXU_WEB_URL: config.webUrl,
+    NEXU_OPENCLAW_BASE_URL: config.openclawBaseUrl,
+    NEXU_OPENCLAW_GATEWAY_TOKEN: config.openclawGatewayToken,
+    NEXU_HOME: config.nexuHomeDir,
+  };
+}
+
 export function getScriptsDevEnvPath(): string {
   return scriptsDevEnvPath;
 }

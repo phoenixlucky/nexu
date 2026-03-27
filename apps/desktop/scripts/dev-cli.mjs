@@ -17,7 +17,6 @@ const logFile = resolve(logDir, "desktop-dev.log");
 const timelineFile = resolve(logDir, "desktop-startup-timeline.log");
 const managerDir = resolve(runtimeRoot, "manager");
 const stateFile = resolve(managerDir, "state.json");
-const defaultPorts = [18789, 50800, 50810];
 const cliFlags = new Set(process.argv.slice(3));
 const sidecarRoot = resolve(rootDir, ".tmp", "sidecars");
 
@@ -116,6 +115,42 @@ function shouldReuseBuildArtifacts() {
   }
 
   return !isEnvFlagEnabled("NEXU_DESKTOP_DISABLE_BUILD_REUSE");
+}
+
+function getRuntimeMode() {
+  const explicitMode = process.env.NEXU_DESKTOP_RUNTIME_MODE?.trim();
+  if (explicitMode === "external") {
+    return "external";
+  }
+
+  if (isEnvFlagEnabled("NEXU_DESKTOP_EXTERNAL_RUNTIME")) {
+    return "external";
+  }
+
+  return "internal";
+}
+
+function readPort(value, fallback) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getRuntimePorts() {
+  const controllerPort = readPort(
+    process.env.NEXU_CONTROLLER_PORT ?? process.env.NEXU_API_PORT,
+    50800,
+  );
+  const webPort = readPort(process.env.NEXU_WEB_PORT, 50810);
+
+  let openclawPort = 18789;
+  try {
+    const url = new URL(
+      process.env.NEXU_OPENCLAW_BASE_URL ?? "http://127.0.0.1:18789",
+    );
+    openclawPort = readPort(url.port, 18789);
+  } catch {}
+
+  return [openclawPort, controllerPort, webPort];
 }
 
 function createLauncherEnv() {
@@ -287,19 +322,25 @@ async function removeState() {
 }
 
 function hasReusableArtifacts() {
-  const requiredPaths = [
-    resolve(rootDir, "packages/shared/dist/index.js"),
-    resolve(rootDir, "apps/controller/dist/index.js"),
-    resolve(rootDir, "apps/web/dist/index.html"),
-    resolve(appDir, "dist/index.html"),
-    resolve(appDir, "dist-electron/main/bootstrap.js"),
-    resolve(rootDir, ".tmp/sidecars/controller/dist/index.js"),
-    resolve(
-      rootDir,
-      ".tmp/sidecars/openclaw/node_modules/openclaw/openclaw.mjs",
-    ),
-    resolve(rootDir, ".tmp/sidecars/web/index.js"),
-  ];
+  const requiredPaths =
+    getRuntimeMode() === "external"
+      ? [
+          resolve(appDir, "dist/index.html"),
+          resolve(appDir, "dist-electron/main/bootstrap.js"),
+        ]
+      : [
+          resolve(rootDir, "packages/shared/dist/index.js"),
+          resolve(rootDir, "apps/controller/dist/index.js"),
+          resolve(rootDir, "apps/web/dist/index.html"),
+          resolve(appDir, "dist/index.html"),
+          resolve(appDir, "dist-electron/main/bootstrap.js"),
+          resolve(rootDir, ".tmp/sidecars/controller/dist/index.js"),
+          resolve(
+            rootDir,
+            ".tmp/sidecars/openclaw/node_modules/openclaw/openclaw.mjs",
+          ),
+          resolve(rootDir, ".tmp/sidecars/web/index.js"),
+        ];
 
   return requiredPaths.every((filePath) => existsSync(filePath));
 }
@@ -560,9 +601,11 @@ async function killResidualProcesses() {
       await killPid(state.electronPid);
     }
 
-    const portPids = listListeningPids(defaultPorts);
-    for (const pid of portPids) {
-      await killPid(pid);
+    if (getRuntimeMode() !== "external") {
+      const portPids = listListeningPids(getRuntimePorts());
+      for (const pid of portPids) {
+        await killPid(pid);
+      }
     }
 
     await removeState();
@@ -572,43 +615,48 @@ async function killResidualProcesses() {
 async function buildRuntime() {
   const launcherEnv = createLauncherEnv();
   const webBuildEnv = createWebBuildEnv();
+  const runtimeMode = getRuntimeMode();
 
   await runTimedPhase("build_runtime", async () => {
-    await log("building runtime artifacts");
-    await logTimeline("build_runtime shared build start");
-    await runLogged(
-      pnpmCommand,
-      ["--dir", rootDir, "--filter", "@nexu/shared", "build"],
-      { env: launcherEnv },
-    );
-    await logTimeline("build_runtime controller build start");
-    await runLogged(
-      pnpmCommand,
-      ["--dir", rootDir, "--filter", "@nexu/controller", "build"],
-      { env: launcherEnv },
-    );
-    await logTimeline("build_runtime web build start");
-    await runLogged(
-      pnpmCommand,
-      ["--dir", rootDir, "--filter", "@nexu/web", "build"],
-      { env: webBuildEnv },
-    );
-    await logTimeline("build_runtime controller sidecar start");
-    await runLogged(
-      pnpmCommand,
-      ["--dir", appDir, "prepare:controller-sidecar"],
-      { env: launcherEnv },
-    );
-    await logTimeline("build_runtime openclaw sidecar start");
-    await runLogged(
-      pnpmCommand,
-      ["--dir", appDir, "prepare:openclaw-sidecar"],
-      { env: launcherEnv },
-    );
-    await logTimeline("build_runtime web sidecar start");
-    await runLogged(pnpmCommand, ["--dir", appDir, "prepare:web-sidecar"], {
-      env: launcherEnv,
-    });
+    await log(`building runtime artifacts mode=${runtimeMode}`);
+
+    if (runtimeMode !== "external") {
+      await logTimeline("build_runtime shared build start");
+      await runLogged(
+        pnpmCommand,
+        ["--dir", rootDir, "--filter", "@nexu/shared", "build"],
+        { env: launcherEnv },
+      );
+      await logTimeline("build_runtime controller build start");
+      await runLogged(
+        pnpmCommand,
+        ["--dir", rootDir, "--filter", "@nexu/controller", "build"],
+        { env: launcherEnv },
+      );
+      await logTimeline("build_runtime web build start");
+      await runLogged(
+        pnpmCommand,
+        ["--dir", rootDir, "--filter", "@nexu/web", "build"],
+        { env: webBuildEnv },
+      );
+      await logTimeline("build_runtime controller sidecar start");
+      await runLogged(
+        pnpmCommand,
+        ["--dir", appDir, "prepare:controller-sidecar"],
+        { env: launcherEnv },
+      );
+      await logTimeline("build_runtime openclaw sidecar start");
+      await runLogged(
+        pnpmCommand,
+        ["--dir", appDir, "prepare:openclaw-sidecar"],
+        { env: launcherEnv },
+      );
+      await logTimeline("build_runtime web sidecar start");
+      await runLogged(pnpmCommand, ["--dir", appDir, "prepare:web-sidecar"], {
+        env: launcherEnv,
+      });
+    }
+
     await logTimeline("build_runtime desktop build start");
     await runLogged(pnpmCommand, ["--dir", appDir, "build"], {
       env: launcherEnv,
@@ -749,7 +797,7 @@ async function status() {
     console.log(`[${timestamp()}] desktop process is not running`);
   }
 
-  const portPids = listListeningPids(defaultPorts);
+  const portPids = listListeningPids(getRuntimePorts());
   if (portPids.length > 0) {
     console.log(`listening pids: ${portPids.join(", ")}`);
   }

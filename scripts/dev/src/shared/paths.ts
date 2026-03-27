@@ -10,6 +10,11 @@ export const controllerWorkingDirectoryPath = join(
   "apps",
   "controller",
 );
+export const desktopWorkingDirectoryPath = join(
+  repoRootPath,
+  "apps",
+  "desktop",
+);
 export const webWorkingDirectoryPath = join(repoRootPath, "apps", "web");
 export const openclawWorkingDirectoryPath = repoRootPath;
 
@@ -28,12 +33,18 @@ export const openclawSupervisorPath = join(
   "supervisors",
   "openclaw.ts",
 );
+export const desktopDevCliPath = join(
+  desktopWorkingDirectoryPath,
+  "scripts",
+  "dev-cli.mjs",
+);
 export const controllerSourceDirectoryPath = join(
   controllerWorkingDirectoryPath,
   "src",
 );
 
 export const controllerDevLockPath = join(devTmpPath, "controller.pid");
+export const desktopDevLockPath = join(devTmpPath, "desktop.pid");
 export const webDevLockPath = join(devTmpPath, "web.pid");
 export const openclawDevLockPath = join(devTmpPath, "openclaw.pid");
 
@@ -45,6 +56,14 @@ export function getWebDevLogPath(runId: string): string {
   return join(devLogsPath, runId, "web.log");
 }
 
+export function getDesktopDevLogPath(): string {
+  return join(repoRootPath, ".tmp", "logs", "desktop-dev.log");
+}
+
 export function getOpenclawDevLogPath(runId: string): string {
   return join(devLogsPath, runId, "openclaw.log");
+}
+
+export function getDesktopDevStatePath(): string {
+  return join(repoRootPath, ".tmp", "desktop", "manager", "state.json");
 }

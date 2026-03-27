@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-
 import {
   createNodeOptions,
   ensureParentDirectory,
@@ -20,6 +18,7 @@ import {
   createControllerInjectedEnv,
   getScriptsDevRuntimeConfig,
 } from "../shared/dev-runtime-config.js";
+import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
 import {
   controllerDevLockPath,
   controllerSupervisorPath,
@@ -83,7 +82,7 @@ export async function startControllerDevProcess(options: {
   ensure(existingSnapshot.status !== "running").orThrow(
     () =>
       new Error(
-        "controller dev process is already running; run `pnpm dev stop` first",
+        "controller dev process is already running; run `pnpm dev stop controller` first",
       ),
   );
 
@@ -219,12 +218,12 @@ export async function getCurrentControllerDevSnapshot(): Promise<ControllerDevSn
   }
 }
 
-export async function readControllerDevLog(): Promise<string> {
+export async function readControllerDevLog(): Promise<DevLogTail> {
   const snapshot = await getCurrentControllerDevSnapshot();
 
   ensure(Boolean(snapshot.logFilePath)).orThrow(
     () => new Error("controller dev log is unavailable"),
   );
 
-  return readFile(snapshot.logFilePath as string, "utf8");
+  return readLogTailFromFile(snapshot.logFilePath as string);
 }

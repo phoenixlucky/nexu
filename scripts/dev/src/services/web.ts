@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-
 import {
   createNodeOptions,
   ensureDirectory,
@@ -21,6 +19,7 @@ import {
   createWebInjectedEnv,
   getScriptsDevRuntimeConfig,
 } from "../shared/dev-runtime-config.js";
+import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
 import {
   getWebDevLogPath,
   webDevLockPath,
@@ -84,7 +83,7 @@ export async function startWebDevProcess(options: {
   ensure(existingSnapshot.status !== "running").orThrow(
     () =>
       new Error(
-        "web dev process is already running; run `pnpm dev stop` first",
+        "web dev process is already running; run `pnpm dev stop web` first",
       ),
   );
 
@@ -216,12 +215,12 @@ export async function getCurrentWebDevSnapshot(): Promise<WebDevSnapshot> {
   }
 }
 
-export async function readWebDevLog(): Promise<string> {
+export async function readWebDevLog(): Promise<DevLogTail> {
   const snapshot = await getCurrentWebDevSnapshot();
 
   ensure(Boolean(snapshot.logFilePath)).orThrow(
     () => new Error("web dev log is unavailable"),
   );
 
-  return readFile(snapshot.logFilePath as string, "utf8");
+  return readLogTailFromFile(snapshot.logFilePath as string);
 }

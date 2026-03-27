@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-
 import {
   createNodeOptions,
   ensureDirectory,
@@ -21,6 +19,7 @@ import {
   createOpenclawInjectedEnv,
   getScriptsDevRuntimeConfig,
 } from "../shared/dev-runtime-config.js";
+import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
 import {
   getOpenclawDevLogPath,
   openclawDevLockPath,
@@ -84,7 +83,7 @@ export async function startOpenclawDevProcess(options: {
   ensure(existingSnapshot.status !== "running").orThrow(
     () =>
       new Error(
-        "openclaw dev process is already running; run `pnpm dev stop` first",
+        "openclaw dev process is already running; run `pnpm dev stop openclaw` first",
       ),
   );
 
@@ -224,12 +223,12 @@ export async function getCurrentOpenclawDevSnapshot(): Promise<OpenclawDevSnapsh
   }
 }
 
-export async function readOpenclawDevLog(): Promise<string> {
+export async function readOpenclawDevLog(): Promise<DevLogTail> {
   const snapshot = await getCurrentOpenclawDevSnapshot();
 
   ensure(Boolean(snapshot.logFilePath)).orThrow(
     () => new Error("openclaw dev log is unavailable"),
   );
 
-  return readFile(snapshot.logFilePath as string, "utf8");
+  return readLogTailFromFile(snapshot.logFilePath as string);
 }
