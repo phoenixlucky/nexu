@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
+import { ensure } from "@nexu/shared";
+
 import {
   readControllerDevLock,
   removeControllerDevLock,
@@ -185,11 +187,12 @@ export async function startControllerDevProcess(): Promise<ControllerDevSnapshot
   try {
     const existingSnapshot = await getCurrentControllerDevSnapshot();
 
-    if (existingSnapshot.status === "running") {
-      throw new Error(
-        "controller dev process is already running; run `pnpm dev stop` first",
-      );
-    }
+    ensure(existingSnapshot.status !== "running").orThrow(
+      () =>
+        new Error(
+          "controller dev process is already running; run `pnpm dev stop` first",
+        ),
+    );
   } catch (error) {
     if (
       !(error instanceof Error) ||
@@ -227,21 +230,22 @@ export async function startControllerDevProcess(): Promise<ControllerDevSnapshot
     processHandle.dispose();
   }
 
-  if (!processHandle.pid) {
-    throw new Error("controller dev process did not expose a pid");
-  }
+  ensure(Boolean(processHandle.pid)).orThrow(
+    () => new Error("controller dev process did not expose a pid"),
+  );
+  const supervisorPid = processHandle.pid as number;
 
   const workerPid = await waitForControllerPortPid();
 
   await writeControllerDevLock({
-    pid: processHandle.pid,
+    pid: supervisorPid,
     runId,
   });
 
   return {
     service: "controller",
     status: "running",
-    pid: processHandle.pid,
+    pid: supervisorPid,
     workerPid,
     runId,
     logFilePath,
@@ -251,11 +255,12 @@ export async function startControllerDevProcess(): Promise<ControllerDevSnapshot
 export async function stopControllerDevProcess(): Promise<ControllerDevSnapshot> {
   const snapshot = await getCurrentControllerDevSnapshot();
 
-  if (snapshot.status !== "running" || !snapshot.pid) {
-    throw new Error("controller dev process is not running");
-  }
+  ensure(snapshot.status === "running" && Boolean(snapshot.pid)).orThrow(
+    () => new Error("controller dev process is not running"),
+  );
+  const supervisorPid = snapshot.pid as number;
 
-  await terminateProcess(snapshot.pid);
+  await terminateProcess(supervisorPid);
 
   try {
     const workerPid = await getControllerPortPid();
@@ -333,9 +338,10 @@ export async function getCurrentControllerDevSnapshot(): Promise<ControllerDevSn
 export async function readControllerDevLog(): Promise<string> {
   const snapshot = await getCurrentControllerDevSnapshot();
 
-  if (!snapshot.logFilePath) {
-    throw new Error("controller dev log is unavailable");
-  }
+  ensure(Boolean(snapshot.logFilePath)).orThrow(
+    () => new Error("controller dev log is unavailable"),
+  );
+  const logFilePath = snapshot.logFilePath as string;
 
-  return readFile(snapshot.logFilePath, "utf8");
+  return readFile(logFilePath, "utf8");
 }

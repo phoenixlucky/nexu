@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
+import { ensure } from "@nexu/shared";
+
 import {
   createRunId,
   ensureDirectory,
@@ -186,11 +188,12 @@ export async function startWebDevProcess(): Promise<WebDevSnapshot> {
   try {
     const existingSnapshot = await getCurrentWebDevSnapshot();
 
-    if (existingSnapshot.status === "running") {
-      throw new Error(
-        "web dev process is already running; run `pnpm dev stop` first",
-      );
-    }
+    ensure(existingSnapshot.status !== "running").orThrow(
+      () =>
+        new Error(
+          "web dev process is already running; run `pnpm dev stop` first",
+        ),
+    );
   } catch (error) {
     if (
       !(error instanceof Error) ||
@@ -248,11 +251,12 @@ export async function startWebDevProcess(): Promise<WebDevSnapshot> {
 export async function stopWebDevProcess(): Promise<WebDevSnapshot> {
   const snapshot = await getCurrentWebDevSnapshot();
 
-  if (snapshot.status !== "running" || !snapshot.pid) {
-    throw new Error("web dev process is not running");
-  }
+  ensure(snapshot.status === "running" && Boolean(snapshot.pid)).orThrow(
+    () => new Error("web dev process is not running"),
+  );
+  const supervisorPid = snapshot.pid as number;
 
-  await terminateProcess(snapshot.pid);
+  await terminateProcess(supervisorPid);
 
   try {
     const listenerPid = await getWebPortPid();
@@ -330,9 +334,10 @@ export async function getCurrentWebDevSnapshot(): Promise<WebDevSnapshot> {
 export async function readWebDevLog(): Promise<string> {
   const snapshot = await getCurrentWebDevSnapshot();
 
-  if (!snapshot.logFilePath) {
-    throw new Error("web dev log is unavailable");
-  }
+  ensure(Boolean(snapshot.logFilePath)).orThrow(
+    () => new Error("web dev log is unavailable"),
+  );
+  const logFilePath = snapshot.logFilePath as string;
 
-  return readFile(snapshot.logFilePath, "utf8");
+  return readFile(logFilePath, "utf8");
 }

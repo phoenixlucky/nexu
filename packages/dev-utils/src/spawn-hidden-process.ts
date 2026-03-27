@@ -4,6 +4,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { ensure } from "@nexu/shared";
+
 type SpawnHiddenProcessArgs = {
   command: string;
   args: string[];
@@ -62,15 +64,19 @@ async function spawnWindowsHiddenProcess({
 
   if (!child.pid) {
     await rm(launcherDirectory, { recursive: true, force: true });
-    throw new Error("hidden process did not expose a pid");
   }
+
+  ensure(Boolean(child.pid)).orThrow(
+    () => new Error("hidden process did not expose a pid"),
+  );
+  const pid = child.pid as number;
 
   child.once("exit", () => {
     void rm(launcherDirectory, { recursive: true, force: true });
   });
 
   return {
-    pid: child.pid,
+    pid,
     child,
     dispose: () => {
       child.unref();
@@ -96,11 +102,15 @@ function spawnPosixHiddenProcess({
 
   if (!child.pid) {
     closeSync(logFd);
-    throw new Error("hidden process did not expose a pid");
   }
 
+  ensure(Boolean(child.pid)).orThrow(
+    () => new Error("hidden process did not expose a pid"),
+  );
+  const pid = child.pid as number;
+
   return {
-    pid: child.pid,
+    pid,
     child,
     dispose: () => {
       child.unref();
