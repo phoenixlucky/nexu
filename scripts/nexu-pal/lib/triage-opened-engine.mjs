@@ -116,10 +116,6 @@ function sanitizeJsonResponse(raw) {
   return raw.replace(/^```(?:json)?\s*\n?/m, "").replace(/\n?```\s*$/m, "");
 }
 
-function isInternalIssueAuthor(authorAssociation) {
-  return authorAssociation === "MEMBER" || authorAssociation === "OWNER";
-}
-
 async function detectAndTranslate({ chat, issueTitle, issueBody }) {
   const content = `Title: ${issueTitle}\n\nBody:\n${issueBody}`;
 
@@ -253,6 +249,9 @@ function buildNeedsInformationComment({ missingItems, reason }) {
 export async function buildOpenedIssueTriagePlan({
   issueTitle,
   issueBody,
+  isInternalAuthor,
+  issueAuthorLogin,
+  repositoryOwner,
   issueAuthorAssociation,
   chat,
 }) {
@@ -320,10 +319,15 @@ export async function buildOpenedIssueTriagePlan({
   plan.diagnostics.push(
     `author association: ${issueAuthorAssociation ?? "unknown"}`,
   );
+  plan.diagnostics.push(`issue author login: ${issueAuthorLogin ?? "unknown"}`);
+  plan.diagnostics.push(`repository owner: ${repositoryOwner ?? "unknown"}`);
+  plan.diagnostics.push(
+    `organization membership: ${isInternalAuthor === true ? "member" : "non-member"}`,
+  );
 
-  if (isInternalIssueAuthor(issueAuthorAssociation)) {
+  if (isInternalAuthor === true) {
     plan.diagnostics.push(
-      "internal author detected; skipped roadmap/duplicate/completeness/needs-triage checks",
+      "organization member detected; skipped roadmap/duplicate/completeness/needs-triage checks",
     );
     return plan;
   }

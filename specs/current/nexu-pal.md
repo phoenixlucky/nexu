@@ -22,7 +22,7 @@ Runs in order:
 
 3. **Intent classification** — Sends the normalized English title and body to the LLM and assigns only the `bug` label when the issue clearly describes broken behavior.
 
-4. **Internal-member short-circuit** — If `issue.author_association` is `MEMBER` or `OWNER`, the opened-issue flow stops after translation + bug classification. Internal issues skip known-issue matching, completeness checks, and `needs-triage` labeling.
+4. **Internal-member short-circuit** — The workflow checks whether `issue.user.login` belongs to the repository owner's GitHub organization via the org-membership API. If the author is an org member, the opened-issue flow stops after translation + bug classification. Internal issues skip known-issue matching, completeness checks, and `needs-triage` labeling.
 
 5. **Completeness check** — For non-internal authors, uses the LLM to decide whether the issue is too incomplete to continue triage. If so, adds `needs-information`, posts a follow-up comment, and pauses there.
 
