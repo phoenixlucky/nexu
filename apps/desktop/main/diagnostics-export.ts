@@ -255,8 +255,8 @@ function runCommand(
     timeout: 5000,
   });
 
-  const stdout = result.stdout.trim();
-  const stderr = result.stderr.trim();
+  const stdout = result.stdout?.trim() ?? "";
+  const stderr = result.stderr?.trim() ?? "";
 
   return {
     binaryPath,
@@ -614,12 +614,16 @@ async function collectArtifacts(
   }
 
   if (desktopDiagnosticsSummary) {
-    entries.push({
-      name: `${archiveRoot}/summary/startup-probe-summary.json`,
-      data: Buffer.from(
+    const redactedStartupProbeSummary = redactJsonBuffer(
+      Buffer.from(
         `${JSON.stringify(desktopDiagnosticsSummary, null, 2)}\n`,
         "utf8",
       ),
+    );
+
+    entries.push({
+      name: `${archiveRoot}/summary/startup-probe-summary.json`,
+      data: redactedStartupProbeSummary,
       modTime: now,
     });
     included.push("summary/startup-probe-summary.json");
