@@ -431,6 +431,9 @@ export type HostDesktopCommand =
     }
   | {
       type: "desktop:check-for-updates";
+    }
+  | {
+      type: "setup:complete";
     };
 
 export type RuntimeUnitSnapshot = Omit<RuntimeUnitState, "logTail">;
@@ -541,6 +544,7 @@ export type HostBootstrap = {
   buildInfo: DesktopBuildInfo;
   sentryDsn: string | null;
   isPackaged: boolean;
+  needsSetupAnimation: boolean;
 };
 
 export type UpdateSource = "r2" | "github";

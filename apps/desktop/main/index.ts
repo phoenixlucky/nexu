@@ -27,7 +27,9 @@ import {
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import {
   buildSkillNodePath,
+  checkOpenclawExtractionNeeded,
   createRuntimeUnitManifests,
+  extractOpenclawSidecarAsync,
 } from "./runtime/manifests";
 import {
   type PortAllocation,
@@ -108,6 +110,17 @@ const { allocations: runtimePortAllocations, runtimeConfig } = useLaunchdMode
         throw error;
       },
     );
+const needsSetupExtraction = checkOpenclawExtractionNeeded(
+  electronRoot,
+  app.getPath("userData"),
+  app.isPackaged,
+);
+
+// Set env var BEFORE window creation so the preload can read it for bootstrap data.
+if (needsSetupExtraction) {
+  process.env.NEXU_NEEDS_SETUP_ANIMATION = "1";
+}
+
 const orchestrator = new RuntimeOrchestrator(
   createRuntimeUnitManifests(
     electronRoot,
@@ -944,6 +957,18 @@ app.whenReady().then(async () => {
     }
 
     try {
+      if (needsSetupExtraction) {
+        logColdStart("starting async openclaw sidecar extraction");
+        diagnosticsReporter?.markColdStartRunning(
+          "extracting openclaw sidecar",
+        );
+        await extractOpenclawSidecarAsync(
+          electronRoot,
+          app.getPath("userData"),
+        );
+        logColdStart("openclaw sidecar extraction complete");
+      }
+
       logColdStart(
         `bootstrap mode: ${useLaunchdMode ? "launchd" : "orchestrator"}`,
       );

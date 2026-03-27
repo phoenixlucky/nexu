@@ -22,6 +22,7 @@ const hostBridge: HostBridge = {
     buildInfo: runtimeConfig.buildInfo,
     sentryDsn: runtimeConfig.sentryDsn,
     isPackaged: !process.defaultApp,
+    needsSetupAnimation: false,
   },
 
   invoke<TChannel extends HostInvokeChannel>(

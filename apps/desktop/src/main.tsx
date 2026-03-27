@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { Toaster, toast } from "sonner";
+import setupVideoUrl from "../assets/setup-animation.mp4";
 import type {
   AppInfo,
   DesktopChromeMode,
@@ -957,6 +958,12 @@ function DesktopShell() {
   const [runtimeConfig, setRuntimeConfig] =
     useState<DesktopRuntimeConfig | null>(null);
   const update = useAutoUpdate();
+
+  // Setup animation: video plays once → fades out → four-color NexuLoader takes over
+  const [setupPhase, setSetupPhase] = useState<"playing" | "fading" | "done">(
+    window.nexuHost.bootstrap.needsSetupAnimation ? "playing" : "done",
+  );
+
   useEffect(() => {
     void getRuntimeConfig()
       .then(setRuntimeConfig)
@@ -967,6 +974,9 @@ function DesktopShell() {
     return onDesktopCommand((command) => {
       if (command.type === "desktop:check-for-updates") {
         void update.check();
+        return;
+      }
+      if (command.type === "setup:complete") {
         return;
       }
 
@@ -1163,6 +1173,52 @@ function DesktopShell() {
         phase={update.phase}
         version={update.version}
       />
+
+      {/* Setup animation overlay — shown during first install / post-update extraction */}
+      {setupPhase !== "done" && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 99999,
+            background: "#ffffff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: setupPhase === "fading" ? 0 : 1,
+            transition: "opacity 0.6s ease-out",
+          }}
+          onTransitionEnd={() => {
+            if (setupPhase === "fading") setSetupPhase("done");
+          }}
+        >
+          {/* Draggable title bar area so window remains movable during setup */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 52,
+              // @ts-expect-error Electron CSS property for window dragging
+              WebkitAppRegion: "drag",
+              zIndex: 1,
+            }}
+          />
+          <video
+            autoPlay
+            muted
+            playsInline
+            src={setupVideoUrl}
+            onEnded={() => setSetupPhase("fading")}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
