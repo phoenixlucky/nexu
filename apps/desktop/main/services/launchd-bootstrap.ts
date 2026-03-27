@@ -1218,11 +1218,11 @@ function readBundleExecutableName(appContentsPath: string): string {
  * drag-and-drop updates. The Electron Framework (~250 MB) is mmap'd into the
  * process address space, holding file references to the bundle.
  *
- * Solution: clone the Electron binary + frameworks to a `.app`-structured
- * directory under `~/.nexu/runtime/nexu-runner.app/`. On APFS (all modern
- * macOS), `cp -Rc` creates copy-on-write clones that occupy near-zero
- * additional disk space. The launchd plist then references this external
- * runner instead of `/Applications/Nexu.app`.
+ * Solution: clone the packaged app bundle to
+ * `~/.nexu/runtime/nexu-runner.app/`. On APFS (all modern macOS), `cp -Rc`
+ * creates copy-on-write clones that occupy near-zero additional disk space.
+ * The launchd plist then references this external runner instead of
+ * `/Applications/Nexu.app`.
  *
  * The runner is version-stamped so it re-clones when the app is updated.
  *
@@ -1236,9 +1236,11 @@ export async function ensureExternalNodeRunner(
   const binaryName = readBundleExecutableName(appContentsPath);
   const runnerRoot = path.join(nexuHome, "runtime", "nexu-runner.app");
   const stagingRoot = `${runnerRoot}.staging`;
-  const contentsDir = path.join(runnerRoot, "Contents");
-  const binaryPath = path.join(contentsDir, "MacOS", binaryName);
+  const binaryPath = path.join(runnerRoot, "Contents", "MacOS", binaryName);
   const stampPath = path.join(runnerRoot, ".version-stamp");
+
+  assertSafeRmTarget(runnerRoot);
+  assertSafeRmTarget(stagingRoot);
 
   // Clean up leftover staging directory from an interrupted extraction
   if (existsSync(stagingRoot)) {
@@ -1266,45 +1268,30 @@ export async function ensureExternalNodeRunner(
   // Atomic extraction: build in staging directory, then rename into place.
   // If the process is killed mid-extraction, only the staging directory is
   // left behind and will be cleaned up on next startup (see above).
-  const stagingContentsDir = path.join(stagingRoot, "Contents");
-  const stagingMacosDir = path.join(stagingContentsDir, "MacOS");
-  const stagingBinaryPath = path.join(stagingMacosDir, binaryName);
-  await fs.mkdir(stagingMacosDir, { recursive: true });
+  const appBundlePath = path.dirname(appContentsPath);
+  const stagingBinaryPath = path.join(
+    stagingRoot,
+    "Contents",
+    "MacOS",
+    binaryName,
+  );
 
-  // Clone the binary (~52K)
-  const srcBinary = path.join(appContentsPath, "MacOS", binaryName);
+  // Clone the full app bundle so the runner keeps a valid macOS app layout,
+  // including signed resources like _CodeSignature and Resources.
   try {
-    await execFileAsync("cp", ["-c", srcBinary, stagingBinaryPath]);
+    await execFileAsync("cp", ["-Rc", appBundlePath, stagingRoot]);
   } catch {
     // APFS clone unavailable (e.g. non-APFS volume) — regular copy
     console.warn(
-      "APFS clone not available for binary, falling back to regular copy",
+      "APFS clone not available for runner bundle, falling back to regular copy",
     );
-    await execFileAsync("cp", [srcBinary, stagingBinaryPath]);
+    await execFileAsync("cp", ["-R", appBundlePath, stagingRoot]);
   }
 
-  // Clone all Frameworks (APFS CoW — ~0 additional disk for ~250MB)
-  const srcFrameworks = path.join(appContentsPath, "Frameworks");
-  const stagingFrameworks = path.join(stagingContentsDir, "Frameworks");
-  try {
-    await execFileAsync("cp", ["-Rc", srcFrameworks, stagingFrameworks]);
-  } catch {
-    // Fall back to regular recursive copy if -c is unsupported.
-    // This will use ~250MB of actual disk space.
-    console.warn(
-      "APFS clone not available for Frameworks (~250MB), falling back to regular copy. " +
-        "This is expected on non-APFS volumes but will use significant disk space.",
+  if (!existsSync(stagingBinaryPath)) {
+    throw new Error(
+      `Runner extraction failed: ${stagingBinaryPath} not found after clone`,
     );
-    await execFileAsync("cp", ["-R", srcFrameworks, stagingFrameworks]);
-  }
-
-  // Copy Info.plist (Electron requires it in the bundle)
-  const infoPlistSrc = path.join(appContentsPath, "Info.plist");
-  if (existsSync(infoPlistSrc)) {
-    await execFileAsync("cp", [
-      infoPlistSrc,
-      path.join(stagingContentsDir, "Info.plist"),
-    ]);
   }
 
   // Write version stamp inside staging directory
@@ -1313,7 +1300,6 @@ export async function ensureExternalNodeRunner(
 
   // Atomic swap: remove old directory, then rename staging into place.
   // mv (rename) is atomic on the same filesystem (POSIX guarantee).
-  assertSafeRmTarget(runnerRoot);
   await execFileAsync("rm", ["-rf", runnerRoot]).catch(() => {});
   await fs.rename(stagingRoot, runnerRoot);
 

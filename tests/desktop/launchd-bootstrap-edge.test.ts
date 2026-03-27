@@ -363,6 +363,13 @@ describe("resolveLaunchdPaths — packaged mode details", () => {
 
     existsSync.mockImplementation((target: string) => {
       if (target.endsWith("nexu-runner.app.staging")) return true;
+      if (
+        target.endsWith(
+          "/Users/testuser/.nexu/runtime/nexu-runner.app.staging/Contents/MacOS/Nexu",
+        )
+      ) {
+        return true;
+      }
       if (target.endsWith("Info.plist")) return true;
       return false;
     });
@@ -386,6 +393,54 @@ describe("resolveLaunchdPaths — packaged mode details", () => {
     expect(rename).toHaveBeenCalledWith(
       "/Users/testuser/.nexu/runtime/nexu-runner.app.staging",
       "/Users/testuser/.nexu/runtime/nexu-runner.app",
+    );
+  });
+
+  it("clones the full app bundle so signed runner resources stay intact", async () => {
+    vi.clearAllMocks();
+    const fsMock = await import("node:fs");
+    const existsSync = fsMock.existsSync as unknown as ReturnType<typeof vi.fn>;
+    const readFileSync = fsMock.readFileSync as unknown as ReturnType<
+      typeof vi.fn
+    >;
+
+    existsSync.mockImplementation((target: string) => {
+      if (target.endsWith(".version-stamp")) return false;
+      if (
+        target.endsWith(
+          "/Users/testuser/.nexu/runtime/nexu-runner.app.staging/Contents/MacOS/Nexu",
+        )
+      ) {
+        return true;
+      }
+      if (target.endsWith("Info.plist")) return true;
+      return false;
+    });
+    readFileSync.mockReturnValue("");
+
+    const { ensureExternalNodeRunner } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    await ensureExternalNodeRunner(
+      "/Applications/Nexu.app/Contents",
+      "/Users/testuser/.nexu",
+      "1.0.0",
+    );
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      "cp",
+      [
+        "-Rc",
+        "/Applications/Nexu.app",
+        "/Users/testuser/.nexu/runtime/nexu-runner.app.staging",
+      ],
+      expect.any(Function),
+    );
+    expect(mockExecFile).not.toHaveBeenCalledWith(
+      "cp",
+      ["-c", "/Applications/Nexu.app/Contents/MacOS/Nexu", expect.any(String)],
+      expect.any(Function),
     );
   });
 });
@@ -528,9 +583,7 @@ describe("external runner — path stability and edge cases", () => {
 
     // Should have called cp (extraction happened, not fast-path)
     expect(mockExecFile).toHaveBeenCalled();
-    const cpCalls = mockExecFile.mock.calls.filter(
-      (call: string[]) => call[0] === "cp",
-    );
+    const cpCalls = mockExecFile.mock.calls.filter((call) => call[0] === "cp");
     expect(cpCalls.length).toBeGreaterThan(0);
   });
 
@@ -560,6 +613,13 @@ describe("external runner — path stability and edge cases", () => {
 
     existsSync.mockImplementation((target: string) => {
       if (target.endsWith("Info.plist")) return true;
+      if (
+        target.endsWith(
+          "/Users/testuser/.nexu/runtime/nexu-runner.app.staging/Contents/MacOS/MyCustomApp",
+        )
+      ) {
+        return true;
+      }
       if (target.endsWith(".version-stamp")) return false;
       return false;
     });
