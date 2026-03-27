@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import { closeSync, openSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
@@ -15,6 +14,7 @@ import {
   getControllerDevLogPath,
   repoRootPath,
 } from "./dev-paths.js";
+import { spawnHiddenProcess } from "./spawn-hidden-process.js";
 
 const require = createRequire(import.meta.url);
 
@@ -60,7 +60,8 @@ async function terminateProcess(pid: number): Promise<void> {
   if (process.platform === "win32") {
     await new Promise<void>((resolve, reject) => {
       const child = spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
-        stdio: "inherit",
+        stdio: "ignore",
+        windowsHide: true,
       });
 
       child.once("error", reject);
@@ -205,8 +206,9 @@ export async function startControllerDevProcess(): Promise<ControllerDevSnapshot
 
   await ensureParentDirectory(logFilePath);
 
-  const logFd = openSync(logFilePath, "a");
-  const child = spawn(commandSpec.command, commandSpec.args, {
+  const processHandle = await spawnHiddenProcess({
+    command: commandSpec.command,
+    args: commandSpec.args,
     cwd: repoRootPath,
     env: {
       ...process.env,
@@ -214,32 +216,32 @@ export async function startControllerDevProcess(): Promise<ControllerDevSnapshot
       NEXU_DEV_CONTROLLER_RUN_ID: runId,
       NEXU_DEV_CONTROLLER_LOG_PATH: logFilePath,
     },
-    stdio: ["ignore", logFd, logFd],
-    detached: true,
+    logFilePath,
   });
 
   try {
-    await waitForProcessStart(child);
+    if (processHandle.child) {
+      await waitForProcessStart(processHandle.child);
+    }
   } finally {
-    child.unref();
-    closeSync(logFd);
+    processHandle.dispose();
   }
 
-  if (!child.pid) {
+  if (!processHandle.pid) {
     throw new Error("controller dev process did not expose a pid");
   }
 
   const workerPid = await waitForControllerPortPid();
 
   await writeControllerDevLock({
-    pid: child.pid,
+    pid: processHandle.pid,
     runId,
   });
 
   return {
     service: "controller",
     status: "running",
-    pid: child.pid,
+    pid: processHandle.pid,
     workerPid,
     runId,
     logFilePath,

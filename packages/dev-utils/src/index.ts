@@ -1,5 +1,6 @@
 export { formatSmokeMessage } from "./smoke/format-smoke-message.js";
 export { isSupportedDevCommand } from "./smoke/is-supported-dev-command.js";
+export { spawnHiddenProcess } from "./spawn-hidden-process.js";
 export { supportedDevCommands } from "./smoke/supported-dev-commands.js";
 export {
   readControllerDevLock,

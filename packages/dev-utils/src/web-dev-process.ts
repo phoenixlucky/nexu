@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import { closeSync, openSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
@@ -11,6 +10,7 @@ import {
   getWebDevLogPath,
   repoRootPath,
 } from "./dev-paths.js";
+import { spawnHiddenProcess } from "./spawn-hidden-process.js";
 import {
   readWebDevLock,
   removeWebDevLock,
@@ -29,14 +29,21 @@ export type WebDevSnapshot = {
 };
 
 function createWebCommand(): { command: string; args: string[] } {
-  const vitePackageJsonPath = require.resolve("vite/package.json", {
-    paths: [join(repoRootPath, "apps", "web")],
+  const tsxPackageJsonPath = require.resolve("tsx/package.json", {
+    paths: [repoRootPath],
   });
-  const viteBinPath = join(dirname(vitePackageJsonPath), "bin", "vite.js");
+  const tsxCliPath = join(dirname(tsxPackageJsonPath), "dist", "cli.mjs");
+  const supervisorPath = join(
+    repoRootPath,
+    "scripts",
+    "dev",
+    "src",
+    "web-supervisor.ts",
+  );
 
   return {
     command: process.execPath,
-    args: [viteBinPath, "--strictPort"],
+    args: [tsxCliPath, supervisorPath],
   };
 }
 
@@ -54,7 +61,8 @@ async function terminateProcess(pid: number): Promise<void> {
   if (process.platform === "win32") {
     await new Promise<void>((resolve, reject) => {
       const child = spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
-        stdio: "inherit",
+        stdio: "ignore",
+        windowsHide: true,
       });
 
       child.once("error", reject);
@@ -196,44 +204,41 @@ export async function startWebDevProcess(): Promise<WebDevSnapshot> {
   const runId = createRunId();
   const logFilePath = getWebDevLogPath(runId);
   const commandSpec = createWebCommand();
-  const webWorkingDirectory = join(repoRootPath, "apps", "web");
 
   await ensureParentDirectory(logFilePath);
   await ensureDirectory(repoRootPath);
 
-  const logFd = openSync(logFilePath, "a");
-  const child = spawn(commandSpec.command, commandSpec.args, {
-    cwd: webWorkingDirectory,
+  const processHandle = await spawnHiddenProcess({
+    command: commandSpec.command,
+    args: commandSpec.args,
+    cwd: repoRootPath,
     env: {
       ...process.env,
       NODE_OPTIONS: createNodeOptions(),
+      NEXU_DEV_WEB_RUN_ID: runId,
     },
-    stdio: ["ignore", logFd, logFd],
-    detached: true,
+    logFilePath,
   });
 
   try {
-    await waitForProcessStart(child);
+    if (processHandle.child) {
+      await waitForProcessStart(processHandle.child);
+    }
   } finally {
-    child.unref();
-    closeSync(logFd);
-  }
-
-  if (!child.pid) {
-    throw new Error("web dev process did not expose a pid");
+    processHandle.dispose();
   }
 
   const listenerPid = await waitForWebPortPid();
 
   await writeWebDevLock({
-    pid: child.pid,
+    pid: processHandle.pid,
     runId,
   });
 
   return {
     service: "web",
     status: "running",
-    pid: child.pid,
+    pid: processHandle.pid,
     listenerPid,
     runId,
     logFilePath,
@@ -248,6 +253,12 @@ export async function stopWebDevProcess(): Promise<WebDevSnapshot> {
   }
 
   await terminateProcess(snapshot.pid);
+
+  try {
+    const listenerPid = await getWebPortPid();
+    await terminateProcess(listenerPid);
+  } catch {}
+
   await removeWebDevLock();
 
   return snapshot;

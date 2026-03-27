@@ -31,11 +31,7 @@ import {
   rotateDesktopLogSession,
   writeDesktopMainLog,
 } from "./runtime/runtime-logger";
-import {
-  type LaunchdBootstrapResult,
-  getDefaultPlistDir,
-  installLaunchdQuitHandler,
-} from "./services";
+import type { LaunchdBootstrapResult } from "./services";
 import { SleepGuard, type SleepGuardLogEntry } from "./sleep-guard";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
@@ -98,6 +94,7 @@ const orchestrator = new RuntimeOrchestrator(
       app.getPath("userData"),
       app.isPackaged,
       runtimeConfig,
+      runtimePlatform.capabilities,
     ),
   ),
 );
@@ -790,21 +787,15 @@ app.whenReady().then(async () => {
       resolveColdStartReady();
     }
 
-    // Install launchd quit handler regardless of cold-start success/failure
-    // so services can always be stopped cleanly on quit.
-    if (launchdResult) {
-      installLaunchdQuitHandler({
-        launchd: launchdResult.launchd,
-        labels: launchdResult.labels,
-        webServer: launchdResult.webServer,
-        plistDir: getDefaultPlistDir(!app.isPackaged),
-        onBeforeQuit: async () => {
-          sleepGuard?.dispose("launchd-quit");
-          await diagnosticsReporter?.flushNow().catch(() => undefined);
-          flushRuntimeLoggers();
-        },
-      });
-    }
+    runtimePlatform.capabilities.shutdownCoordinator.install({
+      app,
+      mainWindow: win,
+      launchdResult,
+      orchestrator,
+      diagnosticsReporter,
+      sleepGuardDispose: (reason) => sleepGuard?.dispose(reason),
+      flushRuntimeLoggers,
+    });
 
     if (app.isPackaged && runtimeConfig.updates.autoUpdateEnabled) {
       const updateMgr = new UpdateManager(win, orchestrator, {
@@ -839,29 +830,4 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
-});
-
-app.on("before-quit", (event) => {
-  sleepGuard?.dispose("app-before-quit");
-  void diagnosticsReporter?.flushNow().catch(() => undefined);
-  flushRuntimeLoggers();
-
-  // If using launchd mode, the quit handler is installed separately
-  // and shows a dialog for quit options
-  if (launchdResult) {
-    // Launchd quit handler is already installed via installLaunchdQuitHandler
-    // This handler just does cleanup; actual quit logic is in quit-handler.ts
-    return;
-  }
-
-  // Legacy orchestrator mode: clean up child processes
-  event.preventDefault();
-  orchestrator
-    .dispose()
-    .catch(() => undefined)
-    .finally(() => {
-      // Remove this handler so the next quit attempt goes through.
-      app.removeAllListeners("before-quit");
-      app.quit();
-    });
 });

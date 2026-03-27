@@ -1,3 +1,4 @@
+import { createDefaultPlatformCapabilities } from "./default/capabilities";
 import {
   createFallbackMacRuntimePlatformAdapter,
   createMacRuntimePlatformAdapter,
@@ -19,5 +20,8 @@ export function getDesktopRuntimePlatformAdapter() {
     return createWindowsRuntimePlatformAdapter();
   }
 
-  return createManagedRuntimePlatformAdapter("default");
+  return createManagedRuntimePlatformAdapter(
+    "default",
+    createDefaultPlatformCapabilities(),
+  );
 }

@@ -1,11 +1,11 @@
-import type { DesktopRuntimePlatformAdapter } from "../types";
-import {
-  PortAllocationError,
-  allocateDesktopRuntimePorts,
-} from "../../runtime/port-allocation";
+import type {
+  DesktopPlatformCapabilities,
+  DesktopRuntimePlatformAdapter,
+} from "../types";
 
 export async function prepareManagedRuntimeConfig(
   adapterId: DesktopRuntimePlatformAdapter["id"],
+  capabilities: DesktopPlatformCapabilities,
   {
     baseRuntimeConfig,
     env,
@@ -14,18 +14,11 @@ export async function prepareManagedRuntimeConfig(
 ) {
   logStartupStep(`${adapterId}:prepareRuntimeConfig:start`);
   try {
-    const result = await allocateDesktopRuntimePorts(env, baseRuntimeConfig).catch(
-      (error: unknown) => {
-        if (error instanceof PortAllocationError) {
-          throw new Error(
-            `[desktop:ports] ${error.code} purpose=${error.purpose} ` +
-              `preferredPort=${error.preferredPort ?? "n/a"} ${error.message}`,
-          );
-        }
-
-        throw error;
-      },
-    );
+    const result = await capabilities.portStrategy.allocateRuntimePorts({
+      baseRuntimeConfig,
+      env,
+      logStartupStep,
+    });
     logStartupStep(`${adapterId}:prepareRuntimeConfig:done`);
     return result;
   } catch (error) {
@@ -70,11 +63,14 @@ export async function runManagedColdStart({
 
 export function createManagedRuntimePlatformAdapter(
   id: DesktopRuntimePlatformAdapter["id"],
+  capabilities: DesktopPlatformCapabilities,
 ): DesktopRuntimePlatformAdapter {
   return {
     id,
     mode: "managed",
-    prepareRuntimeConfig: (args) => prepareManagedRuntimeConfig(id, args),
+    capabilities,
+    prepareRuntimeConfig: (args) =>
+      prepareManagedRuntimeConfig(id, capabilities, args),
     runColdStart: (args) => runManagedColdStart(args),
   };
 }

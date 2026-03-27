@@ -56,7 +56,8 @@ async function terminateProcess(pid: number): Promise<void> {
   if (process.platform === "win32") {
     await new Promise<void>((resolve, reject) => {
       const child = spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
-        stdio: "inherit",
+        stdio: "ignore",
+        windowsHide: true,
       });
 
       child.once("error", reject);
@@ -136,6 +137,7 @@ async function startWorker(): Promise<void> {
       NODE_OPTIONS: createNodeOptions(),
     },
     stdio: "inherit",
+    windowsHide: true,
   });
 
   if (!child.pid) {
