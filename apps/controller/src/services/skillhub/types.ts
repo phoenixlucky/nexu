@@ -23,6 +23,7 @@ export type InstalledSkill = {
   name: string;
   description: string;
   installedAt: string | null;
+  agentId: string | null;
 };
 
 export type SkillhubCatalogData = {

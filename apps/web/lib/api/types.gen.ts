@@ -2688,10 +2688,12 @@ export type GetApiV1SkillhubCatalogResponses = {
         installedSlugs: Array<string>;
         installedSkills: Array<{
             slug: string;
-            source: 'managed' | 'custom';
+            source: 'managed' | 'custom' | 'workspace';
             name: string;
             description: string;
             installedAt: string;
+            agentId: string;
+            agentName: string;
         }>;
         meta: {
             version: string;
@@ -2700,7 +2702,7 @@ export type GetApiV1SkillhubCatalogResponses = {
         };
         queue: Array<{
             slug: string;
-            source: 'managed' | 'custom';
+            source: 'managed' | 'custom' | 'workspace';
             status: 'queued' | 'downloading' | 'installing-deps' | 'done' | 'failed';
             position: number;
             error: string;

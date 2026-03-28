@@ -21,6 +21,8 @@ const installedSkillSchema = z.object({
   name: z.string(),
   description: z.string(),
   installedAt: z.string().nullable(),
+  agentId: z.string().nullable(),
+  agentName: z.string().nullable(),
 });
 
 const catalogMetaSchema = z.object({
@@ -118,7 +120,17 @@ export function registerSkillhubRoutes(
     async (c) => {
       const catalog = container.skillhubService.catalog.getCatalog();
       const queue = [...container.skillhubService.queue.getQueue()];
-      return c.json({ ...catalog, queue }, 200);
+      const bots = await container.configStore.listBots();
+      const botNameMap = new Map(bots.map((b) => [b.id, b.name]));
+
+      const installedSkills = catalog.installedSkills.map((skill) => ({
+        ...skill,
+        agentName: skill.agentId
+          ? (botNameMap.get(skill.agentId) ?? null)
+          : null,
+      }));
+
+      return c.json({ ...catalog, installedSkills, queue }, 200);
     },
   );
 

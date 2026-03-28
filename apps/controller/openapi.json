@@ -7406,7 +7406,8 @@
                             "type": "string",
                             "enum": [
                               "managed",
-                              "custom"
+                              "custom",
+                              "workspace"
                             ]
                           },
                           "name": {
@@ -7418,6 +7419,14 @@
                           "installedAt": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "agentId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "agentName": {
+                            "type": "string",
+                            "nullable": true
                           }
                         },
                         "required": [
@@ -7425,7 +7434,9 @@
                           "source",
                           "name",
                           "description",
-                          "installedAt"
+                          "installedAt",
+                          "agentId",
+                          "agentName"
                         ]
                       }
                     },
@@ -7461,7 +7472,8 @@
                             "type": "string",
                             "enum": [
                               "managed",
-                              "custom"
+                              "custom",
+                              "workspace"
                             ]
                           },
                           "status": {

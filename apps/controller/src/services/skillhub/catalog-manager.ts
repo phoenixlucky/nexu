@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, resolve, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import {
   CURATED_SKILL_SLUGS,
@@ -17,7 +17,7 @@ import {
   copyStaticSkills,
   resolveCuratedSkillsToInstall,
 } from "./curated-skills.js";
-import type { SkillDb } from "./skill-db.js";
+import type { SkillDb, SkillRecord } from "./skill-db.js";
 import type {
   CatalogMeta,
   InstalledSkill,
@@ -200,7 +200,8 @@ export class CatalogManager {
 
     const installedSkills: InstalledSkill[] = dbRecords
       .map((r) => {
-        const skillMdPath = resolve(this.skillsDir, r.slug, "SKILL.md");
+        const skillMdDir = this.resolveSkillMdDir(r);
+        const skillMdPath = resolve(skillMdDir, "SKILL.md");
         const { name, description } = this.parseFrontmatter(skillMdPath);
         return {
           slug: r.slug,
@@ -208,6 +209,7 @@ export class CatalogManager {
           name: name || r.slug,
           description: description || "",
           installedAt: r.installedAt,
+          agentId: r.agentId ?? null,
         };
       })
       .sort((a, b) => {
@@ -606,6 +608,19 @@ export class CatalogManager {
       const message = error instanceof Error ? error.message : String(error);
       this.log("warn", `npm deps failed for ${slug}: ${message}`);
     }
+  }
+
+  /**
+   * Resolves the directory containing SKILL.md for a given skill record.
+   * Workspace skills live under `agents/<agentId>/skills/<slug>`,
+   * while shared skills live under the common `skillsDir/<slug>`.
+   */
+  private resolveSkillMdDir(record: SkillRecord): string {
+    if (record.source === "workspace" && record.agentId) {
+      const stateDir = dirname(this.skillsDir);
+      return join(stateDir, "agents", record.agentId, "skills", record.slug);
+    }
+    return resolve(this.skillsDir, record.slug);
   }
 
   private parseFrontmatter(filePath: string): {
