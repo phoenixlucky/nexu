@@ -341,7 +341,14 @@ export async function processOneMessage(
     deps.channelRuntime.reply.createReplyDispatcherWithTyping({
       humanDelay,
       typingCallbacks,
-      deliver: async (payload) => {
+      deliver: async (payload, info) => {
+        // Drop internal block chunks (tool-call outputs, script runs,
+        // dependency installs). These are execution-level details that must
+        // never surface in user-facing IM chat (#606).
+        if (info?.kind === "block") {
+          return;
+        }
+
         const text = markdownToPlainText(payload.text ?? "");
         const mediaUrl = payload.mediaUrl ?? payload.mediaUrls?.[0];
         logger.debug(

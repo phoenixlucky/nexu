@@ -284,15 +284,10 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
           const useCard = renderMode === "card" || (renderMode === "auto" && shouldUseCard(text));
 
           if (info?.kind === "block") {
-            // Drop internal block chunks unless we can safely consume them as
-            // streaming-card fallback content.
-            if (!(streamingEnabled && useCard)) {
-              return;
-            }
-            startStreaming();
-            if (streamingStartPromise) {
-              await streamingStartPromise;
-            }
+            // Always drop internal block chunks (tool-call outputs, script
+            // runs, dependency installs). These are execution-level details
+            // that must never surface in user-facing IM chat (#606).
+            return;
           }
 
           if (info?.kind === "final" && streamingEnabled && useCard) {
