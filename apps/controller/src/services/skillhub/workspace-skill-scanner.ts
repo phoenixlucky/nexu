@@ -35,7 +35,7 @@ export class WorkspaceSkillScanner {
       return readdirSync(dir, { withFileTypes: true })
         .filter(
           (entry) =>
-            entry.isDirectory() &&
+            (entry.isDirectory() || entry.isSymbolicLink()) &&
             existsSync(join(dir, entry.name, "SKILL.md")),
         )
         .map((entry) => entry.name);

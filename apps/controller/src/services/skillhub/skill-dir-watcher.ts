@@ -209,7 +209,7 @@ export class SkillDirWatcher {
       return readdirSync(dir, { withFileTypes: true })
         .filter(
           (entry) =>
-            entry.isDirectory() &&
+            (entry.isDirectory() || entry.isSymbolicLink()) &&
             existsSync(resolve(dir, entry.name, "SKILL.md")),
         )
         .map((entry) => entry.name);

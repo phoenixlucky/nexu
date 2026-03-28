@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -66,6 +66,32 @@ describe("WorkspaceSkillScanner", () => {
     const result = scanner.scanAll(["bot-1"]);
 
     expect(result.size).toBe(0);
+  });
+
+  it("detects symlinked skills (clawhub install pattern)", () => {
+    // clawhub install creates: workspace/skills/slug -> ../.agents/skills/slug
+    const realDir = path.join(
+      stateDir,
+      "agents",
+      "bot-1",
+      ".agents",
+      "skills",
+      "obsidian",
+    );
+    mkdirSync(realDir, { recursive: true });
+    writeFileSync(
+      path.join(realDir, "SKILL.md"),
+      "---\nname: obsidian\n---\nTest.",
+    );
+
+    const linkDir = path.join(stateDir, "agents", "bot-1", "skills");
+    mkdirSync(linkDir, { recursive: true });
+    symlinkSync(realDir, path.join(linkDir, "obsidian"));
+
+    const scanner = new WorkspaceSkillScanner(stateDir);
+    const result = scanner.scanAll(["bot-1"]);
+
+    expect(result.get("bot-1")).toEqual(["obsidian"]);
   });
 
   it("only scans provided bot IDs", () => {
