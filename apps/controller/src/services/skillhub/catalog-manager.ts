@@ -11,6 +11,7 @@ import {
 import { createRequire } from "node:module";
 import { dirname, resolve, sep } from "node:path";
 import { promisify } from "node:util";
+import { proxyFetch } from "../../lib/proxy-fetch.js";
 import {
   CURATED_SKILL_SLUGS,
   type CuratedInstallResult,
@@ -150,7 +151,7 @@ export class CatalogManager {
     const extractDir = resolve(this.cacheDir, ".extract-staging");
 
     try {
-      const response = await fetch(CATALOG_DOWNLOAD_URL);
+      const response = await proxyFetch(CATALOG_DOWNLOAD_URL);
 
       if (!response.ok || !response.body) {
         throw new Error(`Catalog download failed: ${response.status}`);
@@ -651,7 +652,7 @@ export class CatalogManager {
   }
 
   private async fetchRemoteVersion(): Promise<string> {
-    const response = await fetch(VERSION_CHECK_URL);
+    const response = await proxyFetch(VERSION_CHECK_URL);
 
     if (!response.ok) {
       throw new Error(`Version check failed: ${response.status}`);
