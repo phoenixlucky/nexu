@@ -670,6 +670,9 @@ export class ChannelService {
     const channel = await this.configStore.connectWechat({ accountId });
     await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();
+    // Wait for the WeChat channel to become ready so the UI can show accurate
+    // status and the user doesn't send messages into a not-yet-started channel.
+    await this.waitForWechatReady(accountId);
     return channel;
   }
 
@@ -1046,6 +1049,28 @@ export class ChannelService {
       await this.syncService.syncAll();
     }
     return removed;
+  }
+
+  private async waitForWechatReady(accountId: string) {
+    // With the prewarm account, hot-reload takes ~500ms-2s.
+    // Without prewarm (first ever), full restart takes ~20-45s.
+    // Use a generous deadline but poll frequently for fast path.
+    const deadline = Date.now() + 30_000;
+    let lastReadiness = await this.gatewayService.getChannelReadiness(
+      "wechat",
+      accountId,
+    );
+    while (Date.now() < deadline) {
+      if (lastReadiness.ready) {
+        return lastReadiness;
+      }
+      await sleep(1000);
+      lastReadiness = await this.gatewayService.getChannelReadiness(
+        "wechat",
+        accountId,
+      );
+    }
+    return lastReadiness;
   }
 
   private async waitForWhatsappReady(accountId: string) {
