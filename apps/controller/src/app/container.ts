@@ -106,6 +106,10 @@ export async function createContainer(): Promise<ControllerContainer> {
     onSyncNeeded: () => {
       void syncService?.syncAll().catch(() => {});
     },
+    getBotIds: async () => {
+      const config = await configStore.getConfig();
+      return config.bots.map((b) => b.id);
+    },
   });
   const openclawSyncService = new OpenClawSyncService(
     env,
@@ -120,6 +124,7 @@ export async function createContainer(): Promise<ControllerContainer> {
     watchTrigger,
     gatewayService,
     skillhubService.skillDb,
+    skillhubService.workspaceSkillScanner,
   );
   syncService = openclawSyncService;
   const openclawAuthService = new OpenClawAuthService(env, authProfilesStore);

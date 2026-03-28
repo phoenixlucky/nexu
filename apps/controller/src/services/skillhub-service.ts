@@ -6,9 +6,11 @@ import { InstallQueue } from "./skillhub/install-queue.js";
 import { SkillDb } from "./skillhub/skill-db.js";
 import { SkillDirWatcher } from "./skillhub/skill-dir-watcher.js";
 import type { QueueItem } from "./skillhub/types.js";
+import { WorkspaceSkillScanner } from "./skillhub/workspace-skill-scanner.js";
 
 export interface SkillhubServiceOptions {
   onSyncNeeded?: () => void;
+  getBotIds?: () => Promise<readonly string[]>;
 }
 
 export class SkillhubService {
@@ -17,6 +19,8 @@ export class SkillhubService {
   private readonly dirWatcher: SkillDirWatcher;
   private readonly db: SkillDb;
   private readonly env: ControllerEnv;
+  private readonly scanner: WorkspaceSkillScanner;
+  private readonly getBotIds: (() => Promise<readonly string[]>) | null;
 
   private constructor(
     env: ControllerEnv,
@@ -24,12 +28,16 @@ export class SkillhubService {
     installQueue: InstallQueue,
     dirWatcher: SkillDirWatcher,
     db: SkillDb,
+    scanner: WorkspaceSkillScanner,
+    getBotIds: (() => Promise<readonly string[]>) | null,
   ) {
     this.env = env;
     this.catalogManager = catalogManager;
     this.installQueue = installQueue;
     this.dirWatcher = dirWatcher;
     this.db = db;
+    this.scanner = scanner;
+    this.getBotIds = getBotIds;
   }
 
   static async create(
@@ -71,7 +79,10 @@ export class SkillhubService {
       isSlugInFlight: (slug) => installQueue.isInFlight(slug),
       skillDb,
       log,
+      openclawStateDir: env.openclawStateDir,
     });
+
+    const workspaceScanner = new WorkspaceSkillScanner(env.openclawStateDir);
 
     return new SkillhubService(
       env,
@@ -79,12 +90,23 @@ export class SkillhubService {
       installQueue,
       dirWatcher,
       skillDb,
+      workspaceScanner,
+      options?.getBotIds ?? null,
     );
   }
 
   start(): void {
     this.catalogManager.start();
     if (process.env.CI) return;
+
+    // Resolve bot IDs asynchronously and feed them to the dir watcher
+    // so it can reconcile workspace skill directories on startup.
+    if (this.getBotIds) {
+      void this.getBotIds().then((ids) => {
+        this.dirWatcher.setBotIds(ids);
+        this.dirWatcher.syncNow();
+      });
+    }
 
     // Reconcile disk state with ledger FIRST on every startup.
     // This ensures on-disk skills are recorded before curated enqueue
@@ -127,6 +149,10 @@ export class SkillhubService {
 
   get skillDb(): SkillDb {
     return this.db;
+  }
+
+  get workspaceSkillScanner(): WorkspaceSkillScanner {
+    return this.scanner;
   }
 
   get catalog(): CatalogManager {
