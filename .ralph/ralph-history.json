@@ -37,21 +37,66 @@
         "bootoutService: io.nexu.test.39992.controller already unregistered (Command failed: launchctl bootout gui/501/io.nexu.test.39992.controller",
         "stdout | tests/desktop/launchd-startup-scenarios.test.ts > Launchd Startup Scenarios > Scenario 19: web server startup failure propagates as error"
       ]
+    },
+    {
+      "iteration": 2,
+      "startedAt": "2026-03-28T04:48:12.009Z",
+      "endedAt": "2026-03-28T04:59:03.475Z",
+      "durationMs": 647670,
+      "agent": "opencode",
+      "model": "",
+      "toolsUsed": {},
+      "filesModified": [
+        ".ralph/ralph-opencode.config.json",
+        ".ralph/ralph-tasks.md",
+        "apps/desktop/main/index.ts",
+        "apps/desktop/main/runtime/manifests.ts",
+        "apps/desktop/main/services/launchd-bootstrap.ts",
+        "apps/desktop/main/services/plist-generator.ts",
+        "tests/desktop/data-directory-runtime.test.ts",
+        "tests/desktop/launchd-bootstrap.test.ts",
+        "tests/desktop/launchd-startup-scenarios.test.ts",
+        "tests/desktop/plist-env-parity.test.ts",
+        "tests/desktop/plist-generator.test.ts",
+        "tests/desktop/runtime-manifests.test.ts"
+      ],
+      "exitCode": 0,
+      "completionDetected": false,
+      "errors": [
+        "\u001b[91m\u001b[1mError: \u001b[0mapply_patch verification failed: Error: Failed to find expected lines in /Users/mrc/Projects/nexu-io/nexu-support-proxy/apps/desktop/main/index.ts:",
+        "bootoutService: io.nexu.test.3263.nonexistent already unregistered (Command failed: launchctl bootout gui/501/io.nexu.test.3263.nonexistent",
+        "Boot-out failed: 3: No such process)",
+        "bootoutService: io.nexu.test.3263.ghost already unregistered (Command failed: launchctl bootout gui/501/io.nexu.test.3263.ghost",
+        "bootoutService: io.nexu.test.3263.nope2 already unregistered (Command failed: launchctl bootout gui/501/io.nexu.test.3263.nope2",
+        "bootoutService: io.nexu.test.3263.nope1 already unregistered (Command failed: launchctl bootout gui/501/io.nexu.test.3263.nope1",
+        "Failed to bootout io.nexu.test.3263.nonexistent: Command failed: launchctl bootout gui/501/io.nexu.test.3263.nonexistent",
+        "Boot-out failed: 3: No such process",
+        "bootoutService: io.nexu.test.3263.controller already unregistered (Command failed: launchctl bootout gui/501/io.nexu.test.3263.controller",
+        "stderr | tests/desktop/launchd-manager-pid-aware.test.ts > LaunchdManager PID-aware shutdown > bootoutAndWaitForExit sends SIGKILL when bootout fails and PID is alive"
+      ]
     }
   ],
-  "totalDurationMs": 505843,
+  "totalDurationMs": 1153513,
   "struggleIndicators": {
     "repeatedErrors": {
       "ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command \"vitest\" not found": 1,
       "bootoutService: io.nexu.test.39992.nonexistent already unregistered (Command failed: launchctl booto": 1,
-      "Boot-out failed: 3: No such process)": 1,
+      "Boot-out failed: 3: No such process)": 2,
       "bootoutService: io.nexu.test.39992.ghost already unregistered (Command failed: launchctl bootout gui": 1,
       "bootoutService: io.nexu.test.39992.nope2 already unregistered (Command failed: launchctl bootout gui": 1,
       "bootoutService: io.nexu.test.39992.nope1 already unregistered (Command failed: launchctl bootout gui": 1,
       "Failed to bootout io.nexu.test.39992.nonexistent: Command failed: launchctl bootout gui/501/io.nexu.": 1,
-      "Boot-out failed: 3: No such process": 1,
+      "Boot-out failed: 3: No such process": 2,
       "bootoutService: io.nexu.test.39992.controller already unregistered (Command failed: launchctl bootou": 1,
-      "stdout | tests/desktop/launchd-startup-scenarios.test.ts > Launchd Startup Scenarios > Scenario 19: ": 1
+      "stdout | tests/desktop/launchd-startup-scenarios.test.ts > Launchd Startup Scenarios > Scenario 19: ": 1,
+      "\u001b[91m\u001b[1mError: \u001b[0mapply_patch verification failed: Error: Failed to find expected lines in /Users/": 1,
+      "bootoutService: io.nexu.test.3263.nonexistent already unregistered (Command failed: launchctl bootou": 1,
+      "bootoutService: io.nexu.test.3263.ghost already unregistered (Command failed: launchctl bootout gui/": 1,
+      "bootoutService: io.nexu.test.3263.nope2 already unregistered (Command failed: launchctl bootout gui/": 1,
+      "bootoutService: io.nexu.test.3263.nope1 already unregistered (Command failed: launchctl bootout gui/": 1,
+      "Failed to bootout io.nexu.test.3263.nonexistent: Command failed: launchctl bootout gui/501/io.nexu.t": 1,
+      "bootoutService: io.nexu.test.3263.controller already unregistered (Command failed: launchctl bootout": 1,
+      "stderr | tests/desktop/launchd-manager-pid-aware.test.ts > LaunchdManager PID-aware shutdown > booto": 1
     },
     "noProgressIterations": 0,
     "shortIterations": 0

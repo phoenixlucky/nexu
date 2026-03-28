@@ -15,6 +15,7 @@ import {
 } from "electron";
 import { getOpenclawSkillsDir } from "../shared/desktop-paths";
 import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
+import { buildChildProcessProxyEnv } from "../shared/proxy-config";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { getDesktopAppRoot, getWorkspaceRoot } from "../shared/workspace-paths";
@@ -619,6 +620,7 @@ async function runLaunchdColdStart(): Promise<void> {
     ? resolve(electronRoot, "static/platform-templates")
     : resolve(repoRoot, "apps/controller/static/platform-templates");
   const skillNodePath = buildSkillNodePath(electronRoot, app.isPackaged);
+  const proxyEnv = buildChildProcessProxyEnv(runtimeConfig.proxy);
 
   launchdResult = await bootstrapWithLaunchd({
     isDev,
@@ -643,6 +645,7 @@ async function runLaunchdColdStart(): Promise<void> {
     openclawExtensionsDir,
     skillNodePath,
     openclawTmpDir,
+    proxyEnv,
     appVersion: app.getVersion(),
     userDataPath: app.getPath("userData"),
     buildSource:
