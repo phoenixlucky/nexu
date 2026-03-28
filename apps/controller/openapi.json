@@ -7550,6 +7550,18 @@
                   "slug": {
                     "type": "string",
                     "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "managed",
+                      "custom",
+                      "workspace"
+                    ]
+                  },
+                  "agentId": {
+                    "type": "string",
+                    "nullable": true
                   }
                 },
                 "required": [
@@ -7617,6 +7629,18 @@
                   "slug": {
                     "type": "string",
                     "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "managed",
+                      "custom",
+                      "workspace"
+                    ]
+                  },
+                  "agentId": {
+                    "type": "string",
+                    "nullable": true
                   }
                 },
                 "required": [
@@ -7699,6 +7723,27 @@
             "required": true,
             "name": "slug",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "managed",
+                "custom",
+                "workspace"
+              ]
+            },
+            "required": false,
+            "name": "source",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "agentId",
+            "in": "query"
           }
         ],
         "responses": {
@@ -7739,6 +7784,22 @@
                     "installed": {
                       "type": "boolean"
                     },
+                    "installedSource": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "managed",
+                        "custom",
+                        "workspace"
+                      ]
+                    },
+                    "agentId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "uninstallable": {
+                      "type": "boolean"
+                    },
                     "skillContent": {
                       "type": "string",
                       "nullable": true
@@ -7760,6 +7821,9 @@
                     "version",
                     "updatedAt",
                     "installed",
+                    "installedSource",
+                    "agentId",
+                    "uninstallable",
                     "skillContent",
                     "files"
                   ]

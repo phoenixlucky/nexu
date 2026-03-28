@@ -187,6 +187,32 @@ describe("SkillDb", () => {
       const installed = db.getAllInstalled();
       expect(installed[0].agentId).toBeNull();
     });
+
+    it("recordUninstall scopes workspace records by agentId", async () => {
+      db = await SkillDb.create(dbPath);
+      db.recordInstall("shared-tool", "workspace", undefined, "bot-1");
+      db.recordInstall("shared-tool", "workspace", undefined, "bot-2");
+
+      db.recordUninstall("shared-tool", "workspace", "bot-1");
+
+      expect(db.getInstalledByAgent("bot-1")).toHaveLength(0);
+      const bot2Skills = db.getInstalledByAgent("bot-2");
+      expect(bot2Skills).toHaveLength(1);
+      expect(bot2Skills[0].slug).toBe("shared-tool");
+    });
+
+    it("markUninstalledBySlugs scopes workspace records by agentId when provided", async () => {
+      db = await SkillDb.create(dbPath);
+      db.recordInstall("shared-tool", "workspace", undefined, "bot-1");
+      db.recordInstall("shared-tool", "workspace", undefined, "bot-2");
+
+      db.markUninstalledBySlugs(["shared-tool"], "workspace", "bot-1");
+
+      expect(db.getInstalledByAgent("bot-1")).toHaveLength(0);
+      const bot2Skills = db.getInstalledByAgent("bot-2");
+      expect(bot2Skills).toHaveLength(1);
+      expect(bot2Skills[0].slug).toBe("shared-tool");
+    });
   });
 
   it("supports custom source type", async () => {

@@ -5,13 +5,19 @@ import { copyStaticSkills } from "./skillhub/curated-skills.js";
 import { InstallQueue } from "./skillhub/install-queue.js";
 import { SkillDb } from "./skillhub/skill-db.js";
 import { SkillDirWatcher } from "./skillhub/skill-dir-watcher.js";
-import type { QueueItem } from "./skillhub/types.js";
+import type { QueueItem, SkillSource } from "./skillhub/types.js";
 import { WorkspaceSkillScanner } from "./skillhub/workspace-skill-scanner.js";
 
 export interface SkillhubServiceOptions {
   onSyncNeeded?: () => void;
   getBotIds?: () => Promise<readonly string[]>;
 }
+
+export type SkillUninstallRequest = {
+  slug: string;
+  source?: SkillSource;
+  agentId?: string | null;
+};
 
 export class SkillhubService {
   private readonly catalogManager: CatalogManager;
@@ -21,6 +27,7 @@ export class SkillhubService {
   private readonly env: ControllerEnv;
   private readonly scanner: WorkspaceSkillScanner;
   private readonly getBotIds: (() => Promise<readonly string[]>) | null;
+  private readonly onSyncNeeded: (() => void) | null;
 
   private constructor(
     env: ControllerEnv,
@@ -30,6 +37,7 @@ export class SkillhubService {
     db: SkillDb,
     scanner: WorkspaceSkillScanner,
     getBotIds: (() => Promise<readonly string[]>) | null,
+    onSyncNeeded: (() => void) | null,
   ) {
     this.env = env;
     this.catalogManager = catalogManager;
@@ -38,6 +46,7 @@ export class SkillhubService {
     this.db = db;
     this.scanner = scanner;
     this.getBotIds = getBotIds;
+    this.onSyncNeeded = onSyncNeeded;
   }
 
   static async create(
@@ -80,6 +89,9 @@ export class SkillhubService {
       skillDb,
       log,
       openclawStateDir: env.openclawStateDir,
+      onChange: () => {
+        options?.onSyncNeeded?.();
+      },
     });
 
     const workspaceScanner = new WorkspaceSkillScanner(env.openclawStateDir);
@@ -92,6 +104,7 @@ export class SkillhubService {
       skillDb,
       workspaceScanner,
       options?.getBotIds ?? null,
+      options?.onSyncNeeded ?? null,
     );
   }
 
@@ -171,6 +184,30 @@ export class SkillhubService {
   cancelInstall(slug: string): boolean {
     const canonical = this.catalogManager.canonicalizeSlug(slug);
     return this.installQueue.cancel(canonical);
+  }
+
+  async uninstallSkill(
+    request: SkillUninstallRequest,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const canonical = this.catalogManager.canonicalizeSlug(request.slug);
+    this.cancelInstall(canonical);
+    const result = await this.catalogManager.uninstallSkill({
+      ...request,
+      slug: canonical,
+    });
+    if (result.ok) {
+      this.dirWatcher.syncNow();
+      if (this.getBotIds) {
+        void this.getBotIds()
+          .then((ids) => {
+            this.dirWatcher.setBotIds(ids);
+          })
+          .catch(() => {});
+      }
+      this.onSyncNeeded?.();
+    }
+
+    return result;
   }
 
   dispose(): void {

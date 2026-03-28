@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -31,6 +31,27 @@ describe("SkillDirWatcher workspace reconciliation", () => {
     const dir = path.join(stateDir, "agents", botId, "skills", slug);
     mkdirSync(dir, { recursive: true });
     writeFileSync(path.join(dir, "SKILL.md"), `---\nname: ${slug}\n---\nTest.`);
+  }
+
+  function removeWorkspaceSkill(botId: string, slug: string): void {
+    rmSync(path.join(stateDir, "agents", botId, "skills", slug), {
+      recursive: true,
+      force: true,
+    });
+  }
+
+  async function waitUntil(
+    predicate: () => boolean,
+    timeoutMs = 5_000,
+    intervalMs = 50,
+  ): Promise<void> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (predicate()) return;
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+
+    throw new Error("Timed out waiting for watcher state");
   }
 
   it("records workspace skills with agentId on syncNow", () => {
@@ -136,7 +157,7 @@ describe("SkillDirWatcher workspace reconciliation", () => {
     expect(wsSkills[0].slug).toBe("ws-only-tool");
   });
 
-  it("updates botIds dynamically via setBotIds", () => {
+  it("discovers workspace botIds from disk even before setBotIds", () => {
     createWorkspaceSkill("bot-3", "dynamic-tool");
 
     const watcher = new SkillDirWatcher({
@@ -147,10 +168,55 @@ describe("SkillDirWatcher workspace reconciliation", () => {
     });
 
     watcher.syncNow();
-    expect(db.getInstalledByAgent("bot-3")).toHaveLength(0);
+    expect(db.getInstalledByAgent("bot-3")).toHaveLength(1);
 
     watcher.setBotIds(["bot-3"]);
     watcher.syncNow();
     expect(db.getInstalledByAgent("bot-3")).toHaveLength(1);
   });
+
+  it("only marks workspace removals for the matching agent", () => {
+    createWorkspaceSkill("bot-2", "shared-tool");
+    db.recordInstall("shared-tool", "workspace", undefined, "bot-1");
+    db.recordInstall("shared-tool", "workspace", undefined, "bot-2");
+
+    const watcher = new SkillDirWatcher({
+      skillsDir,
+      skillDb: db,
+      openclawStateDir: stateDir,
+      botIds: ["bot-1", "bot-2"],
+    });
+
+    watcher.syncNow();
+
+    expect(db.getInstalledByAgent("bot-1")).toHaveLength(0);
+    const bot2Skills = db.getInstalledByAgent("bot-2");
+    expect(bot2Skills).toHaveLength(1);
+    expect(bot2Skills[0].slug).toBe("shared-tool");
+  });
+
+  it(
+    "watches workspace directories after start and reconciles removals",
+    { timeout: 10_000 },
+    async () => {
+      createWorkspaceSkill("bot-1", "live-tool");
+
+      const watcher = new SkillDirWatcher({
+        skillsDir,
+        skillDb: db,
+        openclawStateDir: stateDir,
+        botIds: ["bot-1"],
+        debounceMs: 50,
+      });
+
+      watcher.syncNow();
+      watcher.start();
+      expect(db.getInstalledByAgent("bot-1")).toHaveLength(1);
+
+      removeWorkspaceSkill("bot-1", "live-tool");
+
+      await waitUntil(() => db.getInstalledByAgent("bot-1").length === 0);
+      watcher.stop();
+    },
+  );
 });

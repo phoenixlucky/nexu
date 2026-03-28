@@ -2718,6 +2718,8 @@ export type GetApiV1SkillhubCatalogResponse = GetApiV1SkillhubCatalogResponses[k
 export type PostApiV1SkillhubInstallData = {
     body?: {
         slug: string;
+        source?: 'managed' | 'custom' | 'workspace';
+        agentId?: string;
     };
     path?: never;
     query?: never;
@@ -2743,6 +2745,8 @@ export type PostApiV1SkillhubInstallResponse = PostApiV1SkillhubInstallResponses
 export type PostApiV1SkillhubUninstallData = {
     body?: {
         slug: string;
+        source?: 'managed' | 'custom' | 'workspace';
+        agentId?: string;
     };
     path?: never;
     query?: never;
@@ -2786,7 +2790,10 @@ export type GetApiV1SkillhubSkillsBySlugData = {
     path: {
         slug: string;
     };
-    query?: never;
+    query?: {
+        source?: 'managed' | 'custom' | 'workspace';
+        agentId?: string;
+    };
     url: '/api/v1/skillhub/skills/{slug}';
 };
 
@@ -2815,6 +2822,9 @@ export type GetApiV1SkillhubSkillsBySlugResponses = {
         version: string;
         updatedAt: string;
         installed: boolean;
+        installedSource: 'managed' | 'custom' | 'workspace';
+        agentId: string;
+        uninstallable: boolean;
         skillContent: string;
         files: Array<string>;
     };

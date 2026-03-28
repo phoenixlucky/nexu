@@ -88,6 +88,12 @@ const CATALOG_DOWNLOAD_URL =
 
 const DAILY_MS = 24 * 60 * 60 * 1000;
 
+export type SkillUninstallRequest = {
+  slug: string;
+  source?: SkillSource;
+  agentId?: string | null;
+};
+
 /**
  * All skills (curated, managed, custom) live in a single `skillsDir`.
  * The lowdb ledger (`SkillDb`) is the single source of truth for source categorization.
@@ -331,25 +337,55 @@ export class CatalogManager {
    * Step C: Record uninstall in DB with correct source
    */
   async uninstallSkill(
-    rawSlug: string,
+    request: string | SkillUninstallRequest,
   ): Promise<{ ok: boolean; error?: string }> {
-    const slug = SLUG_CORRECTIONS[rawSlug] ?? rawSlug;
+    const payload =
+      typeof request === "string" ? { slug: request } : { ...request };
+    const slug = SLUG_CORRECTIONS[payload.slug] ?? payload.slug;
     if (!isValidSlug(slug)) {
       this.log("warn", `uninstall rejected slug=${slug} — invalid slug`);
       return { ok: false, error: "Invalid skill slug" };
     }
 
+    if (payload.source === "workspace" && !payload.agentId) {
+      this.log(
+        "warn",
+        `uninstall rejected slug=${slug} — workspace uninstall missing agentId`,
+      );
+      return { ok: false, error: "Workspace uninstall requires agentId" };
+    }
+
     this.log("info", `uninstalling skill slug=${slug}`);
     try {
-      const skillPath = resolveSkillPath(this.skillsDir, slug);
-      if (skillPath && existsSync(skillPath)) {
-        const dbRecords = this.db.getAllInstalled();
-        const record = dbRecords.find((r) => r.slug === slug);
-        const source: SkillSource = record?.source ?? "managed";
+      const dbRecords = this.db.getInstalledRecordsBySlug(slug);
+      const record = this.resolveInstalledRecord(dbRecords, payload);
+      if (!record && payload.source === "workspace") {
+        return {
+          ok: false,
+          error: "Workspace skill not installed for the selected agent",
+        };
+      }
+      if (
+        !record &&
+        !payload.source &&
+        dbRecords.some((item) => item.source === "workspace")
+      ) {
+        return { ok: false, error: "Workspace uninstall requires agentId" };
+      }
 
+      const skillPath = record
+        ? this.resolveSkillMdDir(record)
+        : resolveSkillPath(this.skillsDir, slug);
+      if (skillPath && existsSync(skillPath)) {
         rmSync(skillPath, { recursive: true, force: true });
+        const source: SkillSource =
+          record?.source ?? payload.source ?? "managed";
         this.log("info", `uninstall ok (${source}) slug=${slug}`);
-        this.db.recordUninstall(slug, source);
+        this.db.recordUninstall(
+          slug,
+          source,
+          record?.agentId ?? payload.agentId,
+        );
       } else {
         this.log("warn", `uninstall skip slug=${slug} — dir not found`);
       }
@@ -531,19 +567,28 @@ export class CatalogManager {
     const dbRecords = this.db.getAllInstalled();
 
     // DB → disk: handle "installed" records whose SKILL.md is missing from disk
-    const missingBySource = new Map<SkillSource, string[]>();
+    const missingBySource = new Map<string, string[]>();
     for (const record of dbRecords) {
-      const skillMd = resolve(this.skillsDir, record.slug, "SKILL.md");
+      const skillMd = resolve(this.resolveSkillMdDir(record), "SKILL.md");
       if (!existsSync(skillMd)) {
-        const list = missingBySource.get(record.source) ?? [];
+        const key =
+          record.source === "workspace"
+            ? `${record.source}:${record.agentId ?? ""}`
+            : record.source;
+        const list = missingBySource.get(key) ?? [];
         list.push(record.slug);
-        missingBySource.set(record.source, list);
+        missingBySource.set(key, list);
       }
     }
 
     let totalMissing = 0;
-    for (const [source, slugs] of missingBySource) {
-      this.db.markUninstalledBySlugs(slugs, source);
+    for (const [key, slugs] of missingBySource) {
+      const [source, agentId] = key.split(":");
+      this.db.markUninstalledBySlugs(
+        slugs,
+        source as SkillSource,
+        source === "workspace" ? agentId || null : undefined,
+      );
       totalMissing += slugs.length;
     }
     if (totalMissing > 0) {
@@ -621,6 +666,35 @@ export class CatalogManager {
       return join(stateDir, "agents", record.agentId, "skills", record.slug);
     }
     return resolve(this.skillsDir, record.slug);
+  }
+
+  private resolveInstalledRecord(
+    records: readonly SkillRecord[],
+    request: SkillUninstallRequest,
+  ): SkillRecord | undefined {
+    if (request.source === "workspace") {
+      return records.find(
+        (record) =>
+          record.source === "workspace" && record.agentId === request.agentId,
+      );
+    }
+
+    if (request.source) {
+      return records.find((record) => record.source === request.source);
+    }
+
+    const sharedRecord = records.find(
+      (record) => record.source !== "workspace",
+    );
+    if (sharedRecord) {
+      return sharedRecord;
+    }
+
+    if (records.length === 1) {
+      return records[0];
+    }
+
+    return undefined;
   }
 
   private parseFrontmatter(filePath: string): {

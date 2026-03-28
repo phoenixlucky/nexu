@@ -61,6 +61,24 @@ const skillhubMutationResultSchema = z.object({
   error: z.string().optional(),
 });
 
+const skillhubSlugSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,127}$/);
+const skillhubSourceSchema = z.enum(["managed", "custom", "workspace"]);
+const skillhubUninstallRequestSchema = z
+  .object({
+    slug: skillhubSlugSchema,
+    source: skillhubSourceSchema.optional(),
+    agentId: z.string().nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.source === "workspace" && !value.agentId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["agentId"],
+        message: "agentId is required for workspace uninstall",
+      });
+    }
+  });
+
 const skillhubInstallResultSchema = z.object({
   ok: z.boolean(),
   queued: z.boolean().optional(),
@@ -86,6 +104,9 @@ const skillhubDetailResponseSchema = z.object({
   version: z.string(),
   updatedAt: z.string(),
   installed: z.boolean(),
+  installedSource: skillhubSourceSchema.nullable(),
+  agentId: z.string().nullable(),
+  uninstallable: z.boolean(),
   skillContent: z.string().nullable(),
   files: z.array(z.string()),
 });
@@ -95,8 +116,6 @@ const skillhubImportResultSchema = z.object({
   slug: z.string().optional(),
   error: z.string().optional(),
 });
-
-const skillhubSlugSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,127}$/);
 
 export function registerSkillhubRoutes(
   app: OpenAPIHono<ControllerBindings>,
@@ -144,7 +163,7 @@ export function registerSkillhubRoutes(
         body: {
           content: {
             "application/json": {
-              schema: z.object({ slug: skillhubSlugSchema }),
+              schema: skillhubUninstallRequestSchema,
             },
           },
         },
@@ -184,7 +203,11 @@ export function registerSkillhubRoutes(
         body: {
           content: {
             "application/json": {
-              schema: z.object({ slug: skillhubSlugSchema }),
+              schema: z.object({
+                slug: skillhubSlugSchema,
+                source: z.enum(["managed", "custom", "workspace"]).optional(),
+                agentId: z.string().nullable().optional(),
+              }),
             },
           },
         },
@@ -199,11 +222,11 @@ export function registerSkillhubRoutes(
       },
     }),
     async (c) => {
-      const { slug } = c.req.valid("json");
-      container.skillhubService.cancelInstall(slug);
-      const result =
-        await container.skillhubService.catalog.uninstallSkill(slug);
-      await container.openclawSyncService.syncAll();
+      const request = c.req.valid("json");
+      const result = await container.skillhubService.uninstallSkill(request);
+      if (result.ok) {
+        await container.openclawSyncService.syncAll();
+      }
       return c.json(result, 200);
     },
   );
@@ -235,7 +258,23 @@ export function registerSkillhubRoutes(
       method: "get",
       path: "/api/v1/skillhub/skills/{slug}",
       tags: ["SkillHub"],
-      request: { params: z.object({ slug: skillhubSlugSchema }) },
+      request: {
+        params: z.object({ slug: skillhubSlugSchema }),
+        query: z
+          .object({
+            source: skillhubSourceSchema.optional(),
+            agentId: z.string().optional(),
+          })
+          .superRefine((value, ctx) => {
+            if (value.source === "workspace" && !value.agentId) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["agentId"],
+                message: "agentId is required for workspace skill detail",
+              });
+            }
+          }),
+      },
       responses: {
         200: {
           content: {
@@ -253,12 +292,27 @@ export function registerSkillhubRoutes(
     }),
     async (c) => {
       const { slug } = c.req.valid("param");
+      const query = c.req.valid("query");
       const catalog = container.skillhubService.catalog.getCatalog();
       const catalogSkill = catalog.skills.find((s) => s.slug === slug);
-      const installed = catalog.installedSlugs.includes(slug);
-      const installedSkill = catalog.installedSkills.find(
+      const matchingInstalledSkills = catalog.installedSkills.filter(
         (s) => s.slug === slug,
       );
+      const installedSkill = query.source
+        ? matchingInstalledSkills.find(
+            (skill) =>
+              skill.source === query.source &&
+              (query.source !== "workspace" || skill.agentId === query.agentId),
+          )
+        : matchingInstalledSkills.length === 1
+          ? matchingInstalledSkills[0]
+          : matchingInstalledSkills.find(
+              (skill) => skill.source !== "workspace",
+            );
+      const installed =
+        query.source || matchingInstalledSkills.length <= 1
+          ? Boolean(installedSkill)
+          : matchingInstalledSkills.length > 0;
 
       if (!catalogSkill && !installedSkill) {
         return c.json({ message: "Skill not found" }, 404);
@@ -284,6 +338,12 @@ export function registerSkillhubRoutes(
           version: catalogSkill?.version ?? "1.0.0",
           updatedAt: catalogSkill?.updatedAt ?? new Date().toISOString(),
           installed,
+          installedSource: installedSkill?.source ?? null,
+          agentId: installedSkill?.agentId ?? null,
+          uninstallable: Boolean(
+            installedSkill &&
+              (installedSkill.source !== "workspace" || installedSkill.agentId),
+          ),
           skillContent: null,
           files: [],
         },

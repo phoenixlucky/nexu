@@ -10,6 +10,7 @@ import { useGitHubStars } from "@/hooks/use-github-stars";
 import { useLocale } from "@/hooks/use-locale";
 import { getTagLabel } from "@/lib/skill-translations";
 import {
+  type SkillSelection,
   type TopTab,
   type YoursSubTab,
   applySkillsViewStatePatch,
@@ -32,6 +33,13 @@ import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 50;
+type UninstallableSkillSource = Exclude<SkillSource, "curated">;
+
+function toUninstallSource(
+  source: SkillSource | null | undefined,
+): UninstallableSkillSource | undefined {
+  return source && source !== "curated" ? source : undefined;
+}
 
 function getSkillType(tags: readonly string[]): string | null {
   const primaryTag = tags[0]?.trim();
@@ -60,6 +68,7 @@ function SkillCard({
   skillSource,
   detailTo,
   isDetailAvailable,
+  installation,
 }: {
   skill: MinimalSkill;
   isInstalled: boolean;
@@ -74,6 +83,7 @@ function SkillCard({
   skillSource: "builtin" | "explore" | "custom";
   detailTo: string;
   isDetailAvailable: boolean;
+  installation?: SkillSelection;
 }) {
   const { t } = useTranslation();
   const installMutation = useInstallSkill();
@@ -118,7 +128,13 @@ function SkillCard({
   async function handleUninstall() {
     setPendingAction("uninstall");
     try {
-      await uninstallMutation.mutateAsync(skill.slug);
+      await uninstallMutation.mutateAsync({
+        slug: skill.slug,
+        ...(toUninstallSource(installation?.source)
+          ? { source: toUninstallSource(installation?.source) }
+          : {}),
+        ...(installation?.agentId ? { agentId: installation.agentId } : {}),
+      });
       track("workspace_skill_uninstall", {
         skill_name: skill.name,
         skill_source: skillSource,
@@ -230,7 +246,7 @@ function SkillCard({
   return (
     <Link
       to={detailTo}
-      state={createSkillDetailState()}
+      state={createSkillDetailState(installation)}
       draggable={false}
       className={cn(
         "card flex flex-col p-4",
@@ -295,7 +311,14 @@ function AgentSkillGroups({
                   skill={minimalSkill}
                   isInstalled={true}
                   queueStatus={queueBySlug.get(skill.slug)}
-                  detailTo={createSkillDetailPath(skill.slug, locationSearch)}
+                  detailTo={createSkillDetailPath(skill.slug, locationSearch, {
+                    source: skill.source,
+                    agentId: skill.agentId,
+                  })}
+                  installation={{
+                    source: skill.source,
+                    agentId: skill.agentId,
+                  }}
                   isDetailAvailable={!unavailableDetailSlugs.has(skill.slug)}
                   skillSource="builtin"
                   categoryLabel={
@@ -582,6 +605,29 @@ export function SkillsPage() {
       return new Map(acc).set(key, [skill]);
     }, new Map<string, InstalledSkill[]>());
   }, [yoursSubTab, installedSkills]);
+
+  const installationBySlug = useMemo(() => {
+    const map = new Map<string, SkillSelection>();
+    for (const skill of installedSkills) {
+      const existing = map.get(skill.slug);
+      if (!existing) {
+        map.set(skill.slug, {
+          source: toUninstallSource(skill.source),
+          agentId: skill.agentId,
+        });
+        continue;
+      }
+
+      if (existing.source === "workspace" && skill.source !== "workspace") {
+        map.set(skill.slug, {
+          source: toUninstallSource(skill.source),
+          agentId: skill.agentId,
+        });
+      }
+    }
+
+    return map;
+  }, [installedSkills]);
 
   // Category tabs for pills
   const categoryTabs = useMemo(() => {
@@ -900,7 +946,9 @@ export function SkillsPage() {
                     detailTo={createSkillDetailPath(
                       skill.slug,
                       location.search,
+                      installationBySlug.get(skill.slug),
                     )}
+                    installation={installationBySlug.get(skill.slug)}
                     isDetailAvailable={!unavailableDetailSlugs.has(skill.slug)}
                     skillSource={
                       topTab === "explore"
