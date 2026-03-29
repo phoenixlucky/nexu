@@ -104,7 +104,7 @@ export async function monitorWeixinProvider(
 
   const configManager = new WeixinConfigManager({ baseUrl, token }, log);
 
-  const normalTimeoutMs = longPollTimeoutMs ?? DEFAULT_LONG_POLL_TIMEOUT_MS;
+  let normalTimeoutMs = longPollTimeoutMs ?? DEFAULT_LONG_POLL_TIMEOUT_MS;
   let nextTimeoutMs = INITIAL_POLL_TIMEOUT_MS;
   let initialPollsRemaining = INITIAL_POLL_COUNT;
   let consecutiveFailures = 0;
@@ -129,8 +129,10 @@ export async function monitorWeixinProvider(
         resp.longpolling_timeout_ms > 0
       ) {
         // Server-suggested timeout overrides both initial and normal timeouts.
-        normalTimeoutMs !== resp.longpolling_timeout_ms &&
+        if (normalTimeoutMs !== resp.longpolling_timeout_ms) {
           aLog.debug(`Server poll timeout updated: ${resp.longpolling_timeout_ms}ms`);
+          normalTimeoutMs = resp.longpolling_timeout_ms;
+        }
         nextTimeoutMs = resp.longpolling_timeout_ms;
         initialPollsRemaining = 0;
       } else if (initialPollsRemaining > 0) {
