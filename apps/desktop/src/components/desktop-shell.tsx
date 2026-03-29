@@ -3,7 +3,7 @@ import { Toaster } from "sonner";
 import type { DesktopChromeMode, DesktopSurface } from "../../shared/host";
 import { useAutoUpdate } from "../hooks/use-auto-update";
 import { useDesktopRuntimeConfig } from "../hooks/use-desktop-runtime-config";
-import { onDesktopCommand } from "../lib/host-api";
+import { onDesktopCommand, openExternal } from "../lib/host-api";
 import {
   formatBuildCommit,
   formatBuildTimestamp,
@@ -170,6 +170,9 @@ export function DesktopShell() {
       <UpdateBanner
         dismissed={update.dismissed}
         errorMessage={update.errorMessage}
+        onChangelog={() =>
+          void openExternal("https://github.com/nexu-io/nexu/releases")
+        }
         onDismiss={update.dismiss}
         onDownload={() => void update.download()}
         onInstall={() => void update.install()}

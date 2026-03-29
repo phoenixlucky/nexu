@@ -9,6 +9,7 @@ interface UpdateBannerProps {
   onDownload: () => void;
   onInstall: () => void;
   onDismiss: () => void;
+  onChangelog: () => void;
 }
 
 /**
@@ -48,6 +49,7 @@ export function UpdateBanner({
   onDownload,
   onInstall,
   onDismiss,
+  onChangelog,
 }: UpdateBannerProps) {
   if (phase === "idle" || dismissed) {
     return null;
@@ -113,24 +115,22 @@ export function UpdateBanner({
         </div>
       )}
 
-      {/* Downloading — percentage + progress bar */}
+      {/* Downloading — progress bar + percentage */}
       {isDownloading && (
-        <>
+        <div className="update-card-progress-wrap">
+          <div className="update-card-progress-track">
+            <div
+              className="update-card-progress-fill"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
           <div className="update-card-percent">
             <span>{Math.round(percent)}%</span>
           </div>
-          <div className="update-card-progress-wrap">
-            <div className="update-card-progress-track">
-              <div
-                className="update-card-progress-fill"
-                style={{ width: `${percent}%` }}
-              />
-            </div>
-          </div>
-        </>
+        </div>
       )}
 
-      {/* Available — Download / Later */}
+      {/* Available — Download / Changelog */}
       {isAvailable && (
         <div className="update-card-actions">
           <button
@@ -142,15 +142,15 @@ export function UpdateBanner({
           </button>
           <button
             className="update-card-btn update-card-btn--ghost"
-            onClick={onDismiss}
+            onClick={onChangelog}
             type="button"
           >
-            Later
+            Changelog
           </button>
         </div>
       )}
 
-      {/* Ready — Restart / Later */}
+      {/* Ready — Restart / Changelog */}
       {isReady && (
         <div className="update-card-actions">
           <button
@@ -162,15 +162,15 @@ export function UpdateBanner({
           </button>
           <button
             className="update-card-btn update-card-btn--ghost"
-            onClick={onDismiss}
+            onClick={onChangelog}
             type="button"
           >
-            Later
+            Changelog
           </button>
         </div>
       )}
 
-      {/* Error — message + Dismiss */}
+      {/* Error — message + Retry / Changelog */}
       {isError && (
         <>
           <div className="update-card-error-msg">
@@ -178,11 +178,18 @@ export function UpdateBanner({
           </div>
           <div className="update-card-actions">
             <button
-              className="update-card-btn update-card-btn--ghost"
-              onClick={onDismiss}
+              className="update-card-btn update-card-btn--primary"
+              onClick={onDownload}
               type="button"
             >
-              Dismiss
+              Retry
+            </button>
+            <button
+              className="update-card-btn update-card-btn--ghost"
+              onClick={onChangelog}
+              type="button"
+            >
+              Changelog
             </button>
           </div>
         </>
