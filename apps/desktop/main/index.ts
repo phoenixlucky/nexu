@@ -24,6 +24,8 @@ import {
   setUpdateManager,
 } from "./ipc";
 import { getDesktopRuntimePlatformAdapter } from "./platforms";
+import { resolveRuntimePlatform } from "./platforms/platform-resolver";
+import type { DesktopRuntimeResidencyContext } from "./platforms/types";
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import { createRuntimeUnitManifests } from "./runtime/manifests";
 import {
@@ -31,7 +33,6 @@ import {
   rotateDesktopLogSession,
   writeDesktopMainLog,
 } from "./runtime/runtime-logger";
-import type { LaunchdBootstrapResult } from "./services";
 import { SleepGuard, type SleepGuardLogEntry } from "./sleep-guard";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
@@ -43,7 +44,7 @@ const startupEpochMs = Date.now();
 let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let sleepGuard: SleepGuard | null = null;
-let launchdResult: LaunchdBootstrapResult | null = null;
+let residencyContext: DesktopRuntimeResidencyContext = null;
 
 let resolveColdStartReady: () => void;
 const coldStartReady = new Promise<void>((resolve) => {
@@ -80,14 +81,15 @@ const baseRuntimeConfig = getDesktopRuntimeConfig(process.env, {
 });
 logStartupStep("base runtime config created");
 const runtimePlatform = getDesktopRuntimePlatformAdapter(baseRuntimeConfig);
+const runtimeLifecycle = runtimePlatform.lifecycle;
 const { allocations: runtimePortAllocations, runtimeConfig } =
-  await runtimePlatform.prepareRuntimeConfig({
+  await runtimeLifecycle.prepareRuntimeConfig({
     baseRuntimeConfig,
     env: process.env,
     logStartupStep,
   });
 logStartupStep(
-  `runtime config ready platform=${runtimePlatform.id} mode=${runtimeConfig.runtimeMode}`,
+  `runtime config ready platform=${runtimePlatform.id} residency=${runtimeLifecycle.residency} runtimeMode=${runtimeConfig.runtimeMode}`,
 );
 const orchestrator = new RuntimeOrchestrator(
   await measureStartupStep("createRuntimeUnitManifests", () =>
@@ -256,6 +258,7 @@ function triggerUpdateCheck(): void {
 }
 
 function installApplicationMenu(): void {
+  const runtimePlatform = resolveRuntimePlatform();
   const developMenu: MenuItemConstructorOptions = {
     label: "Develop",
     submenu: [
@@ -303,7 +306,7 @@ function installApplicationMenu(): void {
   };
 
   const template: MenuItemConstructorOptions[] = [
-    ...(process.platform === "darwin"
+    ...(runtimePlatform === "mac"
       ? ([
           {
             role: "appMenu",
@@ -481,7 +484,7 @@ app.on("second-instance", () => {
 function createMainWindow(): BrowserWindow {
   logLaunchTimeline("main window creation requested");
   logStartupStep("createMainWindow:start");
-  const isMacOS = process.platform === "darwin";
+  const isMacOS = resolveRuntimePlatform() === "mac";
   const window = new BrowserWindow({
     width: 1400,
     height: 920,
@@ -772,12 +775,25 @@ app.whenReady().then(async () => {
     }
 
     try {
-      logColdStart(`bootstrap mode: ${runtimePlatform.mode}`);
+      const recoveredSession = await runtimeLifecycle.recoverSession?.({
+        app,
+        electronRoot,
+        runtimeConfig,
+        logLifecycleStep: logColdStart,
+      });
+      if (recoveredSession?.snapshot) {
+        const bindings = recoveredSession.snapshot.bindings;
+        logColdStart(
+          `recovery snapshot store=${recoveredSession.snapshot.store} controller=${bindings.controllerPort ?? "n/a"} web=${bindings.webPort ?? "n/a"} openclaw=${bindings.openclawPort ?? "n/a"}`,
+        );
+      }
+
+      logColdStart(`bootstrap residency: ${runtimeLifecycle.residency}`);
       logColdStart(`runtime mode: ${runtimeConfig.runtimeMode}`);
       logColdStart(
         `runtime targets controller=${runtimeConfig.urls.controllerBase} web=${runtimeConfig.urls.web} openclaw=${runtimeConfig.urls.openclawBase}`,
       );
-      const coldStartResult = await runtimePlatform.runColdStart({
+      const coldStartResult = await runtimeLifecycle.coldStartOrAttach({
         app,
         electronRoot,
         runtimeConfig,
@@ -788,7 +804,7 @@ app.whenReady().then(async () => {
         rotateDesktopLogSession,
         waitForControllerReadiness,
       });
-      launchdResult = coldStartResult.launchdResult;
+      residencyContext = coldStartResult.residencyContext;
       healthCheck.recordSuccess();
     } catch (error) {
       healthCheck.recordFailure();
@@ -808,10 +824,10 @@ app.whenReady().then(async () => {
       resolveColdStartReady();
     }
 
-    runtimePlatform.capabilities.shutdownCoordinator.install({
+    runtimeLifecycle.installShutdownCoordinator({
       app,
       mainWindow: win,
-      launchdResult,
+      residencyContext,
       orchestrator,
       diagnosticsReporter,
       sleepGuardDispose: (reason) => sleepGuard?.dispose(reason),
@@ -822,6 +838,7 @@ app.whenReady().then(async () => {
       const updateMgr = new UpdateManager(win, orchestrator, {
         channel: runtimeConfig.updates.channel,
         feedUrl: runtimeConfig.urls.updateFeed,
+        prepareForUpdateInstall: runtimeLifecycle.prepareForUpdateInstall,
       });
       setUpdateManager(updateMgr);
       updateMgr.startPeriodicCheck();
@@ -848,7 +865,11 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
+  switch (resolveRuntimePlatform()) {
+    case "mac":
+      return;
+    case "win":
+      app.quit();
+      return;
   }
 });

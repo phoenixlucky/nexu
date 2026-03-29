@@ -1,6 +1,10 @@
 import { createDesktopWebBuildEnv } from "../shared/build-capabilities.mjs";
 
-export function createWindowsBuildCapabilities({ env, releaseRoot, processPlatform }) {
+export function createWindowsBuildCapabilities({
+  env,
+  releaseRoot,
+  processPlatform,
+}) {
   return {
     platformId: "win",
     artifactLayout: {
@@ -18,7 +22,7 @@ export function createWindowsBuildCapabilities({ env, releaseRoot, processPlatfo
         `--config.electronVersion=${electronVersion}`,
         `--config.buildVersion=${buildVersion}`,
         `--config.directories.output=${releaseRoot}`,
-        ...(dirOnly ? ["--config.win.signAndEditExecutable=false"] : []),
+        "--config.win.signAndEditExecutable=false",
       ];
     },
     createElectronBuilderEnv() {

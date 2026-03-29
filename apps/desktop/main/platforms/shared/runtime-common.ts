@@ -1,16 +1,52 @@
 import type {
   DesktopPlatformCapabilities,
+  DesktopRuntimeLifecycle,
   DesktopRuntimePlatformAdapter,
+  PrepareRuntimeConfigArgs,
+  RecoverPlatformSessionArgs,
+  RunPlatformColdStartArgs,
+  RuntimeTeardownArgs,
 } from "../types";
+
+function createRuntimeLifecycle(opts: {
+  residency: DesktopRuntimeLifecycle["residency"];
+  capabilities: DesktopPlatformCapabilities;
+  prepareRuntimeConfig: DesktopRuntimeLifecycle["prepareRuntimeConfig"];
+  recoverSession?: DesktopRuntimeLifecycle["recoverSession"];
+  coldStartOrAttach: DesktopRuntimeLifecycle["coldStartOrAttach"];
+  teardown?: DesktopRuntimeLifecycle["teardown"];
+}): DesktopRuntimeLifecycle {
+  return {
+    residency: opts.residency,
+    prepareRuntimeConfig: opts.prepareRuntimeConfig,
+    recoverSession: opts.recoverSession,
+    coldStartOrAttach: opts.coldStartOrAttach,
+    installShutdownCoordinator: (args) => {
+      opts.capabilities.shutdownCoordinator.install(args);
+    },
+    teardown: opts.teardown,
+  };
+}
+
+export async function runDefaultTeardown(
+  _args: RuntimeTeardownArgs,
+): Promise<{ handled: boolean }> {
+  return { handled: false };
+}
+
+export async function runDefaultRecoverSession(
+  _args: RecoverPlatformSessionArgs,
+): Promise<{ recovered: boolean; snapshot: null }> {
+  return {
+    recovered: false,
+    snapshot: null,
+  };
+}
 
 export async function prepareManagedRuntimeConfig(
   adapterId: DesktopRuntimePlatformAdapter["id"],
   capabilities: DesktopPlatformCapabilities,
-  {
-    baseRuntimeConfig,
-    env,
-    logStartupStep,
-  }: Parameters<DesktopRuntimePlatformAdapter["prepareRuntimeConfig"]>[0],
+  { baseRuntimeConfig, env, logStartupStep }: PrepareRuntimeConfigArgs,
 ) {
   logStartupStep(`${adapterId}:prepareRuntimeConfig:start`);
   try {
@@ -36,7 +72,7 @@ export async function runManagedColdStart({
   orchestrator,
   rotateDesktopLogSession,
   waitForControllerReadiness,
-}: Parameters<DesktopRuntimePlatformAdapter["runColdStart"]>[0]) {
+}: RunPlatformColdStartArgs) {
   logStartupStep("managedColdStart:start");
   diagnosticsReporter?.markColdStartRunning("starting controller");
   logColdStart("starting controller");
@@ -57,7 +93,7 @@ export async function runManagedColdStart({
   logStartupStep("managedColdStart:done");
 
   return {
-    launchdResult: null,
+    residencyContext: null,
   };
 }
 
@@ -67,7 +103,7 @@ export async function runExternalColdStart({
   logStartupStep,
   rotateDesktopLogSession,
   waitForControllerReadiness,
-}: Parameters<DesktopRuntimePlatformAdapter["runColdStart"]>[0]) {
+}: RunPlatformColdStartArgs) {
   logStartupStep("externalColdStart:start");
   diagnosticsReporter?.markColdStartRunning("attaching to external runtime");
   logColdStart("attaching to external runtime");
@@ -85,7 +121,7 @@ export async function runExternalColdStart({
   logStartupStep("externalColdStart:done");
 
   return {
-    launchdResult: null,
+    residencyContext: null,
   };
 }
 
@@ -95,11 +131,16 @@ export function createManagedRuntimePlatformAdapter(
 ): DesktopRuntimePlatformAdapter {
   return {
     id,
-    mode: "managed",
     capabilities,
-    prepareRuntimeConfig: (args) =>
-      prepareManagedRuntimeConfig(id, capabilities, args),
-    runColdStart: (args) => runManagedColdStart(args),
+    lifecycle: createRuntimeLifecycle({
+      residency: "managed",
+      capabilities,
+      prepareRuntimeConfig: (args) =>
+        prepareManagedRuntimeConfig(id, capabilities, args),
+      recoverSession: (args) => runDefaultRecoverSession(args),
+      coldStartOrAttach: (args) => runManagedColdStart(args),
+      teardown: (args) => runDefaultTeardown(args),
+    }),
   };
 }
 
@@ -109,15 +150,20 @@ export function createExternalRuntimePlatformAdapter(
 ): DesktopRuntimePlatformAdapter {
   return {
     id,
-    mode: "external",
     capabilities,
-    prepareRuntimeConfig: async ({ baseRuntimeConfig, logStartupStep }) => {
-      logStartupStep(`${id}:prepareRuntimeConfig:external`);
-      return {
-        allocations: [],
-        runtimeConfig: baseRuntimeConfig,
-      };
-    },
-    runColdStart: (args) => runExternalColdStart(args),
+    lifecycle: createRuntimeLifecycle({
+      residency: "external",
+      capabilities,
+      prepareRuntimeConfig: async ({ baseRuntimeConfig, logStartupStep }) => {
+        logStartupStep(`${id}:prepareRuntimeConfig:external`);
+        return {
+          allocations: [],
+          runtimeConfig: baseRuntimeConfig,
+        };
+      },
+      recoverSession: (args) => runDefaultRecoverSession(args),
+      coldStartOrAttach: (args) => runExternalColdStart(args),
+      teardown: (args) => runDefaultTeardown(args),
+    }),
   };
 }
