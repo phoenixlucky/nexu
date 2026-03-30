@@ -22,6 +22,7 @@ type ScriptsDevRuntimeConfig = {
   openclawConfigPath: string;
   openclawLogDir: string;
   openclawEntryPath: string;
+  openclawBuiltinExtensionsDir: string;
   openclawLogLevel: string;
   openclawGatewayToken: string;
 };
@@ -134,6 +135,10 @@ export function getScriptsDevRuntimeConfig(): ScriptsDevRuntimeConfig {
       "openclaw.mjs",
     ),
   );
+  const openclawBuiltinExtensionsDir = resolvePath(
+    mergedEnv.OPENCLAW_EXTENSIONS_DIR,
+    join(dirname(openclawEntryPath), "extensions"),
+  );
 
   cachedConfig = {
     devLogLevel: mergedEnv.NEXU_DEV_LOG_LEVEL ?? "info",
@@ -158,6 +163,7 @@ export function getScriptsDevRuntimeConfig(): ScriptsDevRuntimeConfig {
     openclawConfigPath,
     openclawLogDir,
     openclawEntryPath,
+    openclawBuiltinExtensionsDir,
     openclawLogLevel: mergedEnv.NEXU_DEV_OPENCLAW_LOG_LEVEL ?? "info",
     openclawGatewayToken:
       mergedEnv.NEXU_DEV_OPENCLAW_GATEWAY_TOKEN ?? "gw-secret-token",
@@ -179,6 +185,7 @@ export function createControllerInjectedEnv(): NodeJS.ProcessEnv {
     OPENCLAW_STATE_DIR: config.openclawStateDir,
     OPENCLAW_CONFIG_PATH: config.openclawConfigPath,
     OPENCLAW_LOG_DIR: config.openclawLogDir,
+    OPENCLAW_EXTENSIONS_DIR: config.openclawBuiltinExtensionsDir,
     OPENCLAW_GATEWAY_PORT: String(config.openclawPort),
     OPENCLAW_GATEWAY_TOKEN: config.openclawGatewayToken,
   };
