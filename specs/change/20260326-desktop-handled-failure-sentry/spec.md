@@ -28,6 +28,7 @@ Nexu Desktop 已经能够把 renderer/main JavaScript exception 和 native crash
   - `apps/desktop/main/diagnostics-export.ts`
 - 现有 diagnostics 数据已经包含不少对排障有价值的现场信息，包括 runtime state、recent runtime events、cold-start state、renderer/webview failures、startup health 等。
 - `diagnostics-export.ts` 已经具备收集、脱敏、打包 ZIP 的核心能力，理论上可以复用于自动上传路径，只是当前入口仍然是手动导出。
+- 2026-03-30 已经在真实 Sentry dev project 中拿到一条由 POC 产生的 handled failure issue：`NEXU-DESKTOP-DEV-J` / issue id `7373896492` / <https://refly-ai.sentry.io/issues/7373896492/?project=4511058618023936&query=is%3Aunresolved&referrer=issue-stream>。它证明了 `captureMessage(...) + diagnostics ZIP attachment` 这条路径在当前 desktop Sentry 项目内是可达的，而不是只停留在本地代码层面的“理论可行”。
 
 目标状态是让 Nexu Desktop 新增一类面向 **handled functional failures** 的自动上报能力：应用仍然活着，可能没有有意义的 `Error` 对象，但用户可感知的重要功能链路已经断裂、降级或异常，系统应自动附带足够完整的本地诊断现场，以支持远程排查。
 
@@ -191,10 +192,17 @@ POC 验证通过，链路已经打通。
   - `received SIGTERM; shutting down`
 - Sentry `nexu-desktop-dev` 中成功创建并聚合 handled failure issue：
   - issue: `NEXU-DESKTOP-DEV-J`
+  - issue id: `7373896492`
+  - issue url: <https://refly-ai.sentry.io/issues/7373896492/?project=4511058618023936&query=is%3Aunresolved&referrer=issue-stream>
   - title: `desktop.handled_failure.openclaw_process_exited`
 - 最新 event 成功带上 diagnostics ZIP attachment：
   - filename: `nexu-diagnostics.zip`
   - size: `44361` bytes
+- latest event 中可以直接看到：
+  - `isUnhandled=false`，说明它被 Sentry 识别为主动上报的 handled event，而不是 crash / uncaught exception
+  - tags 已包含 `nexu.handled_failure=true`、`nexu.handled_failure_kind=openclaw_process_exited`、`nexu.runtime_unit=openclaw`、`nexu.runtime_reason_code=launchd_log_line`
+  - `handled_failure` context 已包含 `logId`、`message`、`phase`、`ts`、`warnings`
+  - 当前 dev 验证样本里实际命中的触发源是 `launchd_log_line`，不是 `process_exited`
 
 这说明当前方案至少已经证明以下事实：
 
@@ -212,29 +220,45 @@ POC 验证通过，链路已经打通。
 - 如何控制噪音和分组
 - 何时需要从 Sentry attachment 升级为独立上传路径
 
+### 基于 Sentry issue 的可行性判断
+
+结合 `NEXU-DESKTOP-DEV-J` / `7373896492` / <https://refly-ai.sentry.io/issues/7373896492/?project=4511058618023936&query=is%3Aunresolved&referrer=issue-stream> 这条真实 issue，可以把当前结论收敛为：
+
+- **结论：可行。** 现有 POC 已经证明 desktop 可以在“非 crash、非 uncaught exception”的情况下，把 handled failure 以单独 issue 的形式送入现有 Sentry project，并附带 diagnostics ZIP attachment。
+- **短期可以继续沿这条路推进。** 如果目标是先提高问题发现率与远程排障效率，而不是马上建设长期治理体系，那么“trusted signal -> Sentry event + diagnostics ZIP”已经足够作为下一阶段实现基础。
+- **但当前触发条件仍然是 POC 级别。** 从实际 issue 看，命中的信号仍是 `launchd_log_line` 中的 `SIGTERM` 文本，而不是稳定、语义化的 runtime state transition；这适合验证链路，不适合作为最终产品策略直接推广。
+- **Sentry 页面可读性仍需治理。** 当前 event breadcrumbs 混入了大量启动期 console/http/child_process 信息；ZIP attachment 仍然是主要排障载体，但正式 rollout 前最好明确这类 issue 的 query、grouping、tagging 和噪音控制策略。
+- **元数据一致性需要补一轮验证。** 当前样本里的 `build.source` 仍是 `unknown`、`dist` 缺失；这不影响“链路可达”的判断，但说明 handled failure 进入正式 rollout 前，还需要确认 dev / packaged / test / prod 的 release / dist / build metadata 在这类事件上是否稳定完整。
+
 ## Plan
 
 - [ ] Phase 1: Clarify handled failure reporting boundaries
   - [ ] Confirm the first batch of trusted abnormal signals to avoid noisy uploads
   - [ ] Define what qualifies as a handled functional failure versus an existing crash/exception event
   - [ ] Decide how these events should be grouped, tagged, and queried in the desktop Sentry project
+  - [ ] Replace the current `launchd_log_line` SIGTERM fallback with semantically stable runtime failure signals before broader rollout
 - [ ] Phase 2: Define diagnostics payload and transport strategy
   - [ ] Define diagnostics ZIP size expectations, truncation rules, and send-failure fallback behavior
   - [ ] Confirm which existing diagnostics export artifacts can be reused directly for automatic upload
   - [ ] Validate the short-term Sentry attachment/envelope constraints for expected desktop diagnostics bundles
+  - [ ] Decide whether handled failure events need breadcrumb filtering or a dedicated fingerprint/query convention to keep Sentry issues readable
 - [ ] Phase 3: Validate privacy and rollout assumptions
   - [ ] Review whether any additional fields or files must be removed beyond the current redaction layer for default auto-upload
   - [ ] Preserve the manual diagnostics export flow as an explicit support fallback
   - [ ] Document the threshold for switching to a separate upload path if Sentry attachment cost or size becomes unacceptable
+  - [ ] Verify release / dist / build metadata completeness for handled failure events across local dev, packaged test, and prod builds
 
 ## Notes
 
 Open questions:
 
 - 第一批触发信号具体选哪些，才能在“发现率”和“噪音”之间取得平衡？
+- 当前 POC 使用的 `launchd_log_line` + `SIGTERM` 文本匹配何时下线，并替换成哪一层的语义化 failure signal？
 - diagnostics ZIP 的体积上限、截断策略和发送失败兜底应该如何定义？
 - 这类 handled failure 事件在现有 desktop Sentry project 中如何分组、标记和检索，避免与 crash issue 混淆？
+- 是否需要压缩或过滤 breadcrumbs / extra context，避免 issue 页面被大量无关启动日志淹没？
 - 上传完整 diagnostics ZIP 时，还需要额外剔除哪些字段或文件，才能满足默认自动上传的安全边界？
+- 为什么当前真实样本里的 `build.source` 仍然是 `unknown`、`dist` 为空；这是 local-dev 预期行为，还是 handled failure 路径遗漏了部分 metadata？
 - 如果 Sentry attachment 体积或频率不可接受，后续切换独立上传链路的分界点是什么？
 
 References:
