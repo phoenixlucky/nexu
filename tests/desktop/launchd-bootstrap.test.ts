@@ -261,6 +261,21 @@ describe("getLogDir", () => {
 });
 
 describe("resolveLaunchdPaths", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    Object.defineProperty(process, "platform", {
+      value: "darwin",
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, "platform", {
+      value: originalPlatform,
+      configurable: true,
+    });
+  });
+
   it("resolves dev paths from workspace root", async () => {
     const { resolveLaunchdPaths } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"
