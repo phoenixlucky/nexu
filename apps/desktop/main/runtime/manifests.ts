@@ -161,6 +161,24 @@ export function buildSkillNodePath(
   );
 }
 
+/**
+ * Resolve the openclaw sidecar root path WITHOUT extracting.
+ * Returns the path where the sidecar will live after extraction.
+ * Used by createRuntimeUnitManifests to set up paths early without
+ * blocking the main process on synchronous tar extraction.
+ */
+export function resolveOpenclawSidecarRoot(
+  runtimeSidecarBaseRoot: string,
+  runtimeRoot: string,
+): string {
+  const packagedSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "openclaw");
+  const archivePath = path.resolve(packagedSidecarRoot, "payload.tar.gz");
+  if (!existsSync(archivePath)) {
+    return packagedSidecarRoot;
+  }
+  return path.resolve(runtimeRoot, "openclaw-sidecar");
+}
+
 export function ensurePackagedOpenclawSidecar(
   runtimeSidecarBaseRoot: string,
   runtimeRoot: string,
@@ -349,8 +367,12 @@ export function createRuntimeUnitManifests(
     ? path.resolve(electronRoot, "runtime")
     : path.resolve(repoRoot, ".tmp/sidecars");
   const runtimeRoot = ensureDir(path.resolve(userDataPath, "runtime"));
+  // Use the non-blocking path resolver for manifest creation. Actual
+  // extraction happens later in extractOpenclawSidecarAsync() during
+  // cold start. This avoids blocking the main process for 10-20s on
+  // first install while tar extracts synchronously.
   const openclawSidecarRoot = isPackaged
-    ? ensurePackagedOpenclawSidecar(runtimeSidecarBaseRoot, runtimeRoot)
+    ? resolveOpenclawSidecarRoot(runtimeSidecarBaseRoot, runtimeRoot)
     : path.resolve(runtimeSidecarBaseRoot, "openclaw");
   const logsDir = ensureDir(path.resolve(userDataPath, "logs/runtime-units"));
   const openclawRuntimeRoot = ensureDir(path.resolve(runtimeRoot, "openclaw"));

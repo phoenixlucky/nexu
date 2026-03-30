@@ -831,24 +831,23 @@ function createMainWindow(): BrowserWindow {
     }
   });
 
-  // During first install / post-update, show the window immediately with a
-  // white background so the user sees the animation ASAP instead of waiting
-  // for React to fully initialize. The white background matches the animation
-  // overlay, creating a seamless experience.
-  if (needsSetupExtraction) {
-    window.webContents.once("did-start-loading", () => {
-      logLaunchTimeline("setup animation: showing window early");
-      window.setBackgroundColor("#ffffff");
-      window.show();
-      focusMainWindow();
-    });
-  }
-
   window.on("closed", () => {
     if (mainWindow === window) {
       mainWindow = null;
     }
   });
+
+  // During first install / post-update, show the window IMMEDIATELY with a
+  // white background — before loadFile, before React, before anything.
+  // This eliminates the 10-20s blank screen while the Electron main process
+  // is doing sidecar extraction / launchd bootstrap in the background.
+  // The white background matches the animation overlay seamlessly.
+  if (needsSetupExtraction) {
+    logLaunchTimeline("setup animation: showing window immediately");
+    window.setBackgroundColor("#ffffff");
+    window.show();
+    focusMainWindow();
+  }
 
   void window.loadFile(resolve(__dirname, "../../dist/index.html"));
   logLaunchTimeline("main window loadFile dispatched");
