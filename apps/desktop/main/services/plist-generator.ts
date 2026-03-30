@@ -250,7 +250,13 @@ function generateOpenclawPlist(label: string, env: PlistEnv): string {
         <key>OPENCLAW_SERVICE_MARKER</key>
         <string>launchd</string>
         <key>OPENCLAW_IMAGE_BACKEND</key>
-        <string>sips</string>
+        <string>sips</string>${
+          env.gatewayToken
+            ? `
+        <key>OPENCLAW_GATEWAY_TOKEN</key>
+        <string>${escapeXml(env.gatewayToken)}</string>`
+            : ""
+        }
         <key>HOME</key>
         <string>${escapeXml(os.homedir())}</string>${renderProxyEnvEntries(
           env.proxyEnv,
