@@ -23,6 +23,7 @@ import type {
 } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
+import { proxyFetch } from "../lib/proxy-fetch.js";
 import type { OpenClawProcessManager } from "../runtime/openclaw-process.js";
 import type { OpenClawWsClient } from "../runtime/openclaw-ws-client.js";
 import type { RuntimeHealth } from "../runtime/runtime-health.js";
@@ -31,11 +32,6 @@ import type { OpenClawGatewayService } from "./openclaw-gateway-service.js";
 import type { OpenClawSyncService } from "./openclaw-sync-service.js";
 
 const execFileAsync = promisify(execFile);
-
-function timeoutSignal(ms: number): AbortSignal {
-  return AbortSignal.timeout(ms);
-}
-
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -593,8 +589,8 @@ async function fetchWechatQrCode(
     base,
   );
   try {
-    const response = await fetch(url.toString(), {
-      signal: timeoutSignal(WECHAT_QR_FETCH_TIMEOUT_MS),
+    const response = await proxyFetch(url.toString(), {
+      timeoutMs: WECHAT_QR_FETCH_TIMEOUT_MS,
     });
     if (!response.ok) {
       throw new Error(
@@ -625,7 +621,7 @@ async function pollWechatQrStatus(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), WECHAT_QR_POLL_TIMEOUT_MS);
   try {
-    const response = await fetch(url.toString(), {
+    const response = await proxyFetch(url.toString(), {
       headers: { "iLink-App-ClientVersion": "1" },
       signal: controller.signal,
     });
@@ -673,9 +669,9 @@ export class ChannelService {
   }
 
   async connectSlack(input: ConnectSlackInput) {
-    const authResp = await fetch("https://slack.com/api/auth.test", {
+    const authResp = await proxyFetch("https://slack.com/api/auth.test", {
       headers: { Authorization: `Bearer ${input.botToken}` },
-      signal: timeoutSignal(5000),
+      timeoutMs: 5000,
     });
     const authData = (await authResp.json()) as {
       ok: boolean;
@@ -693,11 +689,11 @@ export class ChannelService {
 
     let appId = input.appId;
     if (!appId && authData.bot_id) {
-      const botInfoResp = await fetch(
+      const botInfoResp = await proxyFetch(
         `https://slack.com/api/bots.info?bot=${authData.bot_id}`,
         {
           headers: { Authorization: `Bearer ${input.botToken}` },
-          signal: timeoutSignal(5000),
+          timeoutMs: 5000,
         },
       );
       const botInfo = (await botInfoResp.json()) as {
@@ -724,9 +720,9 @@ export class ChannelService {
   }
 
   async connectDiscord(input: ConnectDiscordInput) {
-    const userResp = await fetch("https://discord.com/api/v10/users/@me", {
+    const userResp = await proxyFetch("https://discord.com/api/v10/users/@me", {
       headers: { Authorization: `Bot ${input.botToken}` },
-      signal: timeoutSignal(5000),
+      timeoutMs: 5000,
     });
     if (!userResp.ok) {
       throw new Error(
@@ -738,11 +734,11 @@ export class ChannelService {
 
     const userData = (await userResp.json()) as { id?: string };
 
-    const appResp = await fetch(
+    const appResp = await proxyFetch(
       "https://discord.com/api/v10/applications/@me",
       {
         headers: { Authorization: `Bot ${input.botToken}` },
-        signal: timeoutSignal(5000),
+        timeoutMs: 5000,
       },
     );
     if (appResp.ok) {
@@ -767,6 +763,18 @@ export class ChannelService {
     const channel = await this.configStore.connectWechat({ accountId });
     await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();
+    const readiness = await this.waitForWechatReady(accountId);
+    if (!readiness.ready) {
+      // Rollback: disconnect the channel so the user doesn't see a
+      // "connected" channel that can't actually receive messages.
+      await this.configStore.disconnectChannel(channel.id);
+      this.cleanupWechatAccountState(accountId);
+      await this.syncService.syncAll();
+      throw new Error(
+        readiness.lastError ??
+          "WeChat linked, but the runtime failed to start the listener.",
+      );
+    }
     return channel;
   }
 
@@ -860,10 +868,10 @@ export class ChannelService {
   }
 
   async connectTelegram(input: ConnectTelegramInput) {
-    const response = await fetch(
+    const response = await proxyFetch(
       `https://api.telegram.org/bot${encodeURIComponent(input.botToken)}/getMe`,
       {
-        signal: timeoutSignal(5000),
+        timeoutMs: 5000,
       },
     );
     if (!response.ok) {
@@ -1117,7 +1125,7 @@ export class ChannelService {
   }
 
   async connectFeishu(input: ConnectFeishuInput) {
-    const response = await fetch(
+    const response = await proxyFetch(
       "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
       {
         method: "POST",
@@ -1126,7 +1134,7 @@ export class ChannelService {
           app_id: input.appId,
           app_secret: input.appSecret,
         }),
-        signal: timeoutSignal(5000),
+        timeoutMs: 5000,
       },
     );
     const payload = (await response.json()) as { code?: number; msg?: string };
@@ -1149,6 +1157,10 @@ export class ChannelService {
     const channel = await this.configStore.getChannel(channelId);
     const removed = await this.configStore.disconnectChannel(channelId);
     if (removed) {
+      // syncAll triggers the authoritative index writer which removes
+      // account IDs no longer in config. Credential files are cleaned up
+      // by the writer's orphan sweep — no destructive cleanup here so
+      // disconnect stays a pure "unbind", not a "logout".
       await this.syncService.syncAll();
       if (channel?.channelType === "whatsapp") {
         await this.restartOpenClawForWhatsappLifecycle("whatsapp-disconnect");
@@ -1198,6 +1210,47 @@ export class ChannelService {
       await sleep(WHATSAPP_READY_POLL_MS);
       lastReadiness = await this.gatewayService.getChannelReadiness(
         "whatsapp",
+        accountId,
+      );
+    }
+    return lastReadiness;
+  }
+
+  /**
+   * Remove credential and sync files for a WeChat account.
+   * Index cleanup is NOT done here — the authoritative config writer
+   * handles index reconciliation during syncAll().
+   */
+  private cleanupWechatAccountState(accountId: string) {
+    const stateDir = this.env.openclawStateDir;
+    if (!stateDir) return;
+
+    const accountsDir = path.join(stateDir, "openclaw-weixin", "accounts");
+    for (const suffix of [".json", ".sync.json"]) {
+      try {
+        rmSync(path.join(accountsDir, `${accountId}${suffix}`));
+      } catch {
+        // ignore if not found
+      }
+    }
+  }
+
+  private async waitForWechatReady(accountId: string) {
+    // With the prewarm account, hot-reload takes ~500ms-2s.
+    // Without prewarm (first ever), full restart takes ~20-45s.
+    // Use a generous deadline but poll frequently for fast path.
+    const deadline = Date.now() + 30_000;
+    let lastReadiness = await this.gatewayService.getChannelReadiness(
+      "wechat",
+      accountId,
+    );
+    while (Date.now() < deadline) {
+      if (lastReadiness.ready) {
+        return lastReadiness;
+      }
+      await sleep(1000);
+      lastReadiness = await this.gatewayService.getChannelReadiness(
+        "wechat",
         accountId,
       );
     }

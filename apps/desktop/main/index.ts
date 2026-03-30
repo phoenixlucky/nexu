@@ -10,10 +10,12 @@ import {
   nativeTheme,
   powerMonitor,
   powerSaveBlocker,
+  session,
   shell,
 } from "electron";
 import { getOpenclawSkillsDir } from "../shared/desktop-paths";
 import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
+import { buildChildProcessProxyEnv } from "../shared/proxy-config";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { getDesktopAppRoot, getWorkspaceRoot } from "../shared/workspace-paths";
@@ -50,6 +52,7 @@ import {
   resolveLaunchdPaths,
   teardownLaunchdServices,
 } from "./services";
+import { ProxyManager } from "./services/proxy-manager";
 import {
   getLegacyNexuHomeStateDir,
   migrateOpenclawState,
@@ -244,6 +247,23 @@ let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let sleepGuard: SleepGuard | null = null;
 let launchdResult: LaunchdBootstrapResult | null = null;
+let proxyManager: ProxyManager | null = null;
+
+async function refreshProxyDiagnostics(): Promise<void> {
+  if (!proxyManager) {
+    return;
+  }
+  const targets = [
+    { label: "controller", url: runtimeConfig.urls.controllerBase },
+    { label: "openclaw", url: runtimeConfig.urls.openclawBase },
+    { label: "external", url: "https://nexu.io" },
+  ];
+  const snapshot = await proxyManager.collectDiagnostics(
+    runtimeConfig.proxy,
+    targets,
+  );
+  diagnosticsReporter?.setProxySnapshot(snapshot);
+}
 
 // ---------------------------------------------------------------------------
 // Unified graceful shutdown — single authoritative teardown path.
@@ -599,6 +619,7 @@ async function runLaunchdColdStart(): Promise<void> {
     ? resolve(electronRoot, "static/platform-templates")
     : resolve(repoRoot, "apps/controller/static/platform-templates");
   const skillNodePath = buildSkillNodePath(electronRoot, app.isPackaged);
+  const proxyEnv = buildChildProcessProxyEnv(runtimeConfig.proxy);
 
   launchdResult = await bootstrapWithLaunchd({
     isDev,
@@ -623,6 +644,7 @@ async function runLaunchdColdStart(): Promise<void> {
     openclawExtensionsDir,
     skillNodePath,
     openclawTmpDir,
+    proxyEnv,
     appVersion: app.getVersion(),
     userDataPath: app.getPath("userData"),
     buildSource:
@@ -956,8 +978,11 @@ logLaunchTimeline("electron main module evaluated");
 
 app.whenReady().then(async () => {
   logLaunchTimeline("app.whenReady resolved");
+  proxyManager = new ProxyManager(session.defaultSession);
+  await proxyManager.applyPolicy(runtimeConfig.proxy);
   installApplicationMenu();
   diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
+  await refreshProxyDiagnostics();
   diagnosticsReporter.recordStartupProbe({
     source: "main",
     stage: "main:app-when-ready",
@@ -1002,8 +1027,10 @@ app.whenReady().then(async () => {
       } else {
         await runDesktopColdStart();
       }
+      await refreshProxyDiagnostics();
       healthCheck.recordSuccess();
     } catch (error) {
+      await refreshProxyDiagnostics().catch(() => undefined);
       healthCheck.recordFailure();
       diagnosticsReporter?.markColdStartFailed(
         error instanceof Error ? error.message : String(error),
