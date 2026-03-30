@@ -1,4 +1,4 @@
-import { cp, mkdir, readdir, stat } from "node:fs/promises";
+import { access, cp, mkdir, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
@@ -48,7 +48,11 @@ export class WorkspaceTemplateWriter {
         // Write directly to workspace root, not nexu-platform/ subdirectory
         const targetPath = path.join(workspaceDir, entry.name);
 
-        await cp(sourcePath, targetPath, { recursive: true, force: true });
+        // Skip files that already exist to preserve agent-written data (e.g. USER.md)
+        if (await this.pathExists(targetPath)) {
+          continue;
+        }
+        await cp(sourcePath, targetPath, { recursive: true });
       }
 
       logger.debug(
@@ -60,6 +64,15 @@ export class WorkspaceTemplateWriter {
         { botId, sourceDir, error: err instanceof Error ? err.message : err },
         "failed to copy platform templates",
       );
+    }
+  }
+
+  private async pathExists(filePath: string): Promise<boolean> {
+    try {
+      await access(filePath);
+      return true;
+    } catch {
+      return false;
     }
   }
 
