@@ -325,6 +325,16 @@ export async function getCurrentOpenclawDevSnapshot(): Promise<OpenclawDevSnapsh
     };
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      try {
+        const listenerPid = await getOpenclawPortPid();
+        return {
+          service: "openclaw",
+          status: "running",
+          pid: listenerPid,
+          listenerPid,
+        };
+      } catch {}
+
       return {
         service: "openclaw",
         status: "stopped",
