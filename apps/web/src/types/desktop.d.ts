@@ -1,4 +1,4 @@
-export type SkillSource = "curated" | "managed" | "custom" | "workspace";
+export type SkillSource = "curated" | "managed" | "custom" | "workspace" | "user";
 
 export type InstalledSkill = {
   slug: string;

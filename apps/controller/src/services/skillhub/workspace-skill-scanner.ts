@@ -33,11 +33,7 @@ export class WorkspaceSkillScanner {
   private scanDir(dir: string): string[] {
     try {
       return readdirSync(dir, { withFileTypes: true })
-        .filter(
-          (entry) =>
-            (entry.isDirectory() || entry.isSymbolicLink()) &&
-            existsSync(join(dir, entry.name, "SKILL.md")),
-        )
+        .filter((entry) => existsSync(join(dir, entry.name, "SKILL.md")))
         .map((entry) => entry.name);
     } catch {
       return [];

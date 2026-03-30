@@ -538,7 +538,7 @@ export function compileOpenClawConfig(
       load: {
         watch: true,
         watchDebounceMs: 250,
-        extraDirs: [env.openclawSkillsDir],
+        extraDirs: [env.openclawSkillsDir, env.userSkillsDir].filter(Boolean),
       },
     },
     commands: {

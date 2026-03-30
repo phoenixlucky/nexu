@@ -60,6 +60,7 @@ export class SkillhubService {
 
     const catalogManager = new CatalogManager(env.skillhubCacheDir, {
       skillsDir: env.openclawSkillsDir,
+      userSkillsDir: env.userSkillsDir,
       staticSkillsDir: env.staticSkillsDir,
       skillDb,
       log,
@@ -85,6 +86,7 @@ export class SkillhubService {
 
     const dirWatcher = new SkillDirWatcher({
       skillsDir: env.openclawSkillsDir,
+      userSkillsDir: env.userSkillsDir,
       isSlugInFlight: (slug) => installQueue.isInFlight(slug),
       skillDb,
       log,

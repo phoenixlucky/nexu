@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import dotenv from "dotenv";
 import { z } from "zod";
@@ -91,6 +92,7 @@ export const env = {
   openclawSkillsDir: expandHomeDir(
     parsed.OPENCLAW_SKILLS_DIR ?? path.join(openclawStateDir, "skills"),
   ),
+  userSkillsDir: path.resolve(os.homedir(), ".agents", "skills"),
   openclawBuiltinExtensionsDir: parsed.OPENCLAW_EXTENSIONS_DIR
     ? expandHomeDir(parsed.OPENCLAW_EXTENSIONS_DIR)
     : null,

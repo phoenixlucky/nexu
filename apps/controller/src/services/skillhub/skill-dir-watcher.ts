@@ -17,10 +17,12 @@ export class SkillDirWatcher {
   private readonly log: SkillDirWatcherLogFn;
   private readonly debounceMs: number;
   private readonly isSlugInFlight: (slug: string) => boolean;
+  private readonly userSkillsDir: string | null;
   private readonly openclawStateDir: string | null;
   private readonly onChange: () => void;
   private botIds: readonly string[];
   private sharedWatcher: FSWatcher | null = null;
+  private userWatcher: FSWatcher | null = null;
   private workspaceWatcher: FSWatcher | null = null;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -31,6 +33,8 @@ export class SkillDirWatcher {
     debounceMs?: number;
     /** Returns true if the slug is currently being installed by the queue. */
     isSlugInFlight?: (slug: string) => boolean;
+    /** User-level skills directory (~/.agents/skills/). */
+    userSkillsDir?: string;
     /** Root of the OpenClaw state directory (contains agents/<botId>/skills/). */
     openclawStateDir?: string;
     /** Bot IDs whose workspace skill directories should be reconciled. */
@@ -43,6 +47,7 @@ export class SkillDirWatcher {
     this.log = opts.log ?? defaultLog;
     this.debounceMs = opts.debounceMs ?? 500;
     this.isSlugInFlight = opts.isSlugInFlight ?? (() => false);
+    this.userSkillsDir = opts.userSkillsDir ?? null;
     this.openclawStateDir = opts.openclawStateDir ?? null;
     this.botIds = opts.botIds ?? [];
     this.onChange = opts.onChange ?? (() => {});
@@ -54,8 +59,9 @@ export class SkillDirWatcher {
 
   syncNow(): boolean {
     const sharedChanged = this.syncSharedDir();
+    const userChanged = this.syncUserDir();
     const workspaceChanged = this.syncWorkspaceDirs();
-    return sharedChanged || workspaceChanged;
+    return sharedChanged || userChanged || workspaceChanged;
   }
 
   private syncSharedDir(): boolean {
@@ -107,6 +113,54 @@ export class SkillDirWatcher {
       this.log(
         "info",
         `Marked ${slugs.length} ${source} skill(s) as uninstalled: ${slugs.join(", ")}`,
+      );
+    }
+
+    return changed;
+  }
+
+  private syncUserDir(): boolean {
+    if (!this.userSkillsDir || !existsSync(this.userSkillsDir)) {
+      return false;
+    }
+
+    const diskSlugs = this.scanDirSlugs(this.userSkillsDir);
+    if (diskSlugs === null) {
+      this.log(
+        "warn",
+        "sync: user directory scan failed, skipping reconciliation",
+      );
+      return false;
+    }
+    const diskSet = new Set(diskSlugs);
+
+    const installed = this.db
+      .getAllInstalled()
+      .filter((r) => r.source === "user");
+    const installedSlugs = new Set(installed.map((r) => r.slug));
+
+    // Disk has it, ledger doesn't -> record as user
+    const added = diskSlugs.filter((slug) => !installedSlugs.has(slug));
+    let changed = false;
+    if (added.length > 0) {
+      this.db.recordBulkInstall(added, "user");
+      changed = true;
+      this.log(
+        "info",
+        `Synced ${added.length} user skill(s) from disk: ${added.join(", ")}`,
+      );
+    }
+
+    // Ledger has it, disk doesn't -> mark as uninstalled
+    const missingSlugs = installed
+      .filter((r) => !diskSet.has(r.slug))
+      .map((r) => r.slug);
+    if (missingSlugs.length > 0) {
+      this.db.markUninstalledBySlugs(missingSlugs, "user");
+      changed = true;
+      this.log(
+        "info",
+        `Marked ${missingSlugs.length} user skill(s) as uninstalled: ${missingSlugs.join(", ")}`,
       );
     }
 
@@ -196,6 +250,27 @@ export class SkillDirWatcher {
 
     this.log("info", `Watching skills directory: ${this.skillsDir}`);
 
+    if (this.userSkillsDir && existsSync(this.userSkillsDir)) {
+      this.userWatcher = watch(
+        this.userSkillsDir,
+        { recursive: true },
+        (_event, filename) => {
+          if (filename?.endsWith("SKILL.md")) {
+            this.scheduleSync();
+          }
+        },
+      );
+
+      this.userWatcher.on("error", (err: unknown) => {
+        this.log(
+          "error",
+          `User watcher error: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
+
+      this.log("info", `Watching user skills directory: ${this.userSkillsDir}`);
+    }
+
     if (this.openclawStateDir && existsSync(this.openclawStateDir)) {
       this.workspaceWatcher = watch(
         this.openclawStateDir,
@@ -236,6 +311,11 @@ export class SkillDirWatcher {
     if (this.sharedWatcher !== null) {
       this.sharedWatcher.close();
       this.sharedWatcher = null;
+    }
+
+    if (this.userWatcher !== null) {
+      this.userWatcher.close();
+      this.userWatcher = null;
     }
 
     if (this.workspaceWatcher !== null) {
@@ -283,11 +363,7 @@ export class SkillDirWatcher {
   private scanDirSlugs(dir: string): string[] | null {
     try {
       return readdirSync(dir, { withFileTypes: true })
-        .filter(
-          (entry) =>
-            (entry.isDirectory() || entry.isSymbolicLink()) &&
-            existsSync(resolve(dir, entry.name, "SKILL.md")),
-        )
+        .filter((entry) => existsSync(resolve(dir, entry.name, "SKILL.md")))
         .map((entry) => entry.name);
     } catch {
       return null;

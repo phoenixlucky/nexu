@@ -109,10 +109,13 @@ export class CatalogManager {
   private readonly log: SkillhubLogFn;
   private intervalId: ReturnType<typeof setInterval> | null = null;
 
+  private readonly userSkillsDir: string;
+
   constructor(
     cacheDir: string,
     opts: {
       skillsDir?: string;
+      userSkillsDir?: string;
       staticSkillsDir?: string;
       skillDb: SkillDb;
       log?: SkillhubLogFn;
@@ -120,6 +123,7 @@ export class CatalogManager {
   ) {
     this.cacheDir = cacheDir;
     this.skillsDir = opts.skillsDir ?? "";
+    this.userSkillsDir = opts.userSkillsDir ?? "";
     this.db = opts.skillDb;
     this.staticSkillsDir = opts.staticSkillsDir ?? "";
     this.metaPath = resolve(this.cacheDir, "meta.json");
@@ -664,6 +668,9 @@ export class CatalogManager {
     if (record.source === "workspace" && record.agentId) {
       const stateDir = dirname(this.skillsDir);
       return join(stateDir, "agents", record.agentId, "skills", record.slug);
+    }
+    if (record.source === "user" && this.userSkillsDir) {
+      return join(this.userSkillsDir, record.slug);
     }
     return resolve(this.skillsDir, record.slug);
   }

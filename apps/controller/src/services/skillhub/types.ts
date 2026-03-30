@@ -15,7 +15,7 @@ export type CatalogMeta = {
   skillCount: number;
 };
 
-export type SkillSource = "managed" | "custom" | "workspace";
+export type SkillSource = "managed" | "custom" | "workspace" | "user";
 
 export type InstalledSkill = {
   slug: string;

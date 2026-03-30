@@ -20,6 +20,7 @@ function createEnv(overrides: Record<string, unknown> = {}): ControllerEnv {
     openclawStateDir: "/tmp/openclaw",
     openclawConfigPath: "/tmp/openclaw/openclaw.json",
     openclawSkillsDir: "/tmp/openclaw/skills",
+    userSkillsDir: "/tmp/.agents/skills",
     openclawWorkspaceTemplatesDir: "/tmp/openclaw/workspace-templates",
     openclawBin: "openclaw",
     openclawGatewayPort: 18789,

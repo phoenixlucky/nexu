@@ -15,10 +15,14 @@ const skillRecordSchema = z.object({
   slug: z.string(),
   // Accept "curated" from legacy ledgers, convert to "managed"
   source: z
-    .enum(["curated", "managed", "custom", "workspace"])
+    .enum(["curated", "managed", "custom", "workspace", "user"])
     .transform(
       (v) =>
-        (v === "curated" ? "managed" : v) as "managed" | "custom" | "workspace",
+        (v === "curated" ? "managed" : v) as
+          | "managed"
+          | "custom"
+          | "workspace"
+          | "user",
     ),
   status: z.enum(["installed", "uninstalled"]),
   version: z.string().nullable().default(null),

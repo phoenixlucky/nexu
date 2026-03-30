@@ -17,7 +17,7 @@ const minimalSkillSchema = z.object({
 
 const installedSkillSchema = z.object({
   slug: z.string(),
-  source: z.enum(["managed", "custom", "workspace"]),
+  source: z.enum(["managed", "custom", "workspace", "user"]),
   name: z.string(),
   description: z.string(),
   installedAt: z.string().nullable(),
@@ -33,7 +33,7 @@ const catalogMetaSchema = z.object({
 
 const queueItemSchema = z.object({
   slug: z.string(),
-  source: z.enum(["managed", "custom", "workspace"]),
+  source: z.enum(["managed", "custom", "workspace", "user"]),
   status: z.enum([
     "queued",
     "downloading",
@@ -62,7 +62,7 @@ const skillhubMutationResultSchema = z.object({
 });
 
 const skillhubSlugSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,127}$/);
-const skillhubSourceSchema = z.enum(["managed", "custom", "workspace"]);
+const skillhubSourceSchema = z.enum(["managed", "custom", "workspace", "user"]);
 const skillhubUninstallRequestSchema = z
   .object({
     slug: skillhubSlugSchema,
@@ -205,7 +205,9 @@ export function registerSkillhubRoutes(
             "application/json": {
               schema: z.object({
                 slug: skillhubSlugSchema,
-                source: z.enum(["managed", "custom", "workspace"]).optional(),
+                source: z
+                  .enum(["managed", "custom", "workspace", "user"])
+                  .optional(),
                 agentId: z.string().nullable().optional(),
               }),
             },

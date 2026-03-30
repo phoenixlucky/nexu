@@ -19,6 +19,7 @@ function createEnv(overrides: Record<string, unknown> = {}): ControllerEnv {
     openclawStateDir: "/tmp/openclaw",
     openclawConfigPath: "/tmp/openclaw/openclaw.json",
     openclawSkillsDir: "/tmp/openclaw/skills",
+    userSkillsDir: "/tmp/.agents/skills",
     openclawWorkspaceTemplatesDir: "/tmp/openclaw/workspace-templates",
     openclawBin: "openclaw",
     openclawGatewayPort: 18789,
@@ -177,7 +178,10 @@ describe("compileOpenClawConfig", () => {
       verificationToken: "verify-token",
     });
     expect(result.plugins?.entries?.feishu?.enabled).toBe(true);
-    expect(result.skills?.load?.extraDirs).toEqual(["/tmp/openclaw/skills"]);
+    expect(result.skills?.load?.extraDirs).toEqual([
+      "/tmp/openclaw/skills",
+      "/tmp/.agents/skills",
+    ]);
   });
 
   it("injects env-backed litellm routing for bare local model ids", () => {

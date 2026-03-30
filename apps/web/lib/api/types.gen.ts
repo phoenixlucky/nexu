@@ -2688,7 +2688,7 @@ export type GetApiV1SkillhubCatalogResponses = {
         installedSlugs: Array<string>;
         installedSkills: Array<{
             slug: string;
-            source: 'managed' | 'custom' | 'workspace';
+            source: 'managed' | 'custom' | 'workspace' | 'user';
             name: string;
             description: string;
             installedAt: string;
@@ -2702,7 +2702,7 @@ export type GetApiV1SkillhubCatalogResponses = {
         };
         queue: Array<{
             slug: string;
-            source: 'managed' | 'custom' | 'workspace';
+            source: 'managed' | 'custom' | 'workspace' | 'user';
             status: 'queued' | 'downloading' | 'installing-deps' | 'done' | 'failed';
             position: number;
             error: string;
@@ -2718,7 +2718,7 @@ export type GetApiV1SkillhubCatalogResponse = GetApiV1SkillhubCatalogResponses[k
 export type PostApiV1SkillhubInstallData = {
     body?: {
         slug: string;
-        source?: 'managed' | 'custom' | 'workspace';
+        source?: 'managed' | 'custom' | 'workspace' | 'user';
         agentId?: string;
     };
     path?: never;
@@ -2745,7 +2745,7 @@ export type PostApiV1SkillhubInstallResponse = PostApiV1SkillhubInstallResponses
 export type PostApiV1SkillhubUninstallData = {
     body?: {
         slug: string;
-        source?: 'managed' | 'custom' | 'workspace';
+        source?: 'managed' | 'custom' | 'workspace' | 'user';
         agentId?: string;
     };
     path?: never;
@@ -2791,7 +2791,7 @@ export type GetApiV1SkillhubSkillsBySlugData = {
         slug: string;
     };
     query?: {
-        source?: 'managed' | 'custom' | 'workspace';
+        source?: 'managed' | 'custom' | 'workspace' | 'user';
         agentId?: string;
     };
     url: '/api/v1/skillhub/skills/{slug}';
@@ -2822,7 +2822,7 @@ export type GetApiV1SkillhubSkillsBySlugResponses = {
         version: string;
         updatedAt: string;
         installed: boolean;
-        installedSource: 'managed' | 'custom' | 'workspace';
+        installedSource: 'managed' | 'custom' | 'workspace' | 'user';
         agentId: string;
         uninstallable: boolean;
         skillContent: string;

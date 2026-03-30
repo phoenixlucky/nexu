@@ -46,7 +46,10 @@ type UninstallableSkillSource = Exclude<SkillSource, "curated">;
 function toUninstallSource(
   source: SkillSource | string | null | undefined,
 ): UninstallableSkillSource | undefined {
-  return source === "managed" || source === "custom" || source === "workspace"
+  return source === "managed" ||
+    source === "custom" ||
+    source === "workspace" ||
+    source === "user"
     ? source
     : undefined;
 }

@@ -7407,7 +7407,8 @@
                             "enum": [
                               "managed",
                               "custom",
-                              "workspace"
+                              "workspace",
+                              "user"
                             ]
                           },
                           "name": {
@@ -7473,7 +7474,8 @@
                             "enum": [
                               "managed",
                               "custom",
-                              "workspace"
+                              "workspace",
+                              "user"
                             ]
                           },
                           "status": {
@@ -7556,7 +7558,8 @@
                     "enum": [
                       "managed",
                       "custom",
-                      "workspace"
+                      "workspace",
+                      "user"
                     ]
                   },
                   "agentId": {
@@ -7635,7 +7638,8 @@
                     "enum": [
                       "managed",
                       "custom",
-                      "workspace"
+                      "workspace",
+                      "user"
                     ]
                   },
                   "agentId": {
@@ -7730,7 +7734,8 @@
               "enum": [
                 "managed",
                 "custom",
-                "workspace"
+                "workspace",
+                "user"
               ]
             },
             "required": false,
@@ -7790,7 +7795,8 @@
                       "enum": [
                         "managed",
                         "custom",
-                        "workspace"
+                        "workspace",
+                        "user"
                       ]
                     },
                     "agentId": {
