@@ -35,7 +35,6 @@ import {
   notifySetupAnimationComplete,
   onDesktopCommand,
   onRuntimeEvent,
-  openExternal,
   reportStartupProbe,
   showRuntimeLogFile,
   startUnit,
@@ -1227,9 +1226,6 @@ function DesktopShell() {
       <UpdateBanner
         dismissed={update.dismissed}
         errorMessage={update.errorMessage}
-        onChangelog={() =>
-          void openExternal("https://github.com/nexu-io/nexu/releases")
-        }
         onDismiss={update.dismiss}
         onDownload={() => void update.download()}
         onInstall={() => void update.install()}
