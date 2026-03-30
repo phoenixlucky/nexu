@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: desktop-release-${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
