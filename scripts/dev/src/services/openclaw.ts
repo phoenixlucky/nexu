@@ -35,6 +35,8 @@ export type OpenclawDevSnapshot = {
   service: "openclaw";
   status: "running" | "stopped" | "stale";
   pid?: number;
+  supervisorPid?: number;
+  workerPid?: number;
   listenerPid?: number;
   runId?: string;
   sessionId?: string;
@@ -130,14 +132,9 @@ async function waitForOpenclawHealth(supervisorPid: number): Promise<void> {
   const waitStartedAt = Date.now();
 
   for (let index = 0; index < attempts; index += 1) {
-    try {
-      const response = await fetch(healthUrl, {
-        signal: AbortSignal.timeout(1000),
-      });
-      if (response.ok) {
-        return;
-      }
-    } catch {}
+    if (await getOpenclawHealthStatus()) {
+      return;
+    }
 
     if (!isProcessRunning(supervisorPid)) {
       throw new Error("openclaw supervisor exited before health check passed");
@@ -163,6 +160,47 @@ async function waitForOpenclawHealth(supervisorPid: number): Promise<void> {
   throw new Error(
     `openclaw health endpoint did not become ready at ${healthUrl}`,
   );
+}
+
+async function getOpenclawHealthStatus(): Promise<boolean> {
+  const runtimeConfig = getScriptsDevRuntimeConfig();
+
+  try {
+    const response = await fetch(`${runtimeConfig.openclawBaseUrl}/health`, {
+      signal: AbortSignal.timeout(1000),
+    });
+
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForOpenclawCurrentLock(options: {
+  runId: string;
+  sessionId: string;
+}): Promise<Awaited<ReturnType<typeof readDevLock>> | null> {
+  const attempts = 20;
+  const delayMs = 250;
+
+  for (let index = 0; index < attempts; index += 1) {
+    const recordedLock = await readDevLock(openclawDevLockPath).catch(
+      () => null,
+    );
+
+    if (
+      recordedLock?.runId === options.runId &&
+      recordedLock.sessionId === options.sessionId
+    ) {
+      return recordedLock;
+    }
+
+    if (index < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  return null;
 }
 
 async function prepareOpenclawEntryPath(): Promise<string> {
@@ -197,6 +235,10 @@ export async function startOpenclawDevProcess(options: {
 }): Promise<OpenclawDevSnapshot> {
   const startedAt = Date.now();
   const existingSnapshot = await getCurrentOpenclawDevSnapshot();
+
+  if (existingSnapshot.status === "stale") {
+    await removeDevLock(openclawDevLockPath);
+  }
 
   ensure(existingSnapshot.status !== "running").orThrow(
     () =>
@@ -286,15 +328,19 @@ export async function startOpenclawDevProcess(options: {
 
   logOpenclawTiming("health-ready", startedAt);
 
-  const recordedLock = await readDevLock(openclawDevLockPath).catch(() => null);
-  const recordedPid = recordedLock?.pid ?? supervisorPid;
+  const recordedLock = await waitForOpenclawCurrentLock({
+    runId,
+    sessionId,
+  });
 
   logOpenclawTiming("lock-written", startedAt);
 
   return {
     service: "openclaw",
     status: "running",
-    pid: recordedPid,
+    pid: recordedLock?.pid ?? supervisorPid,
+    supervisorPid: recordedLock?.pid ?? supervisorPid,
+    workerPid: recordedLock?.workerPid,
     listenerPid,
     runId,
     sessionId,
@@ -309,14 +355,31 @@ export async function stopOpenclawDevProcess(): Promise<OpenclawDevSnapshot> {
     () => new Error("openclaw dev process is not running"),
   );
 
-  if (snapshot.status === "running" && snapshot.pid) {
-    await terminateProcess(snapshot.pid);
+  const pidsToTerminate = new Set<number>();
+
+  if (snapshot.listenerPid) {
+    pidsToTerminate.add(snapshot.listenerPid);
+  }
+
+  if (snapshot.workerPid) {
+    pidsToTerminate.add(snapshot.workerPid);
+  }
+
+  if (snapshot.supervisorPid) {
+    pidsToTerminate.add(snapshot.supervisorPid);
+  }
+
+  if (snapshot.pid) {
+    pidsToTerminate.add(snapshot.pid);
   }
 
   try {
-    const listenerPid = await getOpenclawPortPid();
-    await terminateProcess(listenerPid);
+    pidsToTerminate.add(await getOpenclawPortPid());
   } catch {}
+
+  for (const pid of pidsToTerminate) {
+    await terminateProcess(pid);
+  }
 
   await removeDevLock(openclawDevLockPath);
 
@@ -339,28 +402,29 @@ export async function getCurrentOpenclawDevSnapshot(): Promise<OpenclawDevSnapsh
   try {
     const lock = await readDevLock(openclawDevLockPath);
     const logFilePath = getOpenclawDevLogPath(lock.runId);
+    const supervisorPid = lock.pid;
+    const workerPid = lock.workerPid;
+    const supervisorRunning = isProcessRunning(supervisorPid);
+    const workerRunning =
+      typeof workerPid === "number" && isProcessRunning(workerPid);
     let listenerPid: number | undefined;
 
     try {
-      process.kill(lock.pid, 0);
-    } catch {
-      try {
-        listenerPid = await getOpenclawPortPid();
-      } catch {
-        return {
-          service: "openclaw",
-          status: "stale",
-          pid: lock.pid,
-          runId: lock.runId,
-          sessionId: lock.sessionId,
-          logFilePath,
-        };
-      }
+      listenerPid = await getOpenclawPortPid();
+    } catch {}
 
+    if (
+      (await getOpenclawHealthStatus()) ||
+      listenerPid ||
+      workerRunning ||
+      supervisorRunning
+    ) {
       return {
         service: "openclaw",
         status: "running",
-        pid: listenerPid,
+        pid: supervisorPid,
+        supervisorPid,
+        workerPid,
         listenerPid,
         runId: lock.runId,
         sessionId: lock.sessionId,
@@ -368,14 +432,12 @@ export async function getCurrentOpenclawDevSnapshot(): Promise<OpenclawDevSnapsh
       };
     }
 
-    try {
-      listenerPid = await getOpenclawPortPid();
-    } catch {}
-
     return {
       service: "openclaw",
-      status: "running",
-      pid: lock.pid,
+      status: "stale",
+      pid: supervisorPid,
+      supervisorPid,
+      workerPid,
       listenerPid,
       runId: lock.runId,
       sessionId: lock.sessionId,
@@ -385,6 +447,11 @@ export async function getCurrentOpenclawDevSnapshot(): Promise<OpenclawDevSnapsh
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {
       try {
         const listenerPid = await getOpenclawPortPid();
+
+        if (!(await getOpenclawHealthStatus())) {
+          throw new Error("openclaw health endpoint is not ready");
+        }
+
         return {
           service: "openclaw",
           status: "running",

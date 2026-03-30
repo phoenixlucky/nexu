@@ -54,6 +54,7 @@ let workerChild: ChildProcess | null = null;
 async function writeRunningLock(): Promise<void> {
   await writeDevLock(openclawDevLockPath, {
     pid: process.pid,
+    workerPid: workerChild?.pid,
     runId: openclawRunId,
     sessionId: openclawSessionId,
   });
@@ -86,6 +87,7 @@ async function startWorker(): Promise<void> {
   }
 
   workerChild = child;
+  await writeRunningLock();
 
   child.once("exit", () => {
     workerChild = null;

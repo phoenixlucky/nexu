@@ -154,8 +154,8 @@ jobs:
         run: |
           $captureDir = Join-Path $env:RUNNER_TEMP "desktop-ci"
           New-Item -ItemType Directory -Force -Path $captureDir | Out-Null
-          if (Test-Path ".tmp/logs") {
-            Copy-Item ".tmp/logs" (Join-Path $captureDir "repo-logs") -Recurse -Force
+          if (Test-Path ".tmp/dev/logs") {
+            Copy-Item ".tmp/dev/logs" (Join-Path $captureDir "repo-logs") -Recurse -Force
           }
           if (Test-Path ".tmp/desktop/electron/logs") {
             Copy-Item ".tmp/desktop/electron/logs" (Join-Path $captureDir "electron-logs") -Recurse -Force
@@ -167,8 +167,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/desktop-ci"
-          if [ -d .tmp/logs ]; then
-            cp -R .tmp/logs "$RUNNER_TEMP/desktop-ci/repo-logs"
+          if [ -d .tmp/dev/logs ]; then
+            cp -R .tmp/dev/logs "$RUNNER_TEMP/desktop-ci/repo-logs"
           fi
           if [ -d .tmp/desktop/electron/logs ]; then
             cp -R .tmp/desktop/electron/logs "$RUNNER_TEMP/desktop-ci/electron-logs"

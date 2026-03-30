@@ -26,7 +26,6 @@ import {
   getControllerDevLogPath,
 } from "../shared/paths.js";
 import { createDevMarkerArgs } from "../shared/trace.js";
-import { getCurrentOpenclawDevSnapshot } from "./openclaw.js";
 
 export type ControllerDevSnapshot = {
   service: "controller";
@@ -78,26 +77,39 @@ async function waitForControllerPortPid(): Promise<number> {
 
 async function ensureOpenclawReadyForController(): Promise<void> {
   const runtimeConfig = getScriptsDevRuntimeConfig();
+  const healthUrl = `${runtimeConfig.openclawBaseUrl}/health`;
 
-  try {
-    await waitForListeningPortPid(
-      runtimeConfig.openclawPort,
-      "openclaw gateway",
-      {
-        attempts: 8,
-        delayMs: 250,
-      },
+  await waitForListeningPortPid(
+    runtimeConfig.openclawPort,
+    "openclaw gateway",
+    {
+      attempts: 20,
+      delayMs: 250,
+    },
+  ).catch(() => {
+    throw new Error(
+      "openclaw is not running; start it with `pnpm dev start openclaw` before starting controller",
     );
-    return;
-  } catch {}
+  });
 
-  const openclawSnapshot = await getCurrentOpenclawDevSnapshot();
+  for (let index = 0; index < 20; index += 1) {
+    try {
+      const response = await fetch(healthUrl, {
+        signal: AbortSignal.timeout(1000),
+      });
 
-  ensure(openclawSnapshot.status === "running").orThrow(
-    () =>
-      new Error(
-        "openclaw is not running; start it with `pnpm dev start openclaw` before starting controller",
-      ),
+      if (response.ok) {
+        return;
+      }
+    } catch {}
+
+    if (index < 19) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+
+  throw new Error(
+    `openclaw health endpoint did not become ready at ${healthUrl}; start it with \`pnpm dev start openclaw\` before starting controller`,
   );
 }
 

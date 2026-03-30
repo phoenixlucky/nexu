@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { rm } from "node:fs/promises";
 
 const captureDir =
   process.env.NEXU_DESKTOP_CHECK_CAPTURE_DIR ?? ".tmp/desktop-ci-test";
@@ -36,8 +37,30 @@ function run(command, args) {
   });
 }
 
+async function bestEffortCleanup() {
+  for (const args of [
+    ["dev", "stop", "desktop"],
+    ["dev", "stop", "web"],
+    ["dev", "stop", "controller"],
+    ["dev", "stop", "openclaw"],
+  ]) {
+    await run("pnpm", args);
+  }
+
+  for (const path of [
+    ".tmp/dev/desktop.pid",
+    ".tmp/dev/web.pid",
+    ".tmp/dev/controller.pid",
+    ".tmp/dev/openclaw.pid",
+  ]) {
+    await rm(path, { force: true });
+  }
+}
+
 async function main() {
   let exitCode = 0;
+
+  await bestEffortCleanup();
 
   const startCommands = [
     ["dev", "start", "openclaw"],
