@@ -301,9 +301,7 @@ function createProxySafeError(
     return new Error(`Request to ${summarizeRequestTarget(input)} failed`);
   }
 
-  const safeError = new Error(sanitizeErrorMessage(error.message, proxyEnv), {
-    cause: error,
-  });
+  const safeError = new Error(sanitizeErrorMessage(error.message, proxyEnv));
   safeError.name = error.name;
   return safeError;
 }

@@ -111,6 +111,10 @@ describe("proxyFetch", () => {
     await expect(proxyFetch("https://example.com")).rejects.toMatchObject({
       message: "connect ECONNREFUSED http://***:***@proxy.example.com:8080/",
     });
+    await proxyFetch("https://example.com").catch((error: unknown) => {
+      expect(error).toBeInstanceOf(Error);
+      expect("cause" in (error as Error)).toBe(false);
+    });
     expect(redactProxyUrl(process.env.HTTP_PROXY ?? null)).toBe(
       "http://***:***@proxy.example.com:8080/",
     );
