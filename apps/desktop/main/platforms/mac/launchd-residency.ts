@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import type { App } from "electron";
 import { getOpenclawSkillsDir } from "../../../shared/desktop-paths";
+import { buildChildProcessProxyEnv } from "../../../shared/proxy-config";
 import type { DesktopRuntimeConfig } from "../../../shared/runtime-config";
 import { getWorkspaceRoot } from "../../../shared/workspace-paths";
 import type {
@@ -89,6 +90,7 @@ export function createMacLaunchdBootstrapEnv(args: {
       isPackaged: app.isPackaged,
       openclawSidecarRoot: paths.openclawCwd,
     }),
+    proxyEnv: buildChildProcessProxyEnv(runtimeConfig.proxy),
     openclawTmpDir: runtimeRoots.openclawTmpDir,
     nodePath: paths.nodePath,
     controllerEntryPath: paths.controllerEntryPath,

@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import * as path from "node:path";
 import { getOpenclawSkillsDir } from "../../shared/desktop-paths";
+import { buildChildProcessProxyEnv } from "../../shared/proxy-config";
 import type { DesktopRuntimeConfig } from "../../shared/runtime-config";
 import { getWorkspaceRoot } from "../../shared/workspace-paths";
 import type { DesktopPlatformCapabilities } from "../platforms/types";
@@ -108,6 +109,7 @@ export async function createRuntimeUnitManifests(
       isPackaged,
       openclawSidecarRoot,
     });
+  const childProcessProxyEnv = buildChildProcessProxyEnv(runtimeConfig.proxy);
 
   // Keep all default ports and local URLs defined from this one manifest factory. Other desktop
   // entry points still mirror a few of these defaults directly, so changes here should be treated
@@ -132,6 +134,7 @@ export async function createRuntimeUnitManifests(
         WEB_HOST: "127.0.0.1",
         WEB_PORT: String(webPort),
         WEB_API_ORIGIN: runtimeConfig.urls.controllerBase,
+        ...childProcessProxyEnv,
       },
     },
     {
@@ -193,6 +196,7 @@ export async function createRuntimeUnitManifests(
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
         RUNTIME_GATEWAY_PROBE_ENABLED: "false",
         ...(openclawNodePath ? { PATH: openclawNodePath } : {}),
+        ...childProcessProxyEnv,
       },
     },
     {

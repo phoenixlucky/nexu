@@ -82,6 +82,9 @@ describe("controller plist: real function output", () => {
       openclawExtensionsDir: "/sidecar/extensions",
       skillNodePath: "/Applications/Nexu.app/Contents/Resources/node_modules",
       openclawTmpDir: "/Users/alice/.nexu/tmp",
+      proxyEnv: {
+        NO_PROXY: "localhost,127.0.0.1,::1",
+      },
     } as never);
   });
 
@@ -201,6 +204,9 @@ describe("openclaw plist: real function output", () => {
       openclawExtensionsDir: "/app/extensions",
       skillNodePath: "/app/node_modules",
       openclawTmpDir: "/tmp",
+      proxyEnv: {
+        NO_PROXY: "localhost,127.0.0.1,::1",
+      },
     } as never);
   });
 

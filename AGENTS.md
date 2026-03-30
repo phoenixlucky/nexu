@@ -105,7 +105,8 @@ This repo is desktop-first. Prefer the controller-first path and remove or ignor
 The split is intentional: `NEXU_HOME` holds lightweight user preferences and extracted runtime sidecars that should persist across reinstalls; Electron `userData` holds heavy runtime state tied to the app lifecycle. `OPENCLAW_STATE_DIR` is explicitly set by the desktop launcher to point to the `userData` path — do not rely on the controller's default fallback.
 Launchd services reference ONLY paths under `~/.nexu/runtime/` (never inside the `.app` bundle), so the packaged app can be replaced by Finder drag-and-drop while services run in the background.
 - For startup troubleshooting, use `pnpm logs` to tail dev logs.
-- `pnpm reset-state` is a dev-only cleanup shortcut; it stops the stack and removes repo-local desktop runtime state under `.tmp/desktop/`, but it does not delete packaged app state.
+- For proxy troubleshooting, inspect `desktop-diagnostics.json` and check `proxy.source`, redacted proxy env values, normalized bypass entries, and `resolveProxy(...)` results for controller/OpenClaw/external URLs.
+- To fully reset repo-local desktop runtime state, stop the stack and remove `.tmp/desktop/`; this does not delete packaged app state.
 - `tmux` is no longer required for the `pnpm dev` local-dev workflow; process state there is tracked by the platform-aware launcher entrypoints.
 - To fully reset local desktop + controller state, stop the stack, remove `.tmp/desktop/`, then remove `~/.nexu/` and `~/Library/Application Support/@nexu/desktop/`.
 - Desktop already exposes an agent-friendly runtime observability surface; prefer subscribing/querying before adding temporary UI or ad hoc debug logging.
@@ -335,6 +336,7 @@ This note should track:
 - Controller env path: `apps/controller/.env`
 - Fresh local-dev cold start: `pnpm install` -> `pnpm --filter @nexu/shared build` -> optional `copy scripts/dev/.env.example scripts/dev/.env` (Windows) or `cp scripts/dev/.env.example scripts/dev/.env` (POSIX) -> `pnpm dev start`
 - Daily local-dev flow: `pnpm dev start` -> `pnpm dev logs <service>` / `pnpm dev status <service>` when needed -> `pnpm dev restart` for a clean recycle -> `pnpm dev stop`
+- Desktop proxy env vars: `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` (desktop normalizes mixed-case inputs, always merges `localhost,127.0.0.1,::1` into `NO_PROXY`, and propagates uppercase values to child processes)
 - OpenClaw managed skills dir (expected default): `~/.openclaw/skills/`
 - Slack smoke probe setup: install Chrome Canary, set `PROBE_SLACK_URL`, run `pnpm probe:slack prepare`, then manually log into Slack in Canary before `pnpm probe:slack run`
 - `openclaw-runtime` is installed implicitly by `pnpm install`; local development should normally not use a global `openclaw` CLI

@@ -7,9 +7,11 @@ import {
   type MenuItemConstructorOptions,
   app,
   crashReporter,
+  globalShortcut,
   nativeTheme,
   powerMonitor,
   powerSaveBlocker,
+  session,
   shell,
 } from "electron";
 import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
@@ -33,6 +35,7 @@ import {
   rotateDesktopLogSession,
   writeDesktopMainLog,
 } from "./runtime/runtime-logger";
+import { ProxyManager } from "./services/proxy-manager";
 import { SleepGuard, type SleepGuardLogEntry } from "./sleep-guard";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
@@ -43,13 +46,33 @@ const __dirname = dirname(__filename);
 const startupEpochMs = Date.now();
 let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
+/** When true, the Develop menu and reload shortcuts are visible in production. */
+let productionDebugMode = false;
 let sleepGuard: SleepGuard | null = null;
 let residencyContext: DesktopRuntimeResidencyContext = null;
+let proxyManager: ProxyManager | null = null;
 
 let resolveColdStartReady: () => void;
 const coldStartReady = new Promise<void>((resolve) => {
   resolveColdStartReady = resolve;
 });
+
+async function refreshProxyDiagnostics(): Promise<void> {
+  if (!proxyManager) {
+    return;
+  }
+
+  const targets = [
+    { label: "controller", url: runtimeConfig.urls.controllerBase },
+    { label: "openclaw", url: runtimeConfig.urls.openclawBase },
+    { label: "external", url: "https://nexu.io" },
+  ];
+  const snapshot = await proxyManager.collectDiagnostics(
+    runtimeConfig.proxy,
+    targets,
+  );
+  diagnosticsReporter?.setProxySnapshot(snapshot);
+}
 
 // Set display name early (matches productName in package.json).
 app.setName("nexu");
@@ -333,8 +356,29 @@ function installApplicationMenu(): void {
       : []),
     { role: "fileMenu" },
     { role: "editMenu" },
-    { role: "viewMenu" },
-    developMenu,
+    {
+      label: "View",
+      submenu: [
+        // Reload shortcuts are dev-only — in production they expose
+        // internal "starting local service" screens (see #399).
+        // They can be unlocked at runtime via Cmd+Shift+Alt+D.
+        ...(!app.isPackaged || productionDebugMode
+          ? ([
+              { role: "reload" },
+              { role: "forceReload" },
+              { type: "separator" },
+            ] satisfies MenuItemConstructorOptions[])
+          : []),
+        { role: "toggleDevTools" },
+        { type: "separator" },
+        { role: "resetZoom" },
+        { role: "zoomIn" },
+        { role: "zoomOut" },
+        { type: "separator" },
+        { role: "togglefullscreen" },
+      ],
+    },
+    ...(!app.isPackaged || productionDebugMode ? [developMenu] : []),
     { role: "windowMenu" },
     helpMenu,
   ];
@@ -645,6 +689,22 @@ app.on("web-contents-created", (_event, contents) => {
     return { action: "deny" };
   });
 
+  // In production, block reload shortcuts (Cmd+R, Ctrl+R, Ctrl+Shift+R, F5)
+  // at the webContents level to prevent exposing internal startup screens (#399).
+  // Unlockable at runtime via Cmd+Shift+Alt+D (toggles productionDebugMode).
+  if (app.isPackaged) {
+    contents.on("before-input-event", (event, input) => {
+      if (productionDebugMode) return;
+      if (input.type !== "keyDown") return;
+      const isReload =
+        (input.key.toLowerCase() === "r" && (input.meta || input.control)) ||
+        input.key === "F5";
+      if (isReload) {
+        event.preventDefault();
+      }
+    });
+  }
+
   if (contentType !== "webview") {
     return;
   }
@@ -735,11 +795,29 @@ logStartupStep("electron main module evaluated");
 app.whenReady().then(async () => {
   logLaunchTimeline("app.whenReady resolved");
   logStartupStep("app.whenReady resolved");
+  proxyManager = new ProxyManager(session.defaultSession);
+  await proxyManager.applyPolicy(runtimeConfig.proxy);
   logStartupStep("installApplicationMenu:start");
   installApplicationMenu();
   logStartupStep("installApplicationMenu:done");
+
+  // Hidden shortcut to toggle debug mode in production (Develop menu + reload).
+  // Harmless in dev since those items are always visible.
+  if (app.isPackaged) {
+    globalShortcut.register("CommandOrControl+Shift+Alt+D", () => {
+      productionDebugMode = !productionDebugMode;
+      installApplicationMenu();
+    });
+  }
   diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
   logStartupStep("DesktopDiagnosticsReporter:created");
+  await refreshProxyDiagnostics();
+  diagnosticsReporter.recordStartupProbe({
+    source: "main",
+    stage: "main:app-when-ready",
+    status: "ok",
+    detail: app.getVersion(),
+  });
   logStartupStep("registerIpcHandlers:start");
   registerIpcHandlers(
     orchestrator,
@@ -805,8 +883,10 @@ app.whenReady().then(async () => {
         waitForControllerReadiness,
       });
       residencyContext = coldStartResult.residencyContext;
+      await refreshProxyDiagnostics();
       healthCheck.recordSuccess();
     } catch (error) {
+      await refreshProxyDiagnostics().catch(() => undefined);
       healthCheck.recordFailure();
       diagnosticsReporter?.markColdStartFailed(
         error instanceof Error ? error.message : String(error),

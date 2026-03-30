@@ -93,6 +93,8 @@ export interface LaunchdBootstrapEnv {
   skillNodePath: string;
   /** TMPDIR for openclaw temp files */
   openclawTmpDir: string;
+  /** Normalized proxy env propagated to controller/openclaw launchd services */
+  proxyEnv: Record<string, string>;
 }
 
 export interface LaunchdBootstrapResult {
@@ -373,6 +375,7 @@ export async function bootstrapWithLaunchd(
     openclawExtensionsDir: env.openclawExtensionsDir,
     skillNodePath: env.skillNodePath,
     openclawTmpDir: env.openclawTmpDir,
+    proxyEnv: env.proxyEnv,
   };
   await cleanupStalePlists(launchd, plistDir, labels, cleanupPlistEnv);
 
@@ -477,6 +480,9 @@ export async function bootstrapWithLaunchd(
   // --- Per-service: validate running ones, start missing ones ---
 
   // Health check running services
+  console.log(
+    `[bootstrap] health check: controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"} useRecoveredPorts=${useRecoveredPorts}`,
+  );
   let controllerHealthy = false;
   let openclawHealthy = false;
   let needsControllerReady = true;
@@ -550,25 +556,37 @@ export async function bootstrapWithLaunchd(
     label: string,
     type: "controller" | "openclaw",
   ) => {
+    console.log(`[bootstrap] ${type} installService begin label=${label}`);
     const plist = generatePlist(type, plistEnv);
     await launchd.installService(label, plist);
+    console.log(`[bootstrap] ${type} installService done label=${label}`);
   };
 
-  const ensureRunning = async (label: string) => {
+  const ensureRunning = async (label: string, type: string) => {
     const status = await launchd.getServiceStatus(label);
+    console.log(
+      `[bootstrap] ${type} ensureRunning status=${status.status} pid=${status.pid ?? "none"} label=${label}`,
+    );
     if (status.status !== "running") {
       await launchd.startService(label);
-      console.log(`Started ${label}`);
+      const afterStatus = await launchd.getServiceStatus(label);
+      console.log(
+        `[bootstrap] ${type} kickstart done status=${afterStatus.status} pid=${afterStatus.pid ?? "none"} label=${label}`,
+      );
     }
   };
 
   if (!controllerHealthy) {
     await ensureService(labels.controller, "controller");
-    await ensureRunning(labels.controller);
+    await ensureRunning(labels.controller, "controller");
+  } else {
+    console.log("[bootstrap] controller already healthy, skipping");
   }
   if (!openclawHealthy) {
     await ensureService(labels.openclaw, "openclaw");
-    await ensureRunning(labels.openclaw);
+    await ensureRunning(labels.openclaw, "openclaw");
+  } else {
+    console.log("[bootstrap] openclaw already healthy, skipping");
   }
 
   // Start embedded web server with port retry.

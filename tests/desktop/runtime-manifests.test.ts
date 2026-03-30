@@ -4,6 +4,8 @@ import {
   createRuntimeUnitManifests,
   ensurePackagedOpenclawSidecar,
 } from "../../apps/desktop/main/runtime/manifests";
+import { readProxyPolicy } from "../../apps/desktop/shared/proxy-config";
+import type { DesktopRuntimeConfig } from "../../apps/desktop/shared/runtime-config";
 
 const mkdirSyncMock = vi.hoisted(() => vi.fn());
 
@@ -24,7 +26,7 @@ vi.mock("../../apps/desktop/shared/desktop-paths", () => ({
 function createPlatformCapabilities() {
   return {
     platformId: "mac",
-    runtimeResidency: "single-process",
+    runtimeResidency: "managed",
     packagedArchive: {
       format: "tar.gz",
       extractionMode: "async",
@@ -38,13 +40,18 @@ function createPlatformCapabilities() {
     },
     runtimeExecutables: {
       resolveSkillNodePath: vi.fn(
-        ({ isPackaged, openclawSidecarRoot, inheritedNodePath }) => {
+        ({
+          electronRoot,
+          isPackaged,
+          openclawSidecarRoot,
+          inheritedNodePath,
+        }) => {
           const bundled = isPackaged
             ? path.resolve(openclawSidecarRoot, "../bundled-node-modules")
-            : "/repo/apps/desktop/node_modules";
-          return inheritedNodePath
-            ? [bundled, inheritedNodePath].join(path.delimiter)
-            : bundled;
+            : path.resolve(electronRoot, "node_modules");
+          return [bundled, inheritedNodePath]
+            .filter(Boolean)
+            .join(path.delimiter);
         },
       ),
       resolveOpenclawNodePath: vi.fn(() => "/custom/bin"),
@@ -55,7 +62,7 @@ function createPlatformCapabilities() {
   };
 }
 
-function createRuntimeConfig() {
+function createRuntimeConfig(): DesktopRuntimeConfig {
   return {
     runtimeMode: "internal",
     buildInfo: {
@@ -65,6 +72,12 @@ function createRuntimeConfig() {
       commit: null,
       builtAt: null,
     },
+    proxy: readProxyPolicy({
+      HTTP_PROXY: "http://proxy.example.com:8080",
+      HTTPS_PROXY: "http://secure-proxy.example.com:8443",
+      ALL_PROXY: "socks5://proxy.example.com:1080",
+      NO_PROXY: "example.com",
+    }),
     updates: {
       autoUpdateEnabled: false,
       channel: "stable",
@@ -92,7 +105,7 @@ function createRuntimeConfig() {
       password: "secret",
     },
     sentryDsn: null,
-  } as const;
+  };
 }
 
 function normalizePath(value: string): string {
@@ -140,7 +153,9 @@ describe("desktop runtime manifests", () => {
     const controller = manifests.find(
       (manifest) => manifest.id === "controller",
     );
-    expect(controller?.env?.NODE_PATH).toBe("/repo/apps/desktop/node_modules");
+    expect(normalizePath(controller?.env?.NODE_PATH ?? "")).toBe(
+      "/repo/apps/desktop/node_modules",
+    );
   });
 
   it("uses packaged sidecar roots and bundled NODE_PATH in dist mode", async () => {
@@ -164,13 +179,11 @@ describe("desktop runtime manifests", () => {
     );
   });
 
-  it("preserves inherited NODE_PATH entries through runtime executable resolver", async () => {
+  it("delegates NODE_PATH resolution to the runtime executable resolver", async () => {
     const capabilities = createPlatformCapabilities();
     capabilities.runtimeExecutables.resolveSkillNodePath.mockImplementation(
-      ({ inheritedNodePath }) =>
-        ["/repo/apps/desktop/node_modules", inheritedNodePath]
-          .filter(Boolean)
-          .join(path.delimiter),
+      ({ electronRoot, isPackaged, openclawSidecarRoot }) =>
+        [electronRoot, String(isPackaged), openclawSidecarRoot].join("|"),
     );
 
     const manifests = await createRuntimeUnitManifests(
@@ -184,7 +197,11 @@ describe("desktop runtime manifests", () => {
     const controller = manifests.find(
       (manifest) => manifest.id === "controller",
     );
-    expect(controller?.env?.NODE_PATH).toBe("/repo/apps/desktop/node_modules");
+    const nodePath = controller?.env?.NODE_PATH ?? "";
+    expect(nodePath).toContain("/repo/apps/desktop|false|");
+    expect(
+      normalizePath(nodePath).endsWith("/repo/.tmp/sidecars/openclaw"),
+    ).toBe(true);
   });
 
   it("wires controller environment to runtime roots and custom PATH", async () => {
@@ -207,5 +224,56 @@ describe("desktop runtime manifests", () => {
       "/tmp/user-data/runtime/openclaw/config/openclaw.json",
     );
     expect(controller?.env?.PATH).toBe("/custom/bin");
+  });
+
+  it("propagates normalized proxy env to dev web and controller manifests", async () => {
+    const capabilities = createPlatformCapabilities();
+    const manifests = await createRuntimeUnitManifests(
+      "/repo/apps/desktop",
+      "/tmp/user-data",
+      false,
+      createRuntimeConfig(),
+      capabilities as never,
+    );
+
+    const webManifest = manifests.find((manifest) => manifest.id === "web");
+    const controllerManifest = manifests.find(
+      (manifest) => manifest.id === "controller",
+    );
+
+    expect(webManifest?.env).toMatchObject({
+      HTTP_PROXY: "http://proxy.example.com:8080",
+      HTTPS_PROXY: "http://secure-proxy.example.com:8443",
+      ALL_PROXY: "socks5://proxy.example.com:1080",
+      NO_PROXY: "example.com,localhost,127.0.0.1,::1",
+    });
+    expect(controllerManifest?.env).toMatchObject({
+      HTTP_PROXY: "http://proxy.example.com:8080",
+      HTTPS_PROXY: "http://secure-proxy.example.com:8443",
+      ALL_PROXY: "socks5://proxy.example.com:1080",
+      NO_PROXY: "example.com,localhost,127.0.0.1,::1",
+    });
+  });
+
+  it("propagates normalized proxy env to packaged controller manifest", async () => {
+    const capabilities = createPlatformCapabilities();
+    const manifests = await createRuntimeUnitManifests(
+      "/Applications/Nexu.app/Contents/Resources",
+      "/Users/testuser/Library/Application Support/@nexu/desktop",
+      true,
+      createRuntimeConfig(),
+      capabilities as never,
+    );
+
+    const controllerManifest = manifests.find(
+      (manifest) => manifest.id === "controller",
+    );
+
+    expect(controllerManifest?.env).toMatchObject({
+      HTTP_PROXY: "http://proxy.example.com:8080",
+      HTTPS_PROXY: "http://secure-proxy.example.com:8443",
+      ALL_PROXY: "socks5://proxy.example.com:1080",
+      NO_PROXY: "example.com,localhost,127.0.0.1,::1",
+    });
   });
 });

@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { UpdateChannelName } from "./host";
+import type { ProxyPolicy } from "./proxy-config";
+import { readProxyPolicy } from "./proxy-config";
 import { getDesktopAppRoot } from "./workspace-paths";
 
 export const DEFAULT_CONTROLLER_PORT = 50_800;
@@ -176,6 +178,7 @@ function parseEnvBoolean(value: string | undefined): boolean | null {
 export type DesktopRuntimeConfig = {
   runtimeMode: "internal" | "external";
   buildInfo: DesktopBuildInfo;
+  proxy: ProxyPolicy;
   updates: {
     autoUpdateEnabled: boolean;
     channel: UpdateChannelName;
@@ -286,6 +289,7 @@ export function getDesktopRuntimeConfig(
         buildConfig.NEXU_DESKTOP_BUILD_TIME ??
         null,
     },
+    proxy: readProxyPolicy(env),
     updates: {
       autoUpdateEnabled,
       channel: updateChannel,

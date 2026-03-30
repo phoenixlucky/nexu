@@ -1,4 +1,6 @@
 import type { ControllerEnv } from "../app/env.js";
+import { proxyFetch } from "../lib/proxy-fetch.js";
+import { resolveOpenclawGatewayBaseUrl } from "./openclaw-gateway-url.js";
 
 export class RuntimeHealth {
   constructor(private readonly env: ControllerEnv) {}
@@ -9,8 +11,8 @@ export class RuntimeHealth {
     }
 
     try {
-      const response = await fetch(
-        new URL("/health", this.env.openclawBaseUrl),
+      const response = await proxyFetch(
+        new URL("/health", resolveOpenclawGatewayBaseUrl(this.env)),
       );
       return {
         ok: response.ok,
