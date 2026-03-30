@@ -1154,7 +1154,12 @@ export class ChannelService {
     // Align with OpenClaw's "remove" semantics: disconnect only unbinds the
     // channel from Nexu config and leaves the linked session intact. Explicit
     // logout remains a separate operation.
-    const channel = await this.configStore.getChannel(channelId);
+    const getChannel =
+      "getChannel" in this.configStore &&
+      typeof this.configStore.getChannel === "function"
+        ? this.configStore.getChannel.bind(this.configStore)
+        : null;
+    const channel = getChannel ? await getChannel(channelId) : null;
     const removed = await this.configStore.disconnectChannel(channelId);
     if (removed) {
       // syncAll triggers the authoritative index writer which removes
