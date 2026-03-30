@@ -189,7 +189,8 @@ export function ChannelsPage() {
                 </div>
               </div>
               {connected ? (
-                channelLiveStatus === "error" ? (
+                channelLiveStatus === "error" ||
+                channelLiveStatus === "disconnected" ? (
                   <Shield size={14} className="text-red-500 shrink-0" />
                 ) : channelLiveStatus === "connecting" ||
                   channelLiveStatus === "restarting" ? (
@@ -401,7 +402,7 @@ function ConfiguredView({
         {/* Status banner */}
         <div
           className={`flex flex-col items-start gap-3 p-4 rounded-xl border sm:flex-row sm:items-center ${
-            liveStatus === "error"
+            liveStatus === "error" || liveStatus === "disconnected"
               ? "bg-red-500/5 border-red-500/20"
               : liveStatus === "connecting" || liveStatus === "restarting"
                 ? "bg-amber-500/5 border-amber-500/20"
@@ -410,14 +411,14 @@ function ConfiguredView({
         >
           <div
             className={`flex justify-center items-center w-9 h-9 rounded-lg shrink-0 ${
-              liveStatus === "error"
+              liveStatus === "error" || liveStatus === "disconnected"
                 ? "bg-red-500/10"
                 : liveStatus === "connecting" || liveStatus === "restarting"
                   ? "bg-amber-500/10"
                   : "bg-[var(--color-success-muted)]"
             }`}
           >
-            {liveStatus === "error" ? (
+            {liveStatus === "error" || liveStatus === "disconnected" ? (
               <Shield size={18} className="text-red-500" />
             ) : liveStatus === "connecting" || liveStatus === "restarting" ? (
               <Loader2 size={18} className="text-amber-500 animate-spin" />
@@ -427,7 +428,7 @@ function ConfiguredView({
           </div>
           <div className="flex-1">
             <div className="text-[13px] font-semibold text-text-primary">
-              {liveStatus === "error"
+              {liveStatus === "error" || liveStatus === "disconnected"
                 ? `${PLATFORM_LABELS[platform]} ${t("channels.statusError")}`
                 : liveStatus === "connecting" || liveStatus === "restarting"
                   ? `${PLATFORM_LABELS[platform]} ${t("channels.statusConnecting")}`
