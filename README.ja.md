@@ -255,6 +255,28 @@ A: WeChat 8.0.7 の OpenClaw プラグインに対応しています。接続を
 | 📋 [**Roadmap &amp; RFCs**](https://github.com/nexu-io/nexu/discussions/categories/rfc-roadmap) | 今後の計画をフォローし、設計ディスカッションに参加。 |
 | 📧 [**support@nexu.ai**](mailto:support@nexu.ai) | プライベートなお問い合わせ、パートナーシップなど。 |
 
+### コミュニティグループに参加する
+
+<table>
+  <tr>
+    <td align="center" width="220">
+      <strong>💬 WeChat グループ</strong><br/><br/>
+      <img src="site/media/wechat-qr.png" width="200" height="200" alt="WeChat コミュニティ QR コード" /><br/>
+      <sub>スキャンして WeChat コミュニティに参加</sub>
+    </td>
+    <td align="center" width="220">
+      <strong>🪁 Feishu グループ</strong><br/><br/>
+      <img src="site/media/feishu-qr.png" width="200" height="200" alt="Feishu コミュニティ QR コード" /><br/>
+      <sub>スキャンして Feishu コミュニティに参加</sub>
+    </td>
+    <td align="center" width="220">
+      <strong>🎮 Discord</strong><br/><br/>
+      <img src="site/media/discord-qr.png" width="200" height="200" alt="Discord コミュニティ QR コード" /><br/>
+      <sub>スキャンして Discord サーバーに参加</sub>
+    </td>
+  </tr>
+</table>
+
 ### コントリビューター
 
 <a href="https://github.com/nexu-io/nexu/graphs/contributors">
