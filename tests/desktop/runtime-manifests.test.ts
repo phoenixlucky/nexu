@@ -11,9 +11,11 @@ const execFileSyncMock = vi.hoisted(() => vi.fn());
 
 vi.mock("node:child_process", () => ({
   execFileSync: execFileSyncMock,
-  execFile: vi.fn((_cmd: unknown, _args: unknown, cb: unknown) => {
-    if (typeof cb === "function") (cb as Function)(null, "", "");
-  }),
+  execFile: vi.fn(
+    (_cmd: unknown, _args: unknown, cb?: (...a: unknown[]) => void) => {
+      cb?.(null, "", "");
+    },
+  ),
 }));
 
 vi.mock("node:util", async (importOriginal) => {
