@@ -77,6 +77,8 @@ npm run test:smoke
 
 ### Nightly (default)
 
+Use this path when you want to validate the latest published nightly desktop artifacts.
+
 `npm run download` automatically selects the nightly `arm64` or `x64` artifacts for the current Mac.
 
 ```bash
@@ -100,6 +102,8 @@ npm run download && npm test
 ```
 
 ### Local Builds (unsigned)
+
+Use this path when you want to validate a desktop build produced from your local checkout instead of the published nightly artifacts.
 
 Copy DMG and ZIP into `artifacts/` and skip signature checks:
 
