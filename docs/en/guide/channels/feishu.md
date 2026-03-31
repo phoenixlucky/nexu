@@ -1,36 +1,36 @@
-# Feishu (Lark)
+# Feishu
 
-Get an App ID and App Secret to connect your Feishu bot to nexu.
+All you need is an App ID and App Secret to connect your Feishu bot to nexu.
 
-## Step 1: Create a Feishu App
+## Step 1: Create a Feishu app
 
-1. Open the [Feishu Open Platform](https://open.feishu.cn/app), log in, and click **Create Enterprise Self-Built App**.
+1. Go to the [Feishu Open Platform](https://open.feishu.cn/app), sign in, and click "Create Custom App".
 
 ![Feishu Open Platform app list](/assets/feishu/step1-app-list.webp)
 
-2. Enter the app name and description, choose an icon, and click **Create**.
+2. Fill in the app name, description, choose an icon, and click "Create".
 
-![Create enterprise self-built app](/assets/feishu/step1-create-app.webp)
+![Create Custom App](/assets/feishu/step1-create-app.webp)
 
-3. Go to **Credentials & Basic Info** and copy:
+3. On the "Credentials & Basic Info" page, copy these two values:
    - **App ID**
    - **App Secret**
 
 ![Get App ID and App Secret](/assets/feishu/step1-credentials.webp)
 
-## Step 2: Enter Credentials in nexu
+## Step 2: Add credentials to nexu
 
-Open the nexu client, enter the App ID and App Secret in the Feishu channel configuration, and click **Connect**.
+Open the nexu client, enter the App ID and App Secret in the Feishu channel settings, and click "Connect".
 
-![Enter credentials in nexu](/assets/feishu/step3-nexu-connect.webp)
+![Add credentials in nexu](/assets/feishu/step3-nexu-connect.webp)
 
-## Step 3: Import App Permissions
+## Step 3: Import app permissions
 
-1. In the Feishu Open Platform, go to your app, click **Permission Management** in the left menu, then click **Bulk Import/Export Permissions**.
+1. In the Feishu Open Platform, go to your app, click "Permission Management" on the left sidebar, then click "Batch Import/Export".
 
-![Permission management page](/assets/feishu/step3-permission-management.webp)
+![Permission Management page](/assets/feishu/step3-permission-management.webp)
 
-2. In the dialog, select **Import**, paste the following JSON into the input box, and click **Next, Confirm New Permissions**.
+2. In the dialog, select "Import", paste the following JSON, and click "Next, Confirm New Permissions".
 
 ![Paste permissions JSON](/assets/feishu/step3-paste-json.webp)
 
@@ -150,77 +150,77 @@ Open the nexu client, enter the App ID and App Secret in the Feishu channel conf
 ```
 :::
 
-3. Review the imported permissions list (102 total) and click **Apply**.
+3. Review the imported permissions (102 in total) and click "Apply".
 
 ![Confirm imported permissions](/assets/feishu/step3-confirm-permissions.webp)
 
-4. In the data scope confirmation dialog, click **Confirm**.
+4. In the data scope confirmation dialog, click "Confirm" to complete the import.
 
 ![Confirm data scope](/assets/feishu/step3-data-scope.webp)
 
 These permissions cover messaging, document read/write, calendar management, spreadsheet operations, and more — ensuring all nexu Agent Skills work properly.
 
-## Step 4: Configure Events and Callbacks
+## Step 4: Configure events and callbacks
 
-### Event Configuration
+### Event configuration
 
-1. In the Feishu Open Platform, go to your app, click **Events & Callbacks** in the left menu, and open the **Event Configuration** tab.
+1. In the Feishu Open Platform, go to your app, click "Events & Callbacks" on the left sidebar, and open the "Event Configuration" tab.
 
 ![Events & Callbacks page](/assets/feishu/step4-event-config.webp)
 
-2. Click the edit button next to the subscription method, select **Use persistent connection to receive events**, and click **Save**.
+2. Click the edit button next to "Subscription Method", select "Use Long Connection to Receive Events", and click "Save".
 
-![Select persistent connection for events](/assets/feishu/step4-event-websocket.webp)
+![Select long connection for events](/assets/feishu/step4-event-websocket.webp)
 
-3. Click **Add Event**.
+3. Click "Add Event".
 
-![Add event button](/assets/feishu/step4-add-event.webp)
+![Add Event button](/assets/feishu/step4-add-event.webp)
 
-4. Search for and select the following events, then click **Add**:
-   - **First conversation between user and bot created** (`p2p_chat_create`)
+4. In the dialog, search and select the following events, then click "Add":
+   - **First conversation created between user and bot** (`p2p_chat_create`)
    - **Receive message** (`im.message.receive_v1`)
    - **Bot added to group** (`im.chat.member.bot.added_v1`)
-   - **User enters conversation with bot** (`im.chat.access_event.bot_p2p_chat_entered_v1`)
+   - **User enters bot conversation** (`im.chat.access_event.bot_p2p_chat_entered_v1`)
 
 ![Select events](/assets/feishu/step4-select-event.webp)
 
-5. Confirm the added events in the list.
+5. After adding, confirm the events in the "Added Events" list.
 
 ![Added events list](/assets/feishu/step4-event-list.webp)
 
-### Callback Configuration
+### Callback configuration
 
-1. Switch to the **Callback Configuration** tab and click the edit button next to the subscription method.
+1. Switch to the "Callback Configuration" tab and click the edit button next to "Subscription Method".
 
-![Callback configuration page](/assets/feishu/step4-callback-tab.webp)
+![Callback Configuration page](/assets/feishu/step4-callback-tab.webp)
 
-2. Select **Use persistent connection to receive callbacks** and click **Save**.
+2. Select "Use Long Connection to Receive Callbacks" and click "Save".
 
-![Select persistent connection for callbacks](/assets/feishu/step4-callback-websocket.webp)
+![Select long connection for callbacks](/assets/feishu/step4-callback-websocket.webp)
 
-3. Click **Add Callback**.
+3. Click "Add Callback".
 
-![Add callback button](/assets/feishu/step4-add-callback.webp)
+![Add Callback button](/assets/feishu/step4-add-callback.webp)
 
-4. Select the **Card** category, check **Card action callback** (`card.action.trigger`), and click **Add**.
+4. In the dialog, select the "Card" category, check "Card Action Trigger" (`card.action.trigger`), and click "Add".
 
-![Select card action callback](/assets/feishu/step4-select-callback.webp)
+![Select Card Action Trigger](/assets/feishu/step4-select-callback.webp)
 
-## Step 5: Publish and Test
+## Step 5: Publish and test
 
-1. Go to **Version Management & Release** in the Feishu Open Platform.
+1. Go back to the Feishu Open Platform, navigate to "Version Management & Release".
 
-![Version management & release](/assets/feishu/step4-version-manage.webp)
+![Version Management & Release](/assets/feishu/step4-version-manage.webp)
 
-2. Click **Create Version**, fill in the version number and release notes, and click **Save**.
+2. Click "Create Version", fill in the version number and release notes, then click "Save".
 
-![Create version](/assets/feishu/step4-create-version.webp)
+![Create Version](/assets/feishu/step4-create-version.webp)
 
-3. Click **Confirm Release** and wait for approval.
+3. Click "Publish" and wait for approval.
 
-![Confirm release](/assets/feishu/step4-publish.webp)
+![Publish](/assets/feishu/step4-publish.webp)
 
-4. Once approved, click **Chat** in the nexu client to start chatting with your bot in Feishu 🎉
+4. Once approved, click "Chat" in the nexu client to jump to Feishu and chat with your bot 🎉
 
 ![Feishu connected](/assets/feishu/step3-connected.webp)
 
@@ -228,8 +228,9 @@ These permissions cover messaging, document read/write, calendar management, spr
 
 **Q: Do I need a public server?**
 
-No. nexu uses Feishu's persistent connection (WebSocket) mode — no public IP or callback URL required.
+No. nexu uses Feishu's long-connection (WebSocket) mode — no public IP or callback URL required.
 
 **Q: Why are so many permissions needed?**
 
-These permissions correspond to nexu Agent Skills (messaging, documents, calendar, spreadsheets, etc.). If you only need basic chat, you can enable just the `im:` permissions.
+These permissions correspond to various nexu Agent Skills (messaging, docs, calendar, spreadsheets, etc.). If you only need basic chat, you can enable just the `im:` scopes.
+
