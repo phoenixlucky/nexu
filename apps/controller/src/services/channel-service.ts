@@ -932,35 +932,8 @@ export class ChannelService {
   }
 
   async connectQqbot(input: ConnectQqbotInput) {
-    const pluginDir = resolveInstalledPluginDir(this.env, QQBOT_PLUGIN_ID);
-    if (!pluginDir) {
-      throw new Error(`QQ plugin not installed: ${QQBOT_PLUGIN_ID}`);
-    }
-
-    const appId = input.appId.trim();
-    const appSecret = input.appSecret.trim();
-    const response = await proxyFetch(
-      "https://bots.qq.com/app/getAppAccessToken",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          appId,
-          clientSecret: appSecret,
-        }),
-        timeoutMs: 5000,
-      },
-    );
-    const payload = (await response.json()) as {
-      access_token?: string;
-      code?: number;
-      message?: string;
-    };
-    if (!response.ok || !payload.access_token) {
-      throw new Error(
-        `Invalid QQ credentials: ${payload.message ?? `HTTP ${response.status}`}`,
-      );
-    }
+    this.ensureQqbotPluginInstalled();
+    const { appId, appSecret } = await this.verifyQqbotCredentials(input);
 
     const channel = await this.configStore.connectQqbot({
       appId,
@@ -969,6 +942,15 @@ export class ChannelService {
     await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();
     return channel;
+  }
+
+  async testQqbotConnectivity(input: ConnectQqbotInput) {
+    this.ensureQqbotPluginInstalled();
+    const { appId } = await this.verifyQqbotCredentials(input);
+    return {
+      success: true,
+      message: `QQ credentials are valid for App ID ${appId}`,
+    };
   }
 
   async whatsappQrStart() {
@@ -1342,5 +1324,44 @@ export class ChannelService {
       { channelType: "whatsapp", accountId, authDir },
       "whatsapp_qr_start_auth_dir_cleared",
     );
+  }
+
+  private ensureQqbotPluginInstalled(): void {
+    const pluginDir = resolveInstalledPluginDir(this.env, QQBOT_PLUGIN_ID);
+    if (!pluginDir) {
+      throw new Error(`QQ plugin not installed: ${QQBOT_PLUGIN_ID}`);
+    }
+  }
+
+  private async verifyQqbotCredentials(input: ConnectQqbotInput): Promise<{
+    appId: string;
+    appSecret: string;
+  }> {
+    const appId = input.appId.trim();
+    const appSecret = input.appSecret.trim();
+    const response = await proxyFetch(
+      "https://bots.qq.com/app/getAppAccessToken",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appId,
+          clientSecret: appSecret,
+        }),
+        timeoutMs: 5000,
+      },
+    );
+    const payload = (await response.json()) as {
+      access_token?: string;
+      code?: number;
+      message?: string;
+    };
+    if (!response.ok || !payload.access_token) {
+      throw new Error(
+        `Invalid QQ credentials: ${payload.message ?? `HTTP ${response.status}`}`,
+      );
+    }
+
+    return { appId, appSecret };
   }
 }

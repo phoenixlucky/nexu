@@ -1,9 +1,19 @@
 import { identify, track } from "@/lib/tracking";
-import { KeyRound, Loader2, MessageCircleMore } from "lucide-react";
+import {
+  ExternalLink,
+  KeyRound,
+  Loader2,
+  MessageCircleMore,
+} from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { postApiV1ChannelsQqbotConnect } from "../../../lib/api/sdk.gen";
+import {
+  postApiV1ChannelsQqbotConnect,
+  postApiV1ChannelsQqbotTest,
+} from "../../../lib/api/sdk.gen";
+
+const QQBOT_LOGIN_URL = "https://q.qq.com/qqbot/openclaw/login.html";
 
 export interface QqbotSetupViewProps {
   onConnected: () => void;
@@ -20,10 +30,20 @@ export function QqbotSetupView({
   const [appId, setAppId] = useState("");
   const [appSecret, setAppSecret] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [testing, setTesting] = useState(false);
 
-  const handleConnect = async () => {
+  const getTrimmedCredentials = () => {
     const trimmedAppId = appId.trim();
     const trimmedAppSecret = appSecret.trim();
+    return {
+      appId: trimmedAppId,
+      appSecret: trimmedAppSecret,
+    };
+  };
+
+  const handleConnect = async () => {
+    const { appId: trimmedAppId, appSecret: trimmedAppSecret } =
+      getTrimmedCredentials();
     if (!trimmedAppId || !trimmedAppSecret) {
       toast.error(t("qqbotSetup.credentialsRequired"));
       return;
@@ -57,6 +77,31 @@ export function QqbotSetupView({
     }
   };
 
+  const handleTestConnectivity = async () => {
+    const { appId: trimmedAppId, appSecret: trimmedAppSecret } =
+      getTrimmedCredentials();
+    if (!trimmedAppId || !trimmedAppSecret) {
+      toast.error(t("qqbotSetup.credentialsRequired"));
+      return;
+    }
+
+    setTesting(true);
+    try {
+      const { data, error } = await postApiV1ChannelsQqbotTest({
+        body: { appId: trimmedAppId, appSecret: trimmedAppSecret },
+      });
+
+      if (error || !data?.success) {
+        toast.error(error?.message ?? t("qqbotSetup.testFailed"));
+        return;
+      }
+
+      toast.success(data.message || t("qqbotSetup.testSuccess"));
+    } finally {
+      setTesting(false);
+    }
+  };
+
   return (
     <div className="p-5 rounded-xl border bg-surface-1 border-border">
       <div className="flex gap-3 items-start mb-5">
@@ -79,7 +124,17 @@ export function QqbotSetupView({
             {t("qqbotSetup.quickSetup")}
           </div>
           <ol className="space-y-1 text-[12px] text-text-muted list-decimal pl-4">
-            <li>{t("qqbotSetup.step1")}</li>
+            <li>
+              <a
+                href={QQBOT_LOGIN_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-accent hover:underline underline-offset-2"
+              >
+                {t("qqbotSetup.step1")}
+                <ExternalLink size={12} />
+              </a>
+            </li>
             <li>{t("qqbotSetup.step2")}</li>
             <li>{t("qqbotSetup.step3")}</li>
             <li>{t("qqbotSetup.step4")}</li>
@@ -136,19 +191,35 @@ export function QqbotSetupView({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleConnect}
-          disabled={disabled || submitting}
-          className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[13px] font-medium text-accent-fg transition-all hover:bg-accent-hover disabled:opacity-60"
-        >
-          {submitting ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <MessageCircleMore size={14} />
-          )}
-          {t("qqbotSetup.connect")}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleTestConnectivity}
+            disabled={disabled || submitting || testing}
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-0 px-4 py-2.5 text-[13px] font-medium text-text-primary transition-all hover:bg-surface-2 disabled:opacity-60"
+          >
+            {testing ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <KeyRound size={14} />
+            )}
+            {t("qqbotSetup.testConnectivity")}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleConnect}
+            disabled={disabled || submitting || testing}
+            className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[13px] font-medium text-accent-fg transition-all hover:bg-accent-hover disabled:opacity-60"
+          >
+            {submitting ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <MessageCircleMore size={14} />
+            )}
+            {t("qqbotSetup.connect")}
+          </button>
+        </div>
       </div>
     </div>
   );
