@@ -41,7 +41,7 @@ wait_ports_free() {
   local waited=0
   while true; do
     local busy
-    busy=$(lsof -iTCP:50800 -iTCP:50810 -iTCP:18789 -sTCP:LISTEN -n -P 2>/dev/null || true)
+    busy=$(lsof -iTCP:50800 -iTCP:50810 -iTCP:18789 -iTCP:18790 -iTCP:18791 -sTCP:LISTEN -n -P 2>/dev/null || true)
     if [ -z "$busy" ]; then break; fi
     if [ "$waited" -ge 20 ]; then
       log "WARNING: ports still occupied after 20s"
@@ -269,13 +269,15 @@ capture_logs() {
     echo "=== Launchd ==="
     launchctl list 2>/dev/null | grep nexu || echo "(none)"
     echo "=== Ports ==="
-    lsof -iTCP:50800 -iTCP:50810 -iTCP:18789 -sTCP:LISTEN -n -P 2>/dev/null || echo "(none)"
+    lsof -iTCP:50800 -iTCP:50810 -iTCP:18789 -iTCP:18790 -iTCP:18791 -sTCP:LISTEN -n -P 2>/dev/null || echo "(none)"
     echo "=== Controller ==="
     curl -sf http://127.0.0.1:50800/api/internal/desktop/ready 2>/dev/null || echo "(unreachable)"
     echo "=== Cloud ==="
     curl -sf http://127.0.0.1:50800/api/internal/desktop/cloud-status 2>/dev/null || echo "(unreachable)"
-    echo "=== OpenClaw ==="
-    curl -sf http://127.0.0.1:18789/health 2>/dev/null || echo "(unreachable)"
+    echo "=== OpenClaw (scan ports) ==="
+    for _p in 18789 18790 18791; do
+      curl -sf "http://127.0.0.1:$_p/health" 2>/dev/null && echo "healthy on $_p" && break
+    done || echo "(unreachable on 18789-18791)"
   } > "$state_dir/runtime-snapshot.txt" 2>&1
 
   log "Diagnostics captured"
@@ -337,13 +339,18 @@ verify_services() {
     failed=$((failed + 1))
   fi
 
-  # 3. OpenClaw gateway health
+  # 3. OpenClaw gateway health — discover actual port from runtime-ports.json
+  local oc_port="18789"
+  local plist_dir="$PERSISTENT_HOME/Library/LaunchAgents"
+  if [ -f "$plist_dir/runtime-ports.json" ]; then
+    oc_port=$(python3 -c "import json; print(json.load(open('$plist_dir/runtime-ports.json')).get('openclawPort', 18789))" 2>/dev/null || echo "18789")
+  fi
   local openclaw_health
-  openclaw_health=$(curl -sf http://127.0.0.1:18789/health 2>/dev/null || echo "")
+  openclaw_health=$(curl -sf "http://127.0.0.1:$oc_port/health" 2>/dev/null || echo "")
   if [ -n "$openclaw_health" ]; then
-    log "[$label]   openclaw gateway: healthy"
+    log "[$label]   openclaw gateway: healthy (port $oc_port)"
   else
-    log "[$label]   openclaw gateway: NOT HEALTHY (may still be starting)"
+    log "[$label]   openclaw gateway: NOT HEALTHY on port $oc_port (may still be starting)"
   fi
 
   # 4. Launchd service registration
@@ -355,7 +362,7 @@ verify_services() {
 
   # 5. Port listeners (verify actual TCP LISTEN state)
   local listeners
-  listeners=$(lsof -iTCP:50800 -iTCP:50810 -iTCP:18789 -sTCP:LISTEN -n -P 2>/dev/null | grep LISTEN | wc -l | tr -d ' ')
+  listeners=$(lsof -iTCP:50800 -iTCP:50810 -iTCP:"$oc_port" -sTCP:LISTEN -n -P 2>/dev/null | grep LISTEN | wc -l | tr -d ' ')
   log "[$label]   TCP listeners on known ports: $listeners"
 
   # 6. Electron process alive
@@ -911,7 +918,7 @@ resilience_update_residual() {
 
   # Check if ports are still held by residual services
   local ports_held
-  ports_held=$(lsof -iTCP:50800 -iTCP:18789 -sTCP:LISTEN -n -P 2>/dev/null | grep -c LISTEN || echo 0)
+  ports_held=$(lsof -iTCP:50800 -iTCP:18789 -iTCP:18790 -iTCP:18791 -sTCP:LISTEN -n -P 2>/dev/null | grep -c LISTEN || echo 0)
   log "Ports still held by residual services: $ports_held"
 
   # Now simulate "updated app" starting — it should teardown old services and start fresh
