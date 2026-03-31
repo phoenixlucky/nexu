@@ -11,7 +11,7 @@
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import * as fs from "node:fs/promises";
-import { createConnection } from "node:net";
+import net, { createConnection } from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
@@ -281,30 +281,27 @@ function isProcessAlive(pid: number): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Check if a port is occupied by attempting a TCP connection.
- * Returns `{ occupied: true }` if something is listening, `null` if free.
+ * Check if a port is occupied by attempting to bind a temporary server.
+ * Returns `{ pid: 0 }` if occupied, `null` if free.
  *
- * Uses net.connect instead of lsof because packaged Electron apps with
- * hardened runtime cannot see other processes' file descriptors via lsof.
+ * Uses net.createServer().listen() instead of lsof or net.connect because:
+ * - lsof is blocked by macOS hardened runtime in packaged Electron apps
+ * - net.connect conflicts with probePort (both use createConnection)
  */
 async function detectPortOccupier(
   port: number,
 ): Promise<{ pid: number } | null> {
-  const occupied = await new Promise<boolean>((resolve) => {
-    const sock = createConnection(port, "127.0.0.1");
-    sock.once("connect", () => {
-      sock.destroy();
-      resolve(true);
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => {
+      // EADDRINUSE or other bind failure — port is occupied
+      resolve({ pid: 0 });
     });
-    sock.once("error", () => resolve(false));
-    sock.setTimeout(1000, () => {
-      sock.destroy();
-      resolve(false);
+    server.listen(port, "127.0.0.1", () => {
+      // Successfully bound — port is free. Close immediately.
+      server.close(() => resolve(null));
     });
   });
-  // We can't get the PID without lsof, but we know the port is occupied.
-  // Return pid=0 as a sentinel — callers check occupier != null.
-  return occupied ? { pid: 0 } : null;
 }
 
 /**
