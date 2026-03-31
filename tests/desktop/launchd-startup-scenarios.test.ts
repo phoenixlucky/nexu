@@ -131,7 +131,7 @@ function makeBootstrapEnv(
   return {
     isDev: true,
     controllerPort: 50800,
-    openclawPort: 18789,
+    openclawPort: 50789,
     webPort: 50810,
     webRoot: "/repo/apps/web/dist",
     nodePath: "/usr/local/bin/node",
@@ -163,7 +163,7 @@ function makeRuntimePorts(overrides?: Record<string, unknown>) {
     writtenAt: new Date().toISOString(),
     electronPid: 12345,
     controllerPort: 50800,
-    openclawPort: 18789,
+    openclawPort: 50789,
     webPort: 50810,
     nexuHome: "/tmp/nexu-home",
     isDev: true,
@@ -249,7 +249,7 @@ describe("Launchd Startup Scenarios", () => {
     expect(mockLaunchdManager.installService).toHaveBeenCalledTimes(2);
     expect(result.isAttach).toBe(false);
     expect(result.effectivePorts.controllerPort).toBe(50800);
-    expect(result.effectivePorts.openclawPort).toBe(18789);
+    expect(result.effectivePorts.openclawPort).toBe(50789);
     expect(result.effectivePorts.webPort).toBe(50810);
   });
 
@@ -546,7 +546,7 @@ describe("Launchd Startup Scenarios", () => {
     // biome-ignore lint/style/noNonNullAssertion: guarded by toBeDefined above
     const written = JSON.parse(portsWrite![1] as string);
     expect(written.controllerPort).toBe(50800);
-    expect(written.openclawPort).toBe(18789);
+    expect(written.openclawPort).toBe(50789);
     expect(written.electronPid).toBe(process.pid);
   });
 
@@ -667,7 +667,7 @@ describe("Launchd Startup Scenarios", () => {
           result: { stdout: string; stderr: string },
         ) => void,
       ) => {
-        if (args.some((a: string) => a.includes("18789"))) {
+        if (args.some((a: string) => a.includes("50789"))) {
           callback(null, { stdout: "88888\n", stderr: "" });
         } else {
           callback(new Error("no process"), { stdout: "", stderr: "" });
@@ -681,7 +681,7 @@ describe("Launchd Startup Scenarios", () => {
 
     const result = await bootstrapWithLaunchd(makeBootstrapEnv() as never);
 
-    expect(result.effectivePorts.openclawPort).toBe(18790);
+    expect(result.effectivePorts.openclawPort).toBe(50790);
   });
 
   // -----------------------------------------------------------------------
@@ -974,7 +974,7 @@ describe("Launchd Startup Scenarios", () => {
       writtenAt: new Date().toISOString(),
       electronPid: 12345,
       controllerPort: 50800,
-      openclawPort: 18789,
+      openclawPort: 50789,
       webPort: 50810,
       nexuHome: "/tmp/nexu-home",
       isDev: true,
