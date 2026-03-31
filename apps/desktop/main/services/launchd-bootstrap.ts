@@ -697,6 +697,46 @@ export async function bootstrapWithLaunchd(
   if (!openclawHealthy) {
     await ensureService(labels.openclaw, "openclaw");
     await ensureRunning(labels.openclaw, "openclaw");
+
+    // Verify our openclaw actually owns the port. Another launchd service
+    // (e.g. global `ai.openclaw.gateway` with KeepAlive=true) may have
+    // raced us and grabbed the port first. If so, pick a new port and
+    // re-bootstrap our service.
+    const occupier = await detectPortOccupier(effectivePorts.openclawPort);
+    const ocStatus = await launchd.getServiceStatus(labels.openclaw);
+    if (occupier && ocStatus.pid != null && occupier.pid !== ocStatus.pid) {
+      console.log(
+        `[bootstrap] OpenClaw port ${effectivePorts.openclawPort} stolen by PID ${occupier.pid} (ours is ${ocStatus.pid}), reassigning`,
+      );
+      await launchd.bootoutService(labels.openclaw).catch(() => {});
+      const newPort = await findFreePort(effectivePorts.openclawPort + 1);
+      effectivePorts.openclawPort = newPort;
+      // Regenerate plist with new port and restart
+      const retryPlistEnv: PlistEnv = {
+        ...plistEnv,
+        openclawPort: newPort,
+      };
+      const retryPlist = generatePlist("openclaw", retryPlistEnv);
+      await launchd.installService(labels.openclaw, retryPlist);
+      await launchd.startService(labels.openclaw);
+      await ensureRunning(labels.openclaw, "openclaw");
+      // Controller needs the new port — re-bootstrap it too
+      const retryControllerPlistEnv: PlistEnv = {
+        ...plistEnv,
+        openclawPort: newPort,
+      };
+      await launchd.bootoutService(labels.controller).catch(() => {});
+      const retryControllerPlist = generatePlist(
+        "controller",
+        retryControllerPlistEnv,
+      );
+      await launchd.installService(labels.controller, retryControllerPlist);
+      await launchd.startService(labels.controller);
+      await ensureRunning(labels.controller, "controller");
+      console.log(
+        `[bootstrap] OpenClaw reassigned to port ${newPort}, controller restarted`,
+      );
+    }
   } else {
     console.log("[bootstrap] openclaw already healthy, skipping");
   }
