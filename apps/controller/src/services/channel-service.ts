@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
   chmodSync,
@@ -11,6 +12,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 import type {
   BotQuotaResponse,
   ChannelResponse,
@@ -22,10 +24,14 @@ import type {
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
+import type { OpenClawProcessManager } from "../runtime/openclaw-process.js";
+import type { OpenClawWsClient } from "../runtime/openclaw-ws-client.js";
+import type { RuntimeHealth } from "../runtime/runtime-health.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
 import type { OpenClawGatewayService } from "./openclaw-gateway-service.js";
 import type { OpenClawSyncService } from "./openclaw-sync-service.js";
 
+const execFileAsync = promisify(execFile);
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -41,6 +47,10 @@ const WHATSAPP_LOGIN_TTL_MS = 3 * 60_000;
 const WHATSAPP_QR_TIMEOUT_MS = 45_000;
 const WHATSAPP_WAIT_TIMEOUT_MS = 120_000;
 const WHATSAPP_LOGGED_OUT_STATUS = 401;
+const WHATSAPP_RUNTIME_RESTART_TIMEOUT_MS = 45_000;
+const WHATSAPP_RUNTIME_RESTART_POLL_MS = 500;
+const WHATSAPP_READY_TIMEOUT_MS = 45_000;
+const WHATSAPP_READY_POLL_MS = 1_500;
 
 type ActiveWechatLogin = {
   sessionKey: string;
@@ -102,6 +112,12 @@ type ActiveWhatsappLogin = {
   errorStatus?: number;
   restartAttempted: boolean;
   preserveAuthDirOnReset?: boolean;
+  expectedIdentity?: WhatsappLoginIdentity;
+};
+
+type WhatsappLoginIdentity = {
+  e164: string | null;
+  jid: string | null;
 };
 
 type WhatsappRuntimeModules = {
@@ -154,6 +170,70 @@ function normalizeAccountId(accountId: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .replace(/-{2,}/g, "-");
+}
+
+function normalizeWhatsappSelfJid(
+  value: string | null | undefined,
+): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed.toLowerCase() : null;
+}
+
+function normalizeWhatsappSelfE164(
+  value: string | null | undefined,
+): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const digits = trimmed.replace(/\D+/g, "");
+  return digits || null;
+}
+
+function readWhatsappLoginIdentity(
+  authDir: string,
+): WhatsappLoginIdentity | null {
+  try {
+    const credsPath = path.join(authDir, "creds.json");
+    const parsed = JSON.parse(readFileSync(credsPath, "utf-8")) as {
+      me?: { id?: string | null };
+    };
+    const rawId = parsed.me?.id?.trim();
+    if (!rawId) {
+      return null;
+    }
+    const jid = rawId.toLowerCase();
+    const e164 = normalizeWhatsappSelfE164(rawId.split(":", 1)[0] ?? rawId);
+    return { e164, jid };
+  } catch {
+    return null;
+  }
+}
+
+function matchesWhatsappIdentity(
+  actual: WhatsappLoginIdentity | null,
+  expected: WhatsappLoginIdentity | null | undefined,
+): boolean {
+  if (!expected) {
+    return true;
+  }
+  if (!actual) {
+    return false;
+  }
+
+  const actualE164 = normalizeWhatsappSelfE164(actual.e164);
+  const expectedE164 = normalizeWhatsappSelfE164(expected.e164);
+  if (actualE164 && expectedE164) {
+    return actualE164 === expectedE164;
+  }
+
+  const actualJid = normalizeWhatsappSelfJid(actual.jid);
+  const expectedJid = normalizeWhatsappSelfJid(expected.jid);
+  if (actualJid && expectedJid) {
+    return actualJid === expectedJid;
+  }
+
+  return false;
 }
 
 function resolveWeChatPluginStateDir(env: ControllerEnv): string {
@@ -310,11 +390,14 @@ function attachWhatsappLoginWaiter(
       const current = activeWhatsappLogins.get(login.accountId);
       if (current?.startedAt === login.startedAt) {
         current.connected = true;
+        current.expectedIdentity =
+          readWhatsappLoginIdentity(current.authDir) ?? undefined;
         logger.info(
           {
             accountId: current.accountId,
             authDir: current.authDir,
             restartAttempted: current.restartAttempted,
+            expectedIdentity: current.expectedIdentity ?? null,
           },
           "whatsapp_login_wait_connected",
         );
@@ -388,6 +471,16 @@ function resolveOpenClawPackageDir(env: ControllerEnv): string {
     env.openclawBuiltinExtensionsDir
       ? path.dirname(env.openclawBuiltinExtensionsDir)
       : null,
+    path.join(
+      process.cwd(),
+      "..",
+      "..",
+      ".tmp",
+      "sidecars",
+      "openclaw",
+      "node_modules",
+      "openclaw",
+    ),
     path.join(
       env.openclawStateDir,
       "..",
@@ -555,6 +648,9 @@ export class ChannelService {
     private readonly configStore: NexuConfigStore,
     private readonly syncService: OpenClawSyncService,
     private readonly gatewayService: OpenClawGatewayService,
+    private readonly openclawProcess: OpenClawProcessManager,
+    private readonly runtimeHealth: RuntimeHealth,
+    private readonly wsClient: OpenClawWsClient,
   ) {}
 
   async listChannels() {
@@ -667,18 +763,12 @@ export class ChannelService {
     const channel = await this.configStore.connectWechat({ accountId });
     await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();
-    const readiness = await this.waitForWechatReady(accountId);
-    if (!readiness.ready) {
-      // Rollback: disconnect the channel so the user doesn't see a
-      // "connected" channel that can't actually receive messages.
-      await this.configStore.disconnectChannel(channel.id);
-      this.cleanupWechatAccountState(accountId);
-      await this.syncService.syncAll();
-      throw new Error(
-        readiness.lastError ??
-          "WeChat linked, but the runtime failed to start the listener.",
-      );
-    }
+    // Don't block on readiness — the prewarm hot-reload + monitor startup
+    // can take 15-30s depending on the previous long-poll cycle. Blocking
+    // here keeps the connect modal open and risks a rollback that triggers
+    // yet another config write + channel restart (making things worse).
+    // The home page's live-status polling (every 3s) shows the real-time
+    // "connecting → connected" transition instead.
     return channel;
   }
 
@@ -999,16 +1089,24 @@ export class ChannelService {
     if (!login || !login.connected) {
       throw new Error("WhatsApp login is not complete yet.");
     }
+    const expectedIdentity = login.expectedIdentity;
     const channel = await this.configStore.connectWhatsapp({
       accountId,
       authDir: login.authDir,
     });
     await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();
-    const readiness = await this.waitForWhatsappReady(accountId);
+    await this.restartOpenClawForWhatsappLifecycle("whatsapp-connect");
+    const readiness = await this.waitForWhatsappReady(
+      accountId,
+      expectedIdentity,
+    );
     if (!readiness.ready) {
       await this.configStore.disconnectChannel(channel.id);
       await this.syncService.syncAll();
+      await this.restartOpenClawForWhatsappLifecycle(
+        "whatsapp-connect-rollback",
+      );
       login.preserveAuthDirOnReset = false;
       await resetActiveWhatsappLogin(accountId);
       throw new Error(
@@ -1047,6 +1145,15 @@ export class ChannelService {
   }
 
   async disconnectChannel(channelId: string) {
+    // Align with OpenClaw's "remove" semantics: disconnect only unbinds the
+    // channel from Nexu config and leaves the linked session intact. Explicit
+    // logout remains a separate operation.
+    const getChannel =
+      "getChannel" in this.configStore &&
+      typeof this.configStore.getChannel === "function"
+        ? this.configStore.getChannel.bind(this.configStore)
+        : null;
+    const channel = getChannel ? await getChannel(channelId) : null;
     const removed = await this.configStore.disconnectChannel(channelId);
     if (removed) {
       // syncAll triggers the authoritative index writer which removes
@@ -1054,68 +1161,94 @@ export class ChannelService {
       // by the writer's orphan sweep — no destructive cleanup here so
       // disconnect stays a pure "unbind", not a "logout".
       await this.syncService.syncAll();
+      if (channel?.channelType === "whatsapp") {
+        await this.restartOpenClawForWhatsappLifecycle("whatsapp-disconnect");
+      }
     }
     return removed;
   }
 
-  /**
-   * Remove credential and sync files for a WeChat account.
-   * Index cleanup is NOT done here — the authoritative config writer
-   * handles index reconciliation during syncAll().
-   */
-  private cleanupWechatAccountState(accountId: string) {
-    const stateDir = this.env.openclawStateDir;
-    if (!stateDir) return;
-
-    const accountsDir = path.join(stateDir, "openclaw-weixin", "accounts");
-    for (const suffix of [".json", ".sync.json"]) {
-      try {
-        rmSync(path.join(accountsDir, `${accountId}${suffix}`));
-      } catch {
-        // ignore if not found
-      }
-    }
-  }
-
-  private async waitForWechatReady(accountId: string) {
-    // With the prewarm account, hot-reload takes ~500ms-2s.
-    // Without prewarm (first ever), full restart takes ~20-45s.
-    // Use a generous deadline but poll frequently for fast path.
-    const deadline = Date.now() + 30_000;
-    let lastReadiness = await this.gatewayService.getChannelReadiness(
-      "wechat",
-      accountId,
-    );
-    while (Date.now() < deadline) {
-      if (lastReadiness.ready) {
-        return lastReadiness;
-      }
-      await sleep(1000);
-      lastReadiness = await this.gatewayService.getChannelReadiness(
-        "wechat",
-        accountId,
-      );
-    }
-    return lastReadiness;
-  }
-
-  private async waitForWhatsappReady(accountId: string) {
-    const deadline = Date.now() + 45_000;
+  private async waitForWhatsappReady(
+    accountId: string,
+    expectedIdentity?: WhatsappLoginIdentity,
+  ) {
+    const deadline = Date.now() + WHATSAPP_READY_TIMEOUT_MS;
     let lastReadiness = await this.gatewayService.getChannelReadiness(
       "whatsapp",
       accountId,
     );
     while (Date.now() < deadline) {
       if (lastReadiness.ready) {
-        return lastReadiness;
+        const status = await this.gatewayService.getChannelsStatusSnapshot({
+          probe: false,
+          timeoutMs: 1000,
+        });
+        const self = status.channels?.whatsapp?.self
+          ? {
+              e164: status.channels.whatsapp.self.e164 ?? null,
+              jid: status.channels.whatsapp.self.jid ?? null,
+            }
+          : null;
+        if (matchesWhatsappIdentity(self, expectedIdentity)) {
+          return lastReadiness;
+        }
+        logger.info(
+          {
+            accountId,
+            expectedIdentity: expectedIdentity ?? null,
+            actualIdentity: self,
+          },
+          "whatsapp_ready_identity_mismatch",
+        );
+        lastReadiness = {
+          ...lastReadiness,
+          ready: false,
+          lastError: "listener identity mismatch",
+        };
       }
-      await sleep(1500);
+      await sleep(WHATSAPP_READY_POLL_MS);
       lastReadiness = await this.gatewayService.getChannelReadiness(
         "whatsapp",
         accountId,
       );
     }
     return lastReadiness;
+  }
+
+  private async restartOpenClawForWhatsappLifecycle(reason: string) {
+    logger.info({ reason }, "whatsapp_runtime_restart_requested");
+
+    if (this.env.manageOpenclawProcess) {
+      await this.openclawProcess.stop();
+      this.openclawProcess.enableAutoRestart();
+      this.openclawProcess.start();
+    } else if (this.env.openclawLaunchdLabel) {
+      const domain = `gui/${os.userInfo().uid}/${this.env.openclawLaunchdLabel}`;
+      await execFileAsync("launchctl", ["kickstart", "-k", domain]);
+    } else {
+      logger.warn(
+        {
+          reason,
+          manageOpenclawProcess: this.env.manageOpenclawProcess,
+        },
+        "whatsapp_runtime_restart_skipped",
+      );
+      return;
+    }
+
+    this.wsClient.retryNow();
+
+    const deadline = Date.now() + WHATSAPP_RUNTIME_RESTART_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      const health = await this.runtimeHealth.probe();
+      if (health.ok && this.gatewayService.isConnected()) {
+        logger.info({ reason }, "whatsapp_runtime_restart_ready");
+        return;
+      }
+      await sleep(WHATSAPP_RUNTIME_RESTART_POLL_MS);
+    }
+
+    throw new Error("OpenClaw runtime did not become healthy after restart.");
   }
 
   private async resetWhatsAppDefaultLoginState(accountId: string) {

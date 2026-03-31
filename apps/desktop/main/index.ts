@@ -7,6 +7,7 @@ import {
   type MenuItemConstructorOptions,
   app,
   crashReporter,
+  globalShortcut,
   nativeTheme,
   powerMonitor,
   powerSaveBlocker,
@@ -258,6 +259,9 @@ if (sentryDsn) {
 
 let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
+
+/** When true, the Develop menu and reload shortcuts are visible in production. */
+let productionDebugMode = false;
 let sleepGuard: SleepGuard | null = null;
 let launchdResult: LaunchdBootstrapResult | null = null;
 let proxyManager: ProxyManager | null = null;
@@ -445,8 +449,29 @@ function installApplicationMenu(): void {
       : []),
     { role: "fileMenu" },
     { role: "editMenu" },
-    { role: "viewMenu" },
-    developMenu,
+    {
+      label: "View",
+      submenu: [
+        // Reload shortcuts are dev-only — in production they expose
+        // internal "starting local service" screens (see #399).
+        // They can be unlocked at runtime via Cmd+Shift+Alt+D.
+        ...(!app.isPackaged || productionDebugMode
+          ? ([
+              { role: "reload" },
+              { role: "forceReload" },
+              { type: "separator" },
+            ] satisfies MenuItemConstructorOptions[])
+          : []),
+        { role: "toggleDevTools" },
+        { type: "separator" },
+        { role: "resetZoom" },
+        { role: "zoomIn" },
+        { role: "zoomOut" },
+        { type: "separator" },
+        { role: "togglefullscreen" },
+      ],
+    },
+    ...(!app.isPackaged || productionDebugMode ? [developMenu] : []),
     { role: "windowMenu" },
     helpMenu,
   ];
@@ -624,8 +649,7 @@ async function runLaunchdColdStart(): Promise<void> {
   const openclawTmpDir = resolve(openclawRuntimeRoot, "tmp");
   const openclawBinPath =
     process.env.NEXU_OPENCLAW_BIN ?? paths.openclawBinPath;
-  const openclawPackageRoot = dirname(paths.openclawPath);
-  const openclawExtensionsDir = resolve(openclawPackageRoot, "extensions");
+  const openclawExtensionsDir = paths.openclawExtensionsDir;
   const skillhubStaticSkillsDir = app.isPackaged
     ? resolve(electronRoot, "static/bundled-skills")
     : resolve(repoRoot, "apps/desktop/static/bundled-skills");
@@ -928,6 +952,22 @@ app.on("web-contents-created", (_event, contents) => {
     return { action: "deny" };
   });
 
+  // In production, block reload shortcuts (Cmd+R, Ctrl+R, Ctrl+Shift+R, F5)
+  // at the webContents level to prevent exposing internal startup screens (#399).
+  // Unlockable at runtime via Cmd+Shift+Alt+D (toggles productionDebugMode).
+  if (app.isPackaged) {
+    contents.on("before-input-event", (event, input) => {
+      if (productionDebugMode) return;
+      if (input.type !== "keyDown") return;
+      const isReload =
+        (input.key.toLowerCase() === "r" && (input.meta || input.control)) ||
+        input.key === "F5";
+      if (isReload) {
+        event.preventDefault();
+      }
+    });
+  }
+
   if (contentType !== "webview") {
     return;
   }
@@ -1019,6 +1059,15 @@ app.whenReady().then(async () => {
   proxyManager = new ProxyManager(session.defaultSession);
   await proxyManager.applyPolicy(runtimeConfig.proxy);
   installApplicationMenu();
+
+  // Hidden shortcut to toggle debug mode in production (Develop menu + reload).
+  // Harmless in dev since those items are always visible.
+  if (app.isPackaged) {
+    globalShortcut.register("CommandOrControl+Shift+Alt+D", () => {
+      productionDebugMode = !productionDebugMode;
+      installApplicationMenu();
+    });
+  }
   diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
   await refreshProxyDiagnostics();
   diagnosticsReporter.recordStartupProbe({

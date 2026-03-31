@@ -99,6 +99,7 @@ export function generatePlist(
 function generateControllerPlist(label: string, env: PlistEnv): string {
   const logPath = path.join(env.logDir, "controller.log");
   const errorPath = path.join(env.logDir, "controller.error.log");
+  const openclawLabel = SERVICE_LABELS.openclaw(env.isDev);
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -144,6 +145,8 @@ function generateControllerPlist(label: string, env: PlistEnv): string {
         <string>${escapeXml(env.platformTemplatesDir)}</string>
         <key>OPENCLAW_BIN</key>
         <string>${escapeXml(env.openclawBinPath)}</string>
+        <key>OPENCLAW_LAUNCHD_LABEL</key>
+        <string>${escapeXml(openclawLabel)}</string>
         <key>OPENCLAW_ELECTRON_EXECUTABLE</key>
         <string>${escapeXml(env.nodePath)}</string>
         <key>OPENCLAW_EXTENSIONS_DIR</key>
@@ -246,6 +249,8 @@ function generateOpenclawPlist(label: string, env: PlistEnv): string {
         <string>${label}</string>
         <key>OPENCLAW_SERVICE_MARKER</key>
         <string>launchd</string>
+        <key>OPENCLAW_IMAGE_BACKEND</key>
+        <string>sips</string>
         <key>HOME</key>
         <string>${escapeXml(os.homedir())}</string>${renderProxyEnvEntries(
           env.proxyEnv,
