@@ -762,7 +762,7 @@ const en = {
   "qqbotSetup.desc":
     "Use your QQ bot App ID and App Secret. Nexu will validate the credentials and sync the qqbot channel into OpenClaw.",
   "qqbotSetup.quickSetup": "Quick setup",
-  "qqbotSetup.step1": "Open the QQ bot developer console.",
+  "qqbotSetup.step1": "Open the QQ Bot login page and sign in.",
   "qqbotSetup.step2": "Create or select your QQ bot application.",
   "qqbotSetup.step3": "Copy the App ID and App Secret.",
   "qqbotSetup.step4":
@@ -771,8 +771,11 @@ const en = {
   "qqbotSetup.appIdPlaceholder": "Your QQ bot App ID",
   "qqbotSetup.appSecretLabel": "App Secret",
   "qqbotSetup.appSecretPlaceholder": "Your QQ bot App Secret",
+  "qqbotSetup.testConnectivity": "Test connectivity",
   "qqbotSetup.connect": "Connect QQ Bot",
   "qqbotSetup.credentialsRequired": "QQ bot App ID and App Secret are required",
+  "qqbotSetup.testFailed": "QQ bot connectivity test failed",
+  "qqbotSetup.testSuccess": "QQ bot connectivity test passed",
   "qqbotSetup.connectFailed": "Failed to connect QQ bot",
   "qqbotSetup.connectSuccess": "QQ bot connected",
 

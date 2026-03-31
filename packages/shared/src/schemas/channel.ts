@@ -56,6 +56,11 @@ export const connectQqbotSchema = z.object({
   appSecret: z.string().min(1),
 });
 
+export const qqbotConnectivityResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+});
+
 export const whatsappQrWaitRequestSchema = z.object({
   accountId: z.string().min(1),
 });
@@ -116,6 +121,9 @@ export type ConnectWechatInput = z.infer<typeof connectWechatSchema>;
 export type ConnectTelegramInput = z.infer<typeof connectTelegramSchema>;
 export type ConnectWhatsappInput = z.infer<typeof connectWhatsappSchema>;
 export type ConnectQqbotInput = z.infer<typeof connectQqbotSchema>;
+export type QqbotConnectivityResponse = z.infer<
+  typeof qqbotConnectivityResponseSchema
+>;
 export type WhatsappQrWaitRequest = z.infer<typeof whatsappQrWaitRequestSchema>;
 export type WechatQrStartResponse = z.infer<typeof wechatQrStartResponseSchema>;
 export type WechatQrWaitResponse = z.infer<typeof wechatQrWaitResponseSchema>;

@@ -1242,6 +1242,39 @@ export type PostApiV1ChannelsQqbotConnectResponses = {
 
 export type PostApiV1ChannelsQqbotConnectResponse = PostApiV1ChannelsQqbotConnectResponses[keyof PostApiV1ChannelsQqbotConnectResponses];
 
+export type PostApiV1ChannelsQqbotTestData = {
+    body?: {
+        appId: string;
+        appSecret: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/channels/qqbot/test';
+};
+
+export type PostApiV1ChannelsQqbotTestErrors = {
+    /**
+     * Invalid credentials or plugin missing
+     */
+    409: {
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsQqbotTestError = PostApiV1ChannelsQqbotTestErrors[keyof PostApiV1ChannelsQqbotTestErrors];
+
+export type PostApiV1ChannelsQqbotTestResponses = {
+    /**
+     * QQ bot connectivity test result
+     */
+    200: {
+        success: boolean;
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsQqbotTestResponse = PostApiV1ChannelsQqbotTestResponses[keyof PostApiV1ChannelsQqbotTestResponses];
+
 export type PostApiV1ChannelsTelegramConnectData = {
     body: {
         botToken: string;

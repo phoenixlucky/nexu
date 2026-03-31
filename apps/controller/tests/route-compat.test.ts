@@ -430,6 +430,56 @@ describe("controller route compatibility", () => {
     expect(payload.appId).toBe("123456");
   });
 
+  it("supports qqbot connectivity tests when the plugin is installed", async () => {
+    await mkdir(
+      path.join(container.env.openclawExtensionsDir, "openclaw-qqbot"),
+      {
+        recursive: true,
+      },
+    );
+    await writeFile(
+      path.join(
+        container.env.openclawExtensionsDir,
+        "openclaw-qqbot",
+        "openclaw.plugin.json",
+      ),
+      JSON.stringify({ id: "openclaw-qqbot", channels: ["qqbot"] }),
+      "utf8",
+    );
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = input.toString();
+        if (url.includes("bots.qq.com/app/getAppAccessToken")) {
+          return new Response(
+            JSON.stringify({ access_token: "qq-access-token" }),
+            { status: 200 },
+          );
+        }
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }),
+    );
+
+    const app = createApp(container);
+    const response = await app.request("/api/v1/channels/qqbot/test", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        appId: "123456",
+        appSecret: "qq-secret",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      success: boolean;
+      message: string;
+    };
+    expect(payload.success).toBe(true);
+    expect(payload.message).toContain("123456");
+  });
+
   it("maps legacy qqbot account ids to the runtime default account for live status", async () => {
     const gatewayService = new OpenClawGatewayService(
       {

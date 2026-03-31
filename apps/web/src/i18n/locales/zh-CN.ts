@@ -725,7 +725,7 @@ const zhCN = {
   "qqbotSetup.desc":
     "填写 QQ 机器人的 App ID 和 App Secret。Nexu 会先校验凭据，再把 qqbot 渠道同步到 OpenClaw。",
   "qqbotSetup.quickSetup": "快速配置",
-  "qqbotSetup.step1": "打开 QQ 机器人开发者控制台。",
+  "qqbotSetup.step1": "打开 QQ Bot 登录页并完成登录。",
   "qqbotSetup.step2": "创建或选择你的 QQ 机器人应用。",
   "qqbotSetup.step3": "复制 App ID 和 App Secret。",
   "qqbotSetup.step4":
@@ -734,8 +734,11 @@ const zhCN = {
   "qqbotSetup.appIdPlaceholder": "你的 QQ 机器人 App ID",
   "qqbotSetup.appSecretLabel": "App Secret",
   "qqbotSetup.appSecretPlaceholder": "你的 QQ 机器人 App Secret",
+  "qqbotSetup.testConnectivity": "测试连通性",
   "qqbotSetup.connect": "连接 QQ Bot",
   "qqbotSetup.credentialsRequired": "QQ 机器人 App ID 和 App Secret 不能为空",
+  "qqbotSetup.testFailed": "QQ Bot 连通性测试失败",
+  "qqbotSetup.testSuccess": "QQ Bot 连通性测试通过",
   "qqbotSetup.connectFailed": "连接 QQ Bot 失败",
   "qqbotSetup.connectSuccess": "QQ Bot 已连接",
 

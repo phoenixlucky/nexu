@@ -10,6 +10,7 @@ import {
   connectTelegramSchema,
   connectWechatSchema,
   connectWhatsappSchema,
+  qqbotConnectivityResponseSchema,
   slackOAuthUrlResponseSchema,
   wechatQrStartResponseSchema,
   wechatQrWaitResponseSchema,
@@ -244,6 +245,51 @@ export function registerChannelRoutes(
           {
             message:
               error instanceof Error ? error.message : "QQ bot connect failed",
+          },
+          409,
+        );
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/channels/qqbot/test",
+      tags: ["Channels"],
+      request: {
+        body: {
+          content: { "application/json": { schema: connectQqbotSchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: qqbotConnectivityResponseSchema },
+          },
+          description: "QQ bot connectivity test result",
+        },
+        409: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Invalid credentials or plugin missing",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        return c.json(
+          await container.channelService.testQqbotConnectivity(
+            c.req.valid("json"),
+          ),
+          200,
+        );
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error
+                ? error.message
+                : "QQ bot connectivity test failed",
           },
           409,
         );
