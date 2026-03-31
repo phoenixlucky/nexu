@@ -581,6 +581,81 @@ while True:
   wait_ports_free
 }
 
+# 3b. OpenClaw port conflict: occupy 18789 (global openclaw), verify Nexu auto-assigns new port
+resilience_openclaw_port_conflict() {
+  log "--- Resilience: openclaw port conflict (18789) ---"
+  resilience_reset
+
+  # Simulate a global openclaw (or ClawX) occupying the default openclaw port
+  python3 -c "
+import socket, time
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(('127.0.0.1', 18789))
+s.listen(1)
+while True:
+    time.sleep(1)
+" &
+  local blocker_pid=$!
+  sleep 1
+
+  if lsof -iTCP:18789 -sTCP:LISTEN -n -P 2>/dev/null | grep -q LISTEN; then
+    log "Port 18789 occupied by blocker pid=$blocker_pid"
+  else
+    log "WARNING: failed to occupy port 18789"
+    kill "$blocker_pid" 2>/dev/null || true
+    return 1
+  fi
+
+  # Launch app — it should detect openclaw port conflict and use a different port
+  resilience_launch "$1"
+  sleep 20
+
+  local passed=false
+
+  # Controller should be up on default port
+  if curl -sf "http://127.0.0.1:50800/api/internal/desktop/ready" 2>/dev/null | grep -q '"ready":true'; then
+    log "Controller ready on 50800"
+  else
+    log "WARNING: controller not ready on 50800"
+  fi
+
+  # OpenClaw should be on an alternative port (18790, 18791, etc.) — NOT 18789
+  for port in 18790 18791 18792 18793 18794; do
+    if curl -sf "http://127.0.0.1:$port/health" 2>/dev/null; then
+      log "PASSED: openclaw running on alternative port $port (18789 was occupied)"
+      passed=true
+      break
+    fi
+  done
+
+  if ! $passed; then
+    log "FAILED: openclaw not found on any alternative port"
+    # Check cold-start log for diagnostics
+    local cold_log="$PERSISTENT_HOME/Library/Application Support/@nexu/desktop/logs/cold-start.log"
+    if [ -f "$cold_log" ]; then
+      grep -i "findFreePort\|occupier\|portStolen\|reassign" "$cold_log" | tail -5 >&2 || true
+    fi
+  fi
+
+  # Verify blocker on 18789 was NOT killed (Nexu should coexist, not kill others)
+  if kill -0 "$blocker_pid" 2>/dev/null; then
+    log "PASSED: blocker on 18789 still alive (Nexu coexists)"
+  else
+    log "FAILED: blocker on 18789 was killed (Nexu should not kill other services)"
+    passed=false
+  fi
+
+  # Cleanup
+  kill "$blocker_pid" 2>/dev/null || true
+  wait "$blocker_pid" 2>/dev/null || true
+  quit_app
+  bash "$REPO_ROOT/scripts/kill-all.sh" > "$CAPTURE_DIR/kill-all-oc-port-conflict.log" 2>&1 || true
+  wait_ports_free
+
+  $passed && return 0 || return 1
+}
+
 # 4. Stale runtime-ports.json: write fake state, verify app recovers
 resilience_stale_state() {
   log "--- Resilience: stale runtime-ports.json ---"
@@ -746,6 +821,7 @@ run_resilience() {
   resilience_crash_recovery "$app_path" || failed=$((failed + 1))
   resilience_orphan_cleanup "$app_path" || failed=$((failed + 1))
   resilience_port_conflict "$app_path" || failed=$((failed + 1))
+  resilience_openclaw_port_conflict "$app_path" || failed=$((failed + 1))
   resilience_stale_state "$app_path" || failed=$((failed + 1))
   resilience_double_launch "$app_path" || failed=$((failed + 1))
   resilience_update_residual "$app_path" || failed=$((failed + 1))
