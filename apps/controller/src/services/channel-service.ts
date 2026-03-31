@@ -18,6 +18,7 @@ import type {
   ChannelResponse,
   ConnectDiscordInput,
   ConnectFeishuInput,
+  ConnectQqbotInput,
   ConnectSlackInput,
   ConnectTelegramInput,
 } from "@nexu/shared";
@@ -51,6 +52,7 @@ const WHATSAPP_RUNTIME_RESTART_TIMEOUT_MS = 45_000;
 const WHATSAPP_RUNTIME_RESTART_POLL_MS = 500;
 const WHATSAPP_READY_TIMEOUT_MS = 45_000;
 const WHATSAPP_READY_POLL_MS = 1_500;
+const QQBOT_PLUGIN_ID = "openclaw-qqbot";
 
 type ActiveWechatLogin = {
   sessionKey: string;
@@ -263,6 +265,40 @@ function resolveWhatsAppAccountDir(
     "whatsapp",
     normalizeAccountId(accountId),
   );
+}
+
+function hasPluginManifestWithId(dirPath: string, pluginId: string): boolean {
+  try {
+    const manifestPath = path.join(dirPath, "openclaw.plugin.json");
+    const raw = readFileSync(manifestPath, "utf-8");
+    const parsed = JSON.parse(raw) as { id?: unknown };
+    return parsed.id === pluginId;
+  } catch {
+    return false;
+  }
+}
+
+function resolveInstalledPluginDir(
+  env: ControllerEnv,
+  pluginId: string,
+): string | null {
+  const candidateRoots = [
+    env.openclawExtensionsDir,
+    env.openclawBuiltinExtensionsDir,
+  ].filter(
+    (value): value is string => typeof value === "string" && value.length > 0,
+  );
+
+  for (const root of candidateRoots) {
+    for (const dirName of [pluginId, "qqbot"]) {
+      const dirPath = path.join(root, dirName);
+      if (existsSync(dirPath) && hasPluginManifestWithId(dirPath, pluginId)) {
+        return dirPath;
+      }
+    }
+  }
+
+  return null;
 }
 
 function resolveWhatsAppLoginSessionDir(
@@ -889,6 +925,46 @@ export class ChannelService {
         payload.result.username?.trim() ||
         payload.result.first_name?.trim() ||
         null,
+    });
+    await this.syncService.writePlatformTemplatesForBot(channel.botId);
+    await this.syncService.syncAll();
+    return channel;
+  }
+
+  async connectQqbot(input: ConnectQqbotInput) {
+    const pluginDir = resolveInstalledPluginDir(this.env, QQBOT_PLUGIN_ID);
+    if (!pluginDir) {
+      throw new Error(`QQ plugin not installed: ${QQBOT_PLUGIN_ID}`);
+    }
+
+    const appId = input.appId.trim();
+    const appSecret = input.appSecret.trim();
+    const response = await proxyFetch(
+      "https://bots.qq.com/app/getAppAccessToken",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appId,
+          clientSecret: appSecret,
+        }),
+        timeoutMs: 5000,
+      },
+    );
+    const payload = (await response.json()) as {
+      access_token?: string;
+      code?: number;
+      message?: string;
+    };
+    if (!response.ok || !payload.access_token) {
+      throw new Error(
+        `Invalid QQ credentials: ${payload.message ?? `HTTP ${response.status}`}`,
+      );
+    }
+
+    const channel = await this.configStore.connectQqbot({
+      appId,
+      appSecret,
     });
     await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();

@@ -5,6 +5,7 @@ import type {
   ChannelResponse,
   ConnectDiscordInput,
   ConnectFeishuInput,
+  ConnectQqbotInput,
   ConnectSlackInput,
 } from "@nexu/shared";
 import {
@@ -21,6 +22,7 @@ import {
 } from "@nexu/shared";
 import type { z } from "zod";
 import type { ControllerEnv } from "../app/env.js";
+import { QQBOT_DEFAULT_ACCOUNT_ID } from "../lib/channel-binding-compiler.js";
 import { logger } from "../lib/logger.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
 import { LowDbStore } from "./lowdb-store.js";
@@ -977,6 +979,40 @@ export class NexuConfigStore {
                 input.verificationToken,
             }
           : {}),
+      },
+    }));
+
+    return channel;
+  }
+
+  async connectQqbot(input: ConnectQqbotInput): Promise<ChannelResponse> {
+    const bot = await this.getOrCreateDefaultBot();
+    const connectedAt = now();
+    const channel: ChannelResponse = {
+      id: crypto.randomUUID(),
+      botId: bot.id,
+      channelType: "qqbot",
+      accountId: QQBOT_DEFAULT_ACCOUNT_ID,
+      status: "connected",
+      teamName: null,
+      appId: input.appId,
+      botUserId: null,
+      createdAt: connectedAt,
+      updatedAt: connectedAt,
+    };
+
+    await this.store.update((config) => ({
+      ...config,
+      channels: [
+        ...config.channels.filter(
+          (existing) => existing.channelType !== channel.channelType,
+        ),
+        channel,
+      ],
+      secrets: {
+        ...config.secrets,
+        [`channel:${channel.id}:appId`]: input.appId,
+        [`channel:${channel.id}:clientSecret`]: input.appSecret,
       },
     }));
 

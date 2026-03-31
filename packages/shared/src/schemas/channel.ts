@@ -7,6 +7,7 @@ export const channelTypeSchema = z.enum([
   "wechat",
   "telegram",
   "whatsapp",
+  "qqbot",
 ]);
 
 export const channelStatusSchema = z.enum([
@@ -48,6 +49,11 @@ export const connectTelegramSchema = z.object({
 
 export const connectWhatsappSchema = z.object({
   accountId: z.string().min(1),
+});
+
+export const connectQqbotSchema = z.object({
+  appId: z.string().min(1),
+  appSecret: z.string().min(1),
 });
 
 export const whatsappQrWaitRequestSchema = z.object({
@@ -109,6 +115,7 @@ export type ConnectFeishuInput = z.infer<typeof connectFeishuSchema>;
 export type ConnectWechatInput = z.infer<typeof connectWechatSchema>;
 export type ConnectTelegramInput = z.infer<typeof connectTelegramSchema>;
 export type ConnectWhatsappInput = z.infer<typeof connectWhatsappSchema>;
+export type ConnectQqbotInput = z.infer<typeof connectQqbotSchema>;
 export type WhatsappQrWaitRequest = z.infer<typeof whatsappQrWaitRequestSchema>;
 export type WechatQrStartResponse = z.infer<typeof wechatQrStartResponseSchema>;
 export type WechatQrWaitResponse = z.infer<typeof wechatQrWaitResponseSchema>;

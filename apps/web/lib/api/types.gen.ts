@@ -1018,7 +1018,7 @@ export type GetApiV1ChannelsResponses = {
         channels: Array<{
             id: string;
             botId: string;
-            channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+            channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
             accountId: string;
             status: 'pending' | 'connected' | 'disconnected' | 'error';
             teamName: string;
@@ -1102,7 +1102,7 @@ export type PostApiV1ChannelsSlackConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1145,7 +1145,7 @@ export type PostApiV1ChannelsDiscordConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1188,7 +1188,7 @@ export type PostApiV1ChannelsFeishuConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1200,6 +1200,47 @@ export type PostApiV1ChannelsFeishuConnectResponses = {
 };
 
 export type PostApiV1ChannelsFeishuConnectResponse = PostApiV1ChannelsFeishuConnectResponses[keyof PostApiV1ChannelsFeishuConnectResponses];
+
+export type PostApiV1ChannelsQqbotConnectData = {
+    body?: {
+        appId: string;
+        appSecret: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/channels/qqbot/connect';
+};
+
+export type PostApiV1ChannelsQqbotConnectErrors = {
+    /**
+     * Invalid credentials or plugin missing
+     */
+    409: {
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsQqbotConnectError = PostApiV1ChannelsQqbotConnectErrors[keyof PostApiV1ChannelsQqbotConnectErrors];
+
+export type PostApiV1ChannelsQqbotConnectResponses = {
+    /**
+     * Connected qqbot channel
+     */
+    200: {
+        id: string;
+        botId: string;
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
+        accountId: string;
+        status: 'pending' | 'connected' | 'disconnected' | 'error';
+        teamName: string;
+        appId?: string;
+        botUserId?: string;
+        createdAt: string;
+        updatedAt: string;
+    };
+};
+
+export type PostApiV1ChannelsQqbotConnectResponse = PostApiV1ChannelsQqbotConnectResponses[keyof PostApiV1ChannelsQqbotConnectResponses];
 
 export type PostApiV1ChannelsTelegramConnectData = {
     body: {
@@ -1228,7 +1269,7 @@ export type PostApiV1ChannelsTelegramConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1268,7 +1309,7 @@ export type GetApiV1ChannelsByChannelIdStatusResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1412,7 +1453,7 @@ export type PostApiV1ChannelsWhatsappConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1516,7 +1557,7 @@ export type PostApiV1ChannelsWechatConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;

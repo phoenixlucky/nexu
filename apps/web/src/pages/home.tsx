@@ -1,11 +1,13 @@
 import { ActivityFeed } from "@/components/activity-feed";
 import { ChannelConnectModal } from "@/components/channel-connect-modal";
+import { QqbotSetupView } from "@/components/channel-setup/qqbot-setup-view";
 import { TelegramSetupView } from "@/components/channel-setup/telegram-setup-view";
 import { WechatSetupView } from "@/components/channel-setup/wechat-setup-view";
 import { WhatsappSetupView } from "@/components/channel-setup/whatsapp-setup-view";
 import { GitHubStarCta } from "@/components/github-star-cta";
 import { InlineModelSelector } from "@/components/inline-model-selector";
 import {
+  QqbotIcon,
   TelegramIcon,
   WechatIcon,
   WhatsAppIcon,
@@ -118,6 +120,7 @@ const FEISHU_ICON = (
   />
 );
 
+const QQBOT_ICON = <QqbotIcon size={16} />;
 const TELEGRAM_ICON = <TelegramIcon size={16} />;
 const WHATSAPP_ICON = <WhatsAppIcon size={16} />;
 /** WeChat mark uses a wide viewBox; bump px so it matches visual weight of 16px square logos. */
@@ -158,6 +161,12 @@ const ONBOARDING_CHANNELS = [
     recommended: false,
   },
   {
+    id: "qqbot",
+    name: "QQ",
+    icon: QQBOT_ICON,
+    recommended: false,
+  },
+  {
     id: "slack",
     name: "Slack",
     icon: SLACK_SVG,
@@ -194,6 +203,12 @@ function getChannelOptions(t: (key: string) => string) {
       id: "feishu",
       name: t("home.channel.feishu"),
       icon: FEISHU_ICON,
+      recommended: false,
+    },
+    {
+      id: "qqbot",
+      name: t("home.channel.qqbot"),
+      icon: QQBOT_ICON,
       recommended: false,
     },
     {
@@ -270,6 +285,7 @@ export function HomePage() {
   const [wechatQrOpen, setWechatQrOpen] = useState(false);
   const [telegramOpen, setTelegramOpen] = useState(false);
   const [whatsappOpen, setWhatsappOpen] = useState(false);
+  const [qqbotOpen, setQqbotOpen] = useState(false);
   const queryClient = useQueryClient();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoHover, setVideoHover] = useState(false);
@@ -659,6 +675,8 @@ export function HomePage() {
                         setTelegramOpen(true);
                       } else if (ch.id === "whatsapp") {
                         setWhatsappOpen(true);
+                      } else if (ch.id === "qqbot") {
+                        setQqbotOpen(true);
                       } else {
                         setModalChannel(
                           ch.id as "feishu" | "slack" | "discord",
@@ -728,6 +746,16 @@ export function HomePage() {
             onClose={() => setWhatsappOpen(false)}
             onConnected={() => {
               setWhatsappOpen(false);
+              void handleConnected();
+            }}
+          />
+        )}
+
+        {qqbotOpen && (
+          <QqbotModal
+            onClose={() => setQqbotOpen(false)}
+            onConnected={() => {
+              setQqbotOpen(false);
               void handleConnected();
             }}
           />
@@ -847,7 +875,9 @@ export function HomePage() {
                       connectedChannel?.id === pendingChannelId;
                     const effectiveStatus: ChannelLiveStatus | undefined =
                       isPendingChannel &&
-                      (!statusEntry || statusEntry.status === "disconnected")
+                      (!statusEntry ||
+                        statusEntry.status === "disconnected" ||
+                        statusEntry.status === "restarting")
                         ? "connecting"
                         : statusEntry?.status;
                     const statusMeta = getChannelStatusMeta(
@@ -1002,6 +1032,8 @@ export function HomePage() {
                           setTelegramOpen(true);
                         } else if (ch.id === "whatsapp") {
                           setWhatsappOpen(true);
+                        } else if (ch.id === "qqbot") {
+                          setQqbotOpen(true);
                         } else {
                           setModalChannel(
                             ch.id as "feishu" | "slack" | "discord",
@@ -1077,6 +1109,17 @@ export function HomePage() {
           onClose={() => setWhatsappOpen(false)}
           onConnected={() => {
             setWhatsappOpen(false);
+            void handleConnected();
+          }}
+        />
+      )}
+
+      {qqbotOpen && (
+        <QqbotModal
+          onClose={() => setQqbotOpen(false)}
+          onConnectedChannelCreated={handleChannelCreated}
+          onConnected={() => {
+            setQqbotOpen(false);
             void handleConnected();
           }}
         />
@@ -1338,6 +1381,61 @@ function WhatsappModal({
         </div>
         <div className="p-5">
           <WhatsappSetupView onConnected={onConnected} />
+        </div>
+      </dialog>
+    </div>
+  );
+}
+
+function QqbotModal({
+  onClose,
+  onConnected,
+  onConnectedChannelCreated,
+}: {
+  onClose: () => void;
+  onConnected: () => void;
+  onConnectedChannelCreated?: (channelId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const titleId = useId();
+  const dialogRef = useModalDialog(onClose);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is supplementary to Escape key */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <dialog
+        open
+        ref={dialogRef}
+        tabIndex={-1}
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative w-full max-w-[560px] rounded-2xl border border-border bg-surface-1 shadow-xl overflow-hidden"
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div
+            id={titleId}
+            className="text-[14px] font-semibold text-text-primary"
+          >
+            {t("qqbotSetup.title")}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("common.closeDialog")}
+            className="text-text-muted hover:text-text-primary transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5">
+          <QqbotSetupView
+            onConnected={onConnected}
+            onConnectedChannelCreated={onConnectedChannelCreated}
+          />
         </div>
       </dialog>
     </div>

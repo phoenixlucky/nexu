@@ -249,7 +249,8 @@ type Platform =
   | "telegram"
   | "web"
   | "feishu"
-  | "wechat";
+  | "wechat"
+  | "qqbot";
 
 interface PlatformConfig {
   badgeClass: string;
@@ -276,6 +277,12 @@ const PLATFORM_CONFIG: Record<Platform, PlatformConfig> = {
       "border-[rgba(88,101,242,0.14)] bg-[rgba(88,101,242,0.08)] text-[#5865F2]",
     label: "Discord",
     openLabel: "Open in Discord",
+  },
+  qqbot: {
+    badgeClass:
+      "border-[rgba(17,24,39,0.14)] bg-[rgba(17,24,39,0.08)] text-[#111827]",
+    label: "QQ",
+    openLabel: "Open in QQ",
   },
   whatsapp: {
     badgeClass:

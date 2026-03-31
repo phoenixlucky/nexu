@@ -172,6 +172,7 @@ const zhCN = {
   "home.channel.wechat": "微信",
   "home.channel.telegram": "Telegram",
   "home.channel.whatsapp": "WhatsApp",
+  "home.channel.qqbot": "QQ",
   "home.channel.addBot": "添加 nexu Bot",
   "home.tab.channels": "渠道",
   "home.tab.models": "模型 & Key",
@@ -720,6 +721,23 @@ const zhCN = {
   "telegramSetup.tokenRequired": "请输入 Telegram Bot token",
   "telegramSetup.connectFailed": "连接 Telegram 失败",
   "telegramSetup.connectSuccess": "Telegram 已连接",
+  "qqbotSetup.title": "连接 QQ Bot",
+  "qqbotSetup.desc":
+    "填写 QQ 机器人的 App ID 和 App Secret。Nexu 会先校验凭据，再把 qqbot 渠道同步到 OpenClaw。",
+  "qqbotSetup.quickSetup": "快速配置",
+  "qqbotSetup.step1": "打开 QQ 机器人开发者控制台。",
+  "qqbotSetup.step2": "创建或选择你的 QQ 机器人应用。",
+  "qqbotSetup.step3": "复制 App ID 和 App Secret。",
+  "qqbotSetup.step4":
+    "确认当前 OpenClaw 运行环境里已经安装 openclaw-qqbot 插件。",
+  "qqbotSetup.appIdLabel": "App ID",
+  "qqbotSetup.appIdPlaceholder": "你的 QQ 机器人 App ID",
+  "qqbotSetup.appSecretLabel": "App Secret",
+  "qqbotSetup.appSecretPlaceholder": "你的 QQ 机器人 App Secret",
+  "qqbotSetup.connect": "连接 QQ Bot",
+  "qqbotSetup.credentialsRequired": "QQ 机器人 App ID 和 App Secret 不能为空",
+  "qqbotSetup.connectFailed": "连接 QQ Bot 失败",
+  "qqbotSetup.connectSuccess": "QQ Bot 已连接",
 
   // ── WhatsApp Setup ──
   "whatsappSetup.title": "连接 WhatsApp",

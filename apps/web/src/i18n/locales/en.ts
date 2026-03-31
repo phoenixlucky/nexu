@@ -175,6 +175,7 @@ const en = {
   "home.channel.wechat": "WeChat",
   "home.channel.telegram": "Telegram",
   "home.channel.whatsapp": "WhatsApp",
+  "home.channel.qqbot": "QQ",
   "home.channel.addBot": "Add nexu Bot",
   "home.tab.channels": "Channels",
   "home.tab.models": "Models & Key",
@@ -757,6 +758,23 @@ const en = {
   "telegramSetup.tokenRequired": "Telegram bot token is required",
   "telegramSetup.connectFailed": "Failed to connect Telegram",
   "telegramSetup.connectSuccess": "Telegram connected",
+  "qqbotSetup.title": "Connect QQ Bot",
+  "qqbotSetup.desc":
+    "Use your QQ bot App ID and App Secret. Nexu will validate the credentials and sync the qqbot channel into OpenClaw.",
+  "qqbotSetup.quickSetup": "Quick setup",
+  "qqbotSetup.step1": "Open the QQ bot developer console.",
+  "qqbotSetup.step2": "Create or select your QQ bot application.",
+  "qqbotSetup.step3": "Copy the App ID and App Secret.",
+  "qqbotSetup.step4":
+    "Make sure the openclaw-qqbot plugin is installed in your OpenClaw runtime.",
+  "qqbotSetup.appIdLabel": "App ID",
+  "qqbotSetup.appIdPlaceholder": "Your QQ bot App ID",
+  "qqbotSetup.appSecretLabel": "App Secret",
+  "qqbotSetup.appSecretPlaceholder": "Your QQ bot App Secret",
+  "qqbotSetup.connect": "Connect QQ Bot",
+  "qqbotSetup.credentialsRequired": "QQ bot App ID and App Secret are required",
+  "qqbotSetup.connectFailed": "Failed to connect QQ bot",
+  "qqbotSetup.connectSuccess": "QQ bot connected",
 
   // ── WhatsApp Setup ──
   "whatsappSetup.title": "Connect WhatsApp",

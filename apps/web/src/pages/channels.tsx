@@ -1,5 +1,6 @@
 import { DiscordSetupView } from "@/components/channel-setup/discord-setup-view";
 import { FeishuSetupView } from "@/components/channel-setup/feishu-setup-view";
+import { QqbotSetupView } from "@/components/channel-setup/qqbot-setup-view";
 import { SlackOAuthView } from "@/components/channel-setup/slack-oauth-view";
 import { TelegramSetupView } from "@/components/channel-setup/telegram-setup-view";
 import { WechatSetupView } from "@/components/channel-setup/wechat-setup-view";
@@ -42,7 +43,8 @@ type Platform =
   | "feishu"
   | "wechat"
   | "telegram"
-  | "whatsapp";
+  | "whatsapp"
+  | "qqbot";
 
 type LiveStatusData = {
   gatewayConnected: boolean;
@@ -58,6 +60,7 @@ const PLATFORMS: { id: Platform; emoji: string; desc: string }[] = [
   { id: "whatsapp", emoji: "\u{1F4DE}", desc: "Personal WhatsApp" },
   { id: "wechat", emoji: "\u{1F4AC}", desc: "Personal WeChat" },
   { id: "telegram", emoji: "\u{2708}\u{FE0F}", desc: "Telegram Bot" },
+  { id: "qqbot", emoji: "\u{1F427}", desc: "QQ Bot" },
   { id: "feishu", emoji: "\u{1F426}", desc: "Feishu Bot" },
   { id: "slack", emoji: "#", desc: "Workspace Bot" },
   { id: "discord", emoji: "\u{1F3AE}", desc: "Server Bot" },
@@ -70,6 +73,7 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   wechat: "WeChat",
   telegram: "Telegram",
   whatsapp: "WhatsApp",
+  qqbot: "QQ",
 };
 
 // ─── Main page ───────────────────────────────────────────────
@@ -247,6 +251,11 @@ export function ChannelsPage() {
           />
         ) : platform === "telegram" ? (
           <TelegramSetupView
+            onConnected={handleConnected}
+            disabled={quotaLimited}
+          />
+        ) : platform === "qqbot" ? (
+          <QqbotSetupView
             onConnected={handleConnected}
             disabled={quotaLimited}
           />
