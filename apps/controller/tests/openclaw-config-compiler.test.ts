@@ -184,6 +184,52 @@ describe("compileOpenClawConfig", () => {
     ]);
   });
 
+  it("compiles qqbot channels and enables the canonical qq plugin id", () => {
+    const now = new Date().toISOString();
+    const result = compileOpenClawConfig(
+      createConfig({
+        channels: [
+          {
+            id: "qq-channel-1",
+            botId: "bot-1",
+            channelType: "qqbot",
+            accountId: "default",
+            status: "connected",
+            teamName: null,
+            appId: "123456",
+            botUserId: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+        secrets: {
+          "channel:qq-channel-1:appId": "123456",
+          "channel:qq-channel-1:clientSecret": "qq-secret",
+        },
+      }),
+      createEnv(),
+    );
+
+    expect(result.channels.qqbot).toMatchObject({
+      enabled: true,
+      appId: "123456",
+      clientSecret: "qq-secret",
+      dmPolicy: "open",
+      groupPolicy: "open",
+      historyLimit: 50,
+      markdownSupport: true,
+    });
+    expect(result.bindings).toContainEqual({
+      agentId: "bot-1",
+      match: {
+        channel: "qqbot",
+        accountId: "default",
+      },
+    });
+    expect(result.plugins?.allow).toContain("openclaw-qqbot");
+    expect(result.plugins?.entries?.["openclaw-qqbot"]?.enabled).toBe(true);
+  });
+
   it("injects env-backed litellm routing for bare local model ids", () => {
     const result = compileOpenClawConfig(
       createConfig({

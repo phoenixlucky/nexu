@@ -1,5 +1,6 @@
 import type {
   BindingConfig,
+  ChannelType,
   DiscordAccountConfig,
   FeishuAccountConfig,
   OpenClawConfig,
@@ -14,6 +15,34 @@ export const NEXU_INTERNAL_ACCOUNT_PREFIX = "__nexu_internal_";
 
 const INTERNAL_FEISHU_PREWARM_ACCOUNT_ID = `${NEXU_INTERNAL_ACCOUNT_PREFIX}feishu_prewarm__`;
 const INTERNAL_WECHAT_PREWARM_ACCOUNT_ID = `${NEXU_INTERNAL_ACCOUNT_PREFIX}wechat_prewarm__`;
+
+export const MANAGED_CHANNEL_PLUGIN_IDS: Partial<Record<ChannelType, string>> =
+  {
+    qqbot: "openclaw-qqbot",
+    wechat: "openclaw-weixin",
+  };
+
+export const QQBOT_DEFAULT_ACCOUNT_ID = "default";
+
+export function resolveOpenClawChannelKey(channelType: ChannelType): string {
+  return channelType === "wechat" ? "openclaw-weixin" : channelType;
+}
+
+export function resolveOpenClawRuntimeAccountId(
+  channelType: ChannelType,
+  accountId: string,
+): string {
+  if (channelType === "qqbot") {
+    return QQBOT_DEFAULT_ACCOUNT_ID;
+  }
+  return accountId;
+}
+
+export function resolveManagedChannelPluginId(
+  channelType: ChannelType,
+): string | null {
+  return MANAGED_CHANNEL_PLUGIN_IDS[channelType] ?? null;
+}
 
 function buildSecretLookup(secrets: Record<string, string>, channelId: string) {
   return (suffix: string): string =>
@@ -36,11 +65,11 @@ export function compileChannelBindings(
     .map((channel) => ({
       agentId: channel.botId,
       match: {
-        channel:
-          channel.channelType === "wechat"
-            ? "openclaw-weixin"
-            : channel.channelType,
-        accountId: channel.accountId,
+        channel: resolveOpenClawChannelKey(channel.channelType),
+        accountId: resolveOpenClawRuntimeAccountId(
+          channel.channelType,
+          channel.accountId,
+        ),
       },
     }));
 }
@@ -55,6 +84,7 @@ export function compileChannelsConfig(params: {
   const telegramAccounts: Record<string, TelegramAccountConfig> = {};
   const whatsappAccounts: Record<string, WhatsappAccountConfig> = {};
   const wechatAccounts: Record<string, { enabled: boolean }> = {};
+  let qqbotChannel: OpenClawConfig["channels"]["qqbot"] | undefined;
   const socketAppToken = process.env.SLACK_SOCKET_MODE_APP_TOKEN;
   const useSlackSocketMode =
     typeof socketAppToken === "string" && socketAppToken.length > 0;
@@ -141,6 +171,21 @@ export function compileChannelsConfig(params: {
                 : {}),
             }
           : {}),
+      };
+      continue;
+    }
+
+    if (channel.channelType === "qqbot") {
+      qqbotChannel = {
+        enabled: true,
+        appId: secret("appId") || channel.appId || "",
+        clientSecret: secret("clientSecret"),
+        dmPolicy: "open",
+        allowFrom: ["*"],
+        groupPolicy: "open",
+        groupAllowFrom: ["*"],
+        historyLimit: 50,
+        markdownSupport: true,
       };
     }
   }
@@ -237,6 +282,7 @@ export function compileChannelsConfig(params: {
           },
         }
       : {}),
+    ...(qqbotChannel ? { qqbot: qqbotChannel } : {}),
     "openclaw-weixin": {
       enabled: true,
       accounts: wechatAccounts,

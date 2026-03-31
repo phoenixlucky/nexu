@@ -342,6 +342,20 @@ const whatsappChannelSchema = z
   })
   .passthrough();
 
+const qqbotChannelSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    appId: z.string(),
+    clientSecret: z.string(),
+    dmPolicy: z.enum(["pairing", "allowlist", "open"]).optional(),
+    allowFrom: z.array(z.string()).optional(),
+    groupPolicy: z.enum(["open", "allowlist", "disabled"]).optional(),
+    groupAllowFrom: z.array(z.string()).optional(),
+    historyLimit: z.number().optional(),
+    markdownSupport: z.boolean().optional(),
+  })
+  .passthrough();
+
 const channelsConfigSchema = z
   .object({
     slack: slackChannelSchema.optional(),
@@ -349,6 +363,7 @@ const channelsConfigSchema = z
     feishu: feishuChannelSchema.optional(),
     telegram: telegramChannelSchema.optional(),
     whatsapp: whatsappChannelSchema.optional(),
+    qqbot: qqbotChannelSchema.optional(),
   })
   .passthrough();
 

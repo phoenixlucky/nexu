@@ -5,6 +5,7 @@ import {
   channelResponseSchema,
   connectDiscordSchema,
   connectFeishuSchema,
+  connectQqbotSchema,
   connectSlackSchema,
   connectTelegramSchema,
   connectWechatSchema,
@@ -204,6 +205,45 @@ export function registerChannelRoutes(
           {
             message:
               error instanceof Error ? error.message : "Feishu connect failed",
+          },
+          409,
+        );
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/channels/qqbot/connect",
+      tags: ["Channels"],
+      request: {
+        body: {
+          content: { "application/json": { schema: connectQqbotSchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: { "application/json": { schema: channelResponseSchema } },
+          description: "Connected qqbot channel",
+        },
+        409: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Invalid credentials or plugin missing",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        return c.json(
+          await container.channelService.connectQqbot(c.req.valid("json")),
+          200,
+        );
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error ? error.message : "QQ bot connect failed",
           },
           409,
         );

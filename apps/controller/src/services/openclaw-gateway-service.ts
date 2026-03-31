@@ -11,6 +11,10 @@
 
 import { createHash } from "node:crypto";
 import type { OpenClawConfig } from "@nexu/shared";
+import {
+  resolveOpenClawChannelKey,
+  resolveOpenClawRuntimeAccountId,
+} from "../lib/channel-binding-compiler.js";
 import { logger } from "../lib/logger.js";
 import type { OpenClawWsClient } from "../runtime/openclaw-ws-client.js";
 import type { ControllerRuntimeState } from "../runtime/state.js";
@@ -112,6 +116,19 @@ function isImplicitlyReadyChannelType(channelType: string): boolean {
   return channelType === "feishu";
 }
 
+function findChannelSnapshot(
+  channelType: string,
+  persistedAccountId: string,
+  accounts: ChannelAccountSnapshot[],
+): ChannelAccountSnapshot | undefined {
+  const runtimeAccountId = resolveOpenClawRuntimeAccountId(
+    channelType as Parameters<typeof resolveOpenClawRuntimeAccountId>[0],
+    persistedAccountId,
+  );
+
+  return accounts.find((entry) => entry.accountId === runtimeAccountId);
+}
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
@@ -192,13 +209,22 @@ export class OpenClawGatewayService {
     channelType: string,
     accountId?: string,
   ): Promise<LogoutChannelAccountResult> {
-    const channel =
-      channelType === "wechat" ? "openclaw-weixin" : channelType.trim();
+    const channel = resolveOpenClawChannelKey(
+      channelType.trim() as Parameters<typeof resolveOpenClawChannelKey>[0],
+    );
+    const runtimeAccountId = accountId
+      ? resolveOpenClawRuntimeAccountId(
+          channelType.trim() as Parameters<
+            typeof resolveOpenClawRuntimeAccountId
+          >[0],
+          accountId,
+        )
+      : undefined;
     return this.wsClient.request<LogoutChannelAccountResult>(
       "channels.logout",
       {
         channel,
-        ...(accountId ? { accountId } : {}),
+        ...(runtimeAccountId ? { accountId: runtimeAccountId } : {}),
       },
       { timeoutMs: 5000 },
     );
@@ -251,13 +277,16 @@ export class OpenClawGatewayService {
       return {
         gatewayConnected: true,
         channels: channels.map((channel) => {
-          const openclawChannelId =
-            channel.channelType === "wechat"
-              ? "openclaw-weixin"
-              : channel.channelType;
+          const openclawChannelId = resolveOpenClawChannelKey(
+            channel.channelType as Parameters<
+              typeof resolveOpenClawChannelKey
+            >[0],
+          );
           const accounts = status.channelAccounts?.[openclawChannelId] ?? [];
-          const snapshot = accounts.find(
-            (entry) => entry.accountId === channel.accountId,
+          const snapshot = findChannelSnapshot(
+            channel.channelType,
+            channel.accountId,
+            accounts,
           );
 
           if (!snapshot) {
@@ -395,10 +424,11 @@ export class OpenClawGatewayService {
 
     try {
       const status = await this.getChannelsStatus();
-      const openclawId =
-        channelType === "wechat" ? "openclaw-weixin" : channelType;
+      const openclawId = resolveOpenClawChannelKey(
+        channelType as Parameters<typeof resolveOpenClawChannelKey>[0],
+      );
       const accounts = status.channelAccounts?.[openclawId] ?? [];
-      const snapshot = accounts.find((a) => a.accountId === accountId);
+      const snapshot = findChannelSnapshot(channelType, accountId, accounts);
 
       if (!snapshot) {
         if (isImplicitlyReadyChannelType(channelType)) {
