@@ -77,7 +77,7 @@ python3 scripts/medeo_video.py spawn-task --text "make a video from this image" 
 5. When the cron fires, you will receive a system event. Handle it:
    - Run `task-status --task-id <id>` to get the current state
    - If status changed → casually mention it to the user, like a friend giving a quick update (e.g. "your video is rendering now, almost there!")
-   - If completed → send the video URL to the user, then `cron remove <job_id>`
+   - If completed → you MUST send the video URL to the user immediately. Never just say "completed" without the link. Then `cron remove <job_id>`
    - If failed → let the user know, then `cron remove <job_id>`
    - If no change → use your judgement based on how long since your last update. Don't repeat the same status.
    - **Keep it brief and conversational** — no task IDs, no technical jargon, no system-notification style
