@@ -287,9 +287,11 @@ export function HomePage() {
 
   const budgetBannerStatus = useMemo((): "warning" | "depleted" | "healthy" => {
     if (!rewardsStatus.viewer.cloudConnected) return "healthy";
-    const { availableCredits, earnedCredits } = rewardsStatus.progress;
-    if (availableCredits === 0) return "depleted";
-    const total = earnedCredits + availableCredits;
+    const { cloudBalance } = rewardsStatus;
+    if (cloudBalance === null) return "healthy";
+    if (cloudBalance.totalBalance === 0) return "depleted";
+    const { earnedCredits } = rewardsStatus.progress;
+    const total = cloudBalance.totalBalance + earnedCredits;
     if (total > 0 && earnedCredits / total >= 0.8) return "warning";
     return "healthy";
   }, [rewardsStatus]);

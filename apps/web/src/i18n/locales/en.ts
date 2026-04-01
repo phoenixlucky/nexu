@@ -257,6 +257,9 @@ const en = {
   "rewards.group.daily": "Daily",
   "rewards.group.opensource": "Open Source",
   "rewards.group.social": "Social & messaging",
+  "rewards.cloudBalance": "Cloud Balance",
+  "rewards.totalEarned": "Total earned",
+  "rewards.totalUsed": "Total used",
   "rewards.loginTitle": "Sign in to unlock hosted models and reward claims",
   "rewards.loginBody":
     "Rewards are available to everyone for browsing, but hosted model usage and reward claiming are designed around your nexu cloud session.",

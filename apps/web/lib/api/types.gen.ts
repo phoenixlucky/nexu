@@ -1025,7 +1025,7 @@ export type GetApiInternalDesktopRewardsResponses = {
             claimedCount: number;
             totalCount: number;
             earnedCredits: number;
-            availableCredits: number;
+            availableCredits?: number;
         };
         tasks: Array<{
             id: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'xiaohongshu' | 'lingying' | 'jike' | 'wechat' | 'feishu' | 'facebook' | 'whatsapp';
@@ -1040,6 +1040,11 @@ export type GetApiInternalDesktopRewardsResponses = {
             lastClaimedAt: string;
             claimCount: number;
         }>;
+        cloudBalance?: {
+            totalBalance: number;
+            totalRecharged: number;
+            totalConsumed: number;
+        };
     };
 };
 
@@ -1072,7 +1077,7 @@ export type PostApiInternalDesktopRewardsClaimResponses = {
                 claimedCount: number;
                 totalCount: number;
                 earnedCredits: number;
-                availableCredits: number;
+                availableCredits?: number;
             };
             tasks: Array<{
                 id: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'xiaohongshu' | 'lingying' | 'jike' | 'wechat' | 'feishu' | 'facebook' | 'whatsapp';
@@ -1087,6 +1092,11 @@ export type PostApiInternalDesktopRewardsClaimResponses = {
                 lastClaimedAt: string;
                 claimCount: number;
             }>;
+            cloudBalance?: {
+                totalBalance: number;
+                totalRecharged: number;
+                totalConsumed: number;
+            };
         };
     };
 };

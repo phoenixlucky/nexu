@@ -2873,8 +2873,7 @@
                       "required": [
                         "claimedCount",
                         "totalCount",
-                        "earnedCredits",
-                        "availableCredits"
+                        "earnedCredits"
                       ]
                     },
                     "tasks": {
@@ -2964,6 +2963,30 @@
                           "claimCount"
                         ]
                       }
+                    },
+                    "cloudBalance": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "totalBalance": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "totalRecharged": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "totalConsumed": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "default": null,
+                      "required": [
+                        "totalBalance",
+                        "totalRecharged",
+                        "totalConsumed"
+                      ]
                     }
                   },
                   "required": [
@@ -3078,8 +3101,7 @@
                           "required": [
                             "claimedCount",
                             "totalCount",
-                            "earnedCredits",
-                            "availableCredits"
+                            "earnedCredits"
                           ]
                         },
                         "tasks": {
@@ -3169,6 +3191,30 @@
                               "claimCount"
                             ]
                           }
+                        },
+                        "cloudBalance": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "totalBalance": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "totalRecharged": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "totalConsumed": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "default": null,
+                          "required": [
+                            "totalBalance",
+                            "totalRecharged",
+                            "totalConsumed"
+                          ]
                         }
                       },
                       "required": [

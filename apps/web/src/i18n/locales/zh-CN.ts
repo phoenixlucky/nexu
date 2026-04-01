@@ -254,6 +254,9 @@ const zhCN = {
   "rewards.group.daily": "每日",
   "rewards.group.opensource": "开源社区",
   "rewards.group.social": "社交与即时通讯",
+  "rewards.cloudBalance": "云端余额",
+  "rewards.totalEarned": "累计获得",
+  "rewards.totalUsed": "累计消耗",
   "rewards.loginTitle": "登录后可使用托管模型与奖励领取",
   "rewards.loginBody":
     "奖励任务可以先浏览，但官方托管模型体验和奖励领取会围绕你的 nexu Cloud 登录状态展开。",

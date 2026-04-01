@@ -405,6 +405,33 @@ export function RewardsPage() {
           </div>
         </div>
 
+        {status.cloudBalance ? (
+          <div className="mb-6 flex items-center justify-between rounded-[18px] border border-border bg-surface-0 px-4 py-3">
+            <div>
+              <div className="text-[11px] font-medium text-text-secondary">
+                {t("rewards.cloudBalance")}
+              </div>
+              <div className="mt-0.5 text-[20px] font-bold tabular-nums text-text-primary">
+                {formatRewardAmount(status.cloudBalance.totalBalance)}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-[11px] text-text-muted">
+                {t("rewards.totalEarned")}:{" "}
+                <span className="tabular-nums">
+                  {formatRewardAmount(status.cloudBalance.totalRecharged)}
+                </span>
+              </div>
+              <div className="text-[11px] text-text-muted">
+                {t("rewards.totalUsed")}:{" "}
+                <span className="tabular-nums">
+                  {formatRewardAmount(status.cloudBalance.totalConsumed)}
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {!status.viewer.cloudConnected ? (
           <div className="mb-6 rounded-[18px] border border-[#d6c7aa] bg-[#faf3e6] px-4 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -573,11 +600,16 @@ export function RewardsPage() {
           onConfirm={async () => {
             try {
               const result = await claimTask(confirmTask.id);
-              toast.success(
-                result.alreadyClaimed
-                  ? t("rewards.claimAlreadyDone")
-                  : t("rewards.claimSuccess"),
-              );
+              if (!result.ok) {
+                toast.error(t("rewards.claimFailed"));
+                setConfirmTaskId(null);
+                return;
+              }
+              if (result.alreadyClaimed) {
+                toast.success(t("rewards.claimAlreadyDone"));
+              } else {
+                toast.success(t("rewards.claimSuccess"));
+              }
               setConfirmTaskId(null);
             } catch {
               toast.error(t("rewards.claimFailed"));

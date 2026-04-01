@@ -185,7 +185,7 @@ export const rewardProgressSchema = z.object({
   claimedCount: z.number().int().nonnegative(),
   totalCount: z.number().int().nonnegative(),
   earnedCredits: z.number().nonnegative(),
-  availableCredits: z.number().nonnegative(),
+  availableCredits: z.number().nonnegative().optional(),
 });
 
 export const desktopRewardsViewerSchema = z.object({
@@ -195,10 +195,19 @@ export const desktopRewardsViewerSchema = z.object({
   usingManagedModel: z.boolean(),
 });
 
+export const cloudCreditBalanceSchema = z
+  .object({
+    totalBalance: z.number().int().nonnegative(),
+    totalRecharged: z.number().int().nonnegative(),
+    totalConsumed: z.number().int().nonnegative(),
+  })
+  .nullable();
+
 export const desktopRewardsStatusSchema = z.object({
   viewer: desktopRewardsViewerSchema,
   progress: rewardProgressSchema,
   tasks: z.array(rewardTaskStatusSchema),
+  cloudBalance: cloudCreditBalanceSchema.default(null),
 });
 
 export const claimDesktopRewardRequestSchema = z.object({

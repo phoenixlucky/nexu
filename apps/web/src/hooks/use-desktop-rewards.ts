@@ -38,6 +38,7 @@ function createFallbackRewardsStatus(): DesktopRewardsStatus {
       availableCredits: tasks.reduce((sum, task) => sum + task.reward, 0),
     },
     tasks,
+    cloudBalance: null,
   };
 }
 
