@@ -25,6 +25,7 @@ import { exportDiagnostics } from "./diagnostics-export";
 import {
   registerIpcHandlers,
   setComponentUpdater,
+  setQuitFallback,
   setQuitHandlerOpts,
   setUpdateManager,
 } from "./ipc";
@@ -1088,6 +1089,14 @@ app.whenReady().then(async () => {
     runtimeConfig,
     diagnosticsReporter,
     coldStartReady,
+  );
+  // Provide orchestrator-mode quit fallback for app:quit IPC when launchd
+  // quit handler is not available (e.g. CI, orchestrator mode).
+  setQuitFallback(() =>
+    gracefulShutdown("ipc-quit").finally(() => {
+      (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+      app.exit(0);
+    }),
   );
   const unsubscribeDiagnostics = diagnosticsReporter.start();
   sleepGuard = new SleepGuard({

@@ -22,6 +22,7 @@ const validChannels = new Set<string>(hostInvokeChannels);
 let updateManager: UpdateManager | null = null;
 let componentUpdater: ComponentUpdater | null = null;
 let quitHandlerOpts: QuitHandlerOptions | null = null;
+let quitFallback: (() => Promise<void>) | null = null;
 
 async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -111,6 +112,10 @@ export function setComponentUpdater(updater: ComponentUpdater): void {
 
 export function setQuitHandlerOpts(opts: QuitHandlerOptions): void {
   quitHandlerOpts = opts;
+}
+
+export function setQuitFallback(fallback: () => Promise<void>): void {
+  quitFallback = fallback;
 }
 
 function assertValidChannel(
@@ -531,6 +536,8 @@ export function registerIpcHandlers(
           // so the process always exits even if teardown throws.
           if (quitHandlerOpts) {
             void runTeardownAndExit(quitHandlerOpts, "ipc-quit");
+          } else if (quitFallback) {
+            void quitFallback();
           } else {
             app.exit(0);
           }
