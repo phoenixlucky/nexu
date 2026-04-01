@@ -479,8 +479,20 @@ def cmd_spawn_task(args):
     spawn_payload = {
         "sessions_spawn": {
             "instruction": (
-                f"Wait for video task {task_id} to complete, then send the video to the user. "
-                f"Use command: python3 scripts/medeo_video.py wait-and-deliver --task-id {task_id}"
+                f"Monitor video task {task_id} progress and keep the user informed.\n"
+                f"\n"
+                f"Poll every 60 seconds: python3 scripts/medeo_video.py wait-and-deliver --task-id {task_id}\n"
+                f"\n"
+                f"The script will print stage updates as they happen. For each stage change, "
+                f"use the `message` tool to send a brief, friendly status update to the user:\n"
+                f"  - composing  → '🎬 AI 正在构思你的视频画面...'\n"
+                f"  - rendering  → '⏳ 画面已构思完成，正在渲染中...'\n"
+                f"  - storing    → '📦 视频渲染完成，正在传输...'\n"
+                f"\n"
+                f"When the video is COMPLETED, do NOT send it yourself. "
+                f"Return the video URL as plain text so the main agent can deliver it with context.\n"
+                f"\n"
+                f"When FAILED, return the error message as plain text."
             ),
             "runTimeoutSeconds": 5400,
             **({"env": passthrough_env} if passthrough_env else {}),
@@ -490,7 +502,7 @@ def cmd_spawn_task(args):
 
     # Info output to stderr (main agent can read, does not interfere with OpenClaw)
     print(f"✅ Video generation submitted (task ID: {task_id})", file=sys.stderr)
-    print(f"⏳ Expected to take 5-15 minutes. Will be sent automatically when complete.", file=sys.stderr)
+    print(f"⏳ Expected to take 5-15 minutes. Progress updates will be sent automatically.", file=sys.stderr)
 
 def cmd_wait_and_deliver(args):
     task_id = args.task_id
@@ -503,8 +515,9 @@ def cmd_wait_and_deliver(args):
             print("❌ No pending video tasks found")
             return
 
-    poll_interval = 180  # 3 minutes per poll
-    max_polls = 30       # Up to 90 minutes (30 x 3min)
+    poll_interval = 60   # 1 minute per poll
+    max_polls = 90       # Up to 90 minutes (90 x 1min)
+    last_stage = None
 
     for i in range(max_polls):
         result = call_gateway("GET", f"/api/v1/tasks/{task_id}")
@@ -516,24 +529,31 @@ def cmd_wait_and_deliver(args):
             thumbnail_url = result.get("thumbnail_url", "")
             print(f"✅ Video generation complete!")
             print(f"🎬 Video URL: {video_url}")
-            # Deliver to chat platform
-            deliver_video(video_url, thumbnail_url, task_id)
+            if thumbnail_url:
+                print(f"🖼️ Thumbnail: {thumbnail_url}")
             return
         if status == "failed":
             error_msg = result.get("error_message", "Unknown error")
             print(f"❌ Video generation failed: {error_msg}")
             _save_task(task_id, status="failed")
-            deliver_failure(error_msg, task_id)
             return
 
-        status_labels = {
-            "pending": "Queued", "composing": "AI composing",
-            "composed": "Composed, preparing to render", "rendering": "Rendering",
-            "rendered": "Rendered, transferring", "storing": "Transferring video",
-        }
-        label = status_labels.get(status, status)
-        elapsed = (i + 1) * 3
-        print(f"⏳ [{elapsed}min/{max_polls * 3}min] {label}, waiting 3 minutes...")
+        # Emit a clear stage-change line for the sub-agent to relay
+        if status != last_stage:
+            last_stage = status
+            stage_messages = {
+                "pending": "STAGE_CHANGE: pending — 任务已提交，排队中",
+                "composing": "STAGE_CHANGE: composing — AI 正在构思视频画面",
+                "composed": "STAGE_CHANGE: composed — 画面构思完成，准备渲染",
+                "rendering": "STAGE_CHANGE: rendering — 视频正在渲染中",
+                "rendered": "STAGE_CHANGE: rendered — 渲染完成，正在传输",
+                "storing": "STAGE_CHANGE: storing — 视频传输中，即将完成",
+            }
+            msg = stage_messages.get(status, f"STAGE_CHANGE: {status}")
+            print(msg)
+
+        elapsed = (i + 1)
+        print(f"⏳ [{elapsed}min/{max_polls}min] waiting...", file=sys.stderr)
         time.sleep(poll_interval)
 
     print("❌ Video generation timed out (exceeded 90 minutes)")

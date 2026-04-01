@@ -61,9 +61,11 @@ python3 scripts/medeo_video.py spawn-task --text "make a video from this image" 
 ### After Submission
 
 1. spawn-task returns immediately without blocking
-2. **Reply to the user immediately**: "Your video is being generated. It typically takes 5-15 minutes and will be sent to you automatically when ready."
+2. **Reply to the user immediately**: tell them the video is being generated and they'll receive progress updates automatically
 3. **Do not wait** — resume normal conversation
-4. A sub-agent will automatically wait in the background and deliver the video
+4. A sub-agent monitors progress in the background:
+   - It sends brief status updates to the user at each stage change (composing → rendering → complete)
+   - When the video is ready, the result is returned to you (the main agent) so you can deliver it naturally with conversation context
 
 ## When the User Asks "Is my video ready?"
 
