@@ -1,4 +1,4 @@
-# 双层健康管理与语义化协调协议
+# Nexu Desktop 与 OpenClaw 端到端自愈闭环
 
 - **ID**: 20260402-dual-layer-health-management
 - **Status**: Proposed

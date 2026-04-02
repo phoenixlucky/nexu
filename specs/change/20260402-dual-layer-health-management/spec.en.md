@@ -1,4 +1,4 @@
-# Dual-Layer Health Management with Semantic Coordination Protocol
+# End-to-End Self-Healing Loop for Nexu Desktop & OpenClaw
 
 - **ID**: 20260402-dual-layer-health-management
 - **Status**: Proposed
