@@ -528,21 +528,54 @@ Controller 探针：0 次连续失败
 **触发**：用户在任意已连接 IM channel 中发送 `/fix`。
 
 **流程**：
-1. Controller 调用 OpenClaw `run_fix(scope: "safe")`
-3. OpenClaw 执行安全修复（auth 刷新、channel 重启、session 清理）
-4. 结果返回至 IM
-5. 如果安全修复不够，IM 询问："部分问题需要重启 gateway（短暂断连）。是否继续？回复 `/fix confirm`"
+1. Controller 调用 OpenClaw `run_fix`，内部运行 **doctor** 诊断修复流程
+2. Doctor 识别根因并尝试定向修复（如检测到 webhook 过期 → 重新注册，检测到端口冲突 → 杀残留进程，检测到 LaunchAgent 异常 → 重新加载）
+3. 将发现的问题和修复结果返回至 IM
+4. 如果 doctor 修复解决了问题 → 完成，无需进一步操作
+5. 如果 doctor 无法解决 → IM 询问："Doctor 无法修复此问题。是否重启 gateway？（短暂断连）回复 `/fix restart`"
 6. 确认后：Controller 执行 `prepare_for_restart` → 进程重启 → `reset_transient_health_counters`
 
-**操作分级**：
+**修复升级**（先 doctor，重启是最后手段）：
 
-| 级别 | 操作 | 需要确认 |
+| 步骤 | 操作 | 需要确认 |
 |------|-----|---------|
-| 安全 | 刷新 auth token、重启不健康 channel、清理卡死 session | 否 |
-| 中等 | 重启 gateway 进程、重载配置 | 是 — "这将短暂断开所有 channel。是否继续？" |
-| 受限 | 清空 session 存储、重建沙箱镜像 | 是 — "警告：这可能丢失进行中的对话。是否继续？" |
+| 1. Doctor | 根因诊断、auth 刷新、webhook 重新注册、端口冲突解决、LaunchAgent 修复、channel 重启、session 清理 | 否 |
+| 2. 重启 | 重启 gateway 进程 | 是 — "Doctor 无法修复，是否重启 gateway？" |
+| 3. 重建 | 清空 session 存储、重建沙箱镜像 | 是 — "警告：这可能丢失进行中的对话。" |
 
 **降级模式**：当 OpenClaw 不可达（wedge/崩溃）时，`/fix` 回退为仅 Controller 操作：进程重启、诊断导出。IM 响应会说明能力受限。
+
+### 10.3 具体场景
+
+端到端自愈闭环的完整示例：
+
+```
+1. OpenClaw 检测到：telegram:bot1 断连
+   → 自动重连尝试 1/3... 失败（webhook URL 已变更）
+   → 自动重连尝试 2/3... 失败
+   → 自动重连尝试 3/3... 失败
+   → 发出 escalation_requested { scope: "channel", target: "telegram:bot1" }
+
+2. Controller 收到升级请求
+   → 尝试 restart_channel... 仍然失败
+   → 通知 Desktop 升级至第三层
+
+3. 用户收到 IM 通知：
+   "telegram:bot1 持续断连，自动重连未恢复。
+    输入 /diagnose 查看详情，或 /fix 尝试修复。"
+
+4. 用户回复：/fix
+
+5. OpenClaw doctor 运行：
+   → 检测到：Telegram webhook URL 在 bot token 刷新后已变更
+   → 修复：使用新 URL 重新注册 webhook
+   → 重启 telegram:bot1 channel
+   → Channel 重连成功
+
+6. 用户收到 IM 回复：
+   "已修复：Telegram webhook URL 已更新并重新注册。
+    telegram:bot1 已恢复连接。"
+```
 
 ---
 

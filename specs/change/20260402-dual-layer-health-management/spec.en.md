@@ -530,21 +530,54 @@ Escalations: none
 **Trigger**: user sends `/fix` in any connected IM channel.
 
 **Flow**:
-1. Controller calls OpenClaw `run_fix(scope: "safe")`
-3. OpenClaw executes safe repairs (auth refresh, channel restart, session cleanup)
-4. Results returned to IM
-5. If safe repairs insufficient, IM asks: "Some issues require restarting the gateway (brief disconnection). Proceed? Reply `/fix confirm`"
+1. Controller calls OpenClaw `run_fix` which runs the **doctor** diagnostic and repair flow internally
+2. Doctor identifies root causes and attempts targeted repairs (e.g., detect expired webhook → re-register, detect port conflict → kill stale process, detect broken LaunchAgent → reload)
+3. Results returned to IM with what was found and fixed
+4. If doctor repairs resolve the issue → done, no further action
+5. If doctor cannot resolve → IM asks: "Doctor couldn't fix this. Restart gateway? (brief disconnection) Reply `/fix restart`"
 6. On confirm: Controller executes `prepare_for_restart` → process restart → `reset_transient_health_counters`
 
-**Action tiers**:
+**Repair escalation** (doctor first, restart last):
 
-| Tier | Actions | Requires confirm |
+| Step | Actions | Requires confirm |
 |------|---------|-----------------|
-| Safe | Refresh auth tokens, restart unhealthy channels, clean stuck sessions | No |
-| Moderate | Restart gateway process, reload config | Yes — "This will briefly disconnect all channels. Proceed?" |
-| Restricted | Clear session store, rebuild sandbox images | Yes — "WARNING: this may lose in-progress conversations. Proceed?" |
+| 1. Doctor | Root-cause diagnosis, auth refresh, webhook re-register, port conflict resolution, LaunchAgent repair, channel restart, session cleanup | No |
+| 2. Restart | Restart gateway process | Yes — "Doctor couldn't fix this. Restart gateway?" |
+| 3. Rebuild | Clear session store, rebuild sandbox images | Yes — "WARNING: this may lose in-progress conversations." |
 
 **Degraded mode**: when OpenClaw is unreachable (wedge/crash), `/fix` falls back to Controller-only actions: process restart, diagnostics export. IM response indicates reduced capability.
+
+### 10.3 Example Scenario
+
+A concrete end-to-end example of the self-healing loop in action:
+
+```
+1. OpenClaw detects: telegram:bot1 disconnected
+   → Auto-reconnect attempt 1/3... failed (webhook URL changed)
+   → Auto-reconnect attempt 2/3... failed
+   → Auto-reconnect attempt 3/3... failed
+   → Emits escalation_requested { scope: "channel", target: "telegram:bot1" }
+
+2. Controller receives escalation
+   → Attempts restart_channel... still failing
+   → Signals Desktop to escalate to Layer 3
+
+3. User receives IM notification:
+   "telegram:bot1 持续断连，自动重连未恢复。
+    输入 /diagnose 查看详情，或 /fix 尝试修复。"
+
+4. User replies: /fix
+
+5. OpenClaw doctor runs:
+   → Detects: Telegram webhook URL changed after bot token refresh
+   → Repairs: re-registers webhook with new URL
+   → Restarts telegram:bot1 channel
+   → Channel reconnects successfully
+
+6. User receives IM reply:
+   "已修复：Telegram webhook URL 已更新并重新注册。
+    telegram:bot1 已恢复连接。"
+```
 
 ---
 
