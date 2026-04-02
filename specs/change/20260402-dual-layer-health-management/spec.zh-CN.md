@@ -60,9 +60,9 @@
 - 输出：结构化诊断事件 + 通过 `/health` 提供语义化健康状态
 - 自愈失败时：健康状态转为 `unhealthy`，发出 `escalation_requested`
 
-**Controller（运行时协调者）** — OpenClaw 生命周期的唯一管理者。
+**Controller（运行时协调者）** — 目标态下 OpenClaw 生命周期和事件协调的管理者。（注：当前基于 launchd 的桌面运行时中，Desktop 仍执行部分启动/清理编排。阶段 2+ 的工作应将生命周期协调收敛到 Controller 侧，同时保留现有 launchd 约束。）
 - 负责：HTTP 健康探针、OpenClaw 进程生命周期（启动/停止/重启）、健康循环、升级决策、wedge 检测
-- 消费：OpenClaw 健康响应 + 通过 Controller 拥有的事件管道接收运行时事件
+- 消费：OpenClaw 健康响应 + 通过 stdout `NEXU_EVENT` marker 解析接收运行时事件
 - 决策：是否重启、是否升级给 Desktop、还是等待
 - 提供：向 OpenClaw 传递宿主上下文信号（sleep/wake 恢复、准备重启）
 - 边界：Controller 与 OpenClaw 通信；Desktop 与 Controller 通信。不存在 Desktop ↔ OpenClaw 的直接控制路径。
@@ -223,13 +223,11 @@ interface HealthResponse {
 
 ### 7.1 协议通道
 
-所有 OpenClaw → Controller 事件通过 **Controller 拥有的运行时事件管道**（即 Controller 订阅 OpenClaw 运行时事件的现有机制）。这不是新通道——而是在现有 `runtime/events` 订阅上扩展新的事件类型。
+当前 Controller 通过 **stdout `NEXU_EVENT` marker 解析**（`openclaw-process.ts` 中的 `emitRuntimeEventFromLine`）接收 OpenClaw 运行时事件。阶段 2 在同一机制上扩展新的结构化事件类型。初始设计不需要全新的传输层；现有 stdout marker 路径足够。如有需要，后续可引入更正式的事件传输机制。
 
 Controller → OpenClaw 命令使用**现有 RPC 接口**（OpenClaw gateway 服务器上的 HTTP/WS 方法）。
 
 Desktop ↔ Controller 通信使用**现有 Controller API**（Desktop 已经在用的与 Controller 交互的内部接口）。
-
-**不引入新的传输层。** 所有变更都是在现有通道上增加事件类型和 RPC 方法。
 
 ### 7.2 OpenClaw → Controller 事件
 
@@ -517,7 +515,7 @@ Controller 将相关信号转发给 OpenClaw（如 `host_sleep_resumed`），其
 
 ## 10. IM 命令
 
-**仅限私聊**：`/diagnose` 和 `/fix` 仅在与 bot 的私聊（DM）中响应。在群聊中，bot 忽略这些命令或回复："请私聊我执行此命令。"这避免了共享 channel 中的误操作。
+本命令模型基于 **单用户桌面部署** 前提——能私聊 bot 的人就是设备所有者。因此 `/diagnose` 和 `/fix` 限制在私聊（DM）上下文中，而非引入独立的多用户操作员授权体系。在群聊中，bot 忽略这些命令或回复："请私聊我执行此命令。"
 
 ### 10.1 `/diagnose` — 自检报告
 

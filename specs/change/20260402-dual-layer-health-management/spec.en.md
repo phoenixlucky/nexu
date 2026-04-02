@@ -60,9 +60,9 @@ This is a solvable integration problem, not a missing-capability problem.
 - Output: structured diagnostic events + semantic health status via `/health`
 - When self-heal fails: transitions health to `unhealthy`, emits `escalation_requested`
 
-**Controller (Runtime Coordinator)** — the sole authority for OpenClaw lifecycle.
+**Controller (Runtime Coordinator)** — the target-state authority for OpenClaw lifecycle and incident coordination. (Note: in the current launchd-based desktop runtime, Desktop still performs part of bootstrap/teardown orchestration. Phase 2+ work should converge lifecycle coordination on Controller while preserving existing launchd constraints.)
 - Owns: HTTP health probe, OpenClaw process lifecycle (start/stop/restart), health loop, escalation decisions, wedge detection
-- Consumes: OpenClaw health responses + runtime events via the controller-owned event pipe
+- Consumes: OpenClaw health responses + runtime events via stdout `NEXU_EVENT` marker parsing
 - Decides: whether to restart, escalate to Desktop, or wait
 - Provides: host-context signals to OpenClaw (sleep/wake resume, prepare-for-restart)
 - Boundary: Controller talks to OpenClaw; Desktop talks to Controller. No Desktop ↔ OpenClaw direct control path.
@@ -225,13 +225,11 @@ on probe response:
 
 ### 7.1 Protocol Channel
 
-All OpenClaw → Controller events flow through the **controller-owned runtime event pipe** (the existing mechanism by which Controller subscribes to OpenClaw runtime events). This is NOT a new channel — it extends the existing `runtime/events` subscription with new event types.
+Today, Controller receives OpenClaw runtime events via **stdout `NEXU_EVENT` marker parsing** (`emitRuntimeEventFromLine` in `openclaw-process.ts`). Phase 2 extends that same mechanism with additional structured event types. No brand-new transport is required for the initial design; the existing stdout-marker path is sufficient. A more formal event transport can be introduced later if needed.
 
 Controller → OpenClaw commands use the **existing RPC interface** (HTTP/WS methods on OpenClaw's gateway server).
 
 Desktop ↔ Controller communication uses the **existing controller API** (the internal interface Desktop already uses to interact with Controller).
-
-**No new transport is introduced.** All changes are additive event types and RPC methods on existing channels.
 
 ### 7.2 OpenClaw → Controller Events
 
@@ -519,7 +517,7 @@ Two tiers: a **remote-safe subset** for Sentry, and the **full bundle** for loca
 
 ## 10. IM Commands
 
-**DM only**: `/diagnose` and `/fix` only respond in direct messages (DM / private chat) with the bot. In group channels, the bot ignores these commands or replies: "Please DM me to run this command." This prevents accidental or unintended repair actions in shared channels.
+This command model assumes a **single-user desktop deployment** where the person who can DM the bot is the device owner. `/diagnose` and `/fix` are therefore limited to DM (private chat) contexts rather than introducing a separate multi-user operator authorization system. In group channels, the bot ignores these commands or replies: "Please DM me to run this command."
 
 ### 10.1 `/diagnose` — Self-Check Report
 
