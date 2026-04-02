@@ -548,7 +548,7 @@ Controller 探针：0 次连续失败
 
 **流程**：
 1. Controller 调用 OpenClaw `run_fix`，内部运行 **doctor** 诊断修复流程
-2. Doctor 识别根因并尝试定向修复（如检测到 webhook 过期 → 重新注册，检测到端口冲突 → 杀残留进程，检测到 LaunchAgent 异常 → 重新加载）
+2. Doctor 识别根因并尝试定向应用层修复（如检测到 webhook 过期 → 重新注册，检测到 channel 配置过期 → 刷新，检测到 auth token 问题 → 重新授权流程）
 3. 将发现的问题和修复结果返回至 IM
 4. 如果 doctor 修复解决了问题 → 完成，无需进一步操作
 5. 如果 doctor 无法解决 → IM 询问："Doctor 无法修复此问题。是否重启 gateway？（短暂断连）回复 `/fix restart`"
@@ -558,7 +558,8 @@ Controller 探针：0 次连续失败
 
 | 步骤 | 操作 | 需要确认 |
 |------|-----|---------|
-| 1. Doctor | 根因诊断、auth 刷新、webhook 重新注册、端口冲突解决、LaunchAgent 修复、channel 重启、session 清理 | 否 |
+| 1. Doctor（应用层） | 根因诊断、auth 刷新、webhook 重新注册、channel 重启、session 清理、配置重载 | 否 |
+| 1b. Controller（宿主层） | 端口冲突解决、LaunchAgent 修复、服务重启 — Controller 直接处理，不经 OpenClaw doctor | 否 |
 | 2. 重启 | 重启 gateway 进程 | 是 — "Doctor 无法修复，是否重启 gateway？" |
 | 3. 重建 | 清空 session 存储、重建沙箱镜像 | 是 — "警告：这可能丢失进行中的对话。" |
 

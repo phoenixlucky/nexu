@@ -550,7 +550,7 @@ Escalations: none
 
 **Flow**:
 1. Controller calls OpenClaw `run_fix` which runs the **doctor** diagnostic and repair flow internally
-2. Doctor identifies root causes and attempts targeted repairs (e.g., detect expired webhook → re-register, detect port conflict → kill stale process, detect broken LaunchAgent → reload)
+2. Doctor identifies root causes and attempts targeted application-layer repairs (e.g., detect expired webhook → re-register, detect stale channel config → refresh, detect auth token issue → re-auth flow)
 3. Results returned to IM with what was found and fixed
 4. If doctor repairs resolve the issue → done, no further action
 5. If doctor cannot resolve → IM asks: "Doctor couldn't fix this. Restart gateway? (brief disconnection) Reply `/fix restart`"
@@ -560,7 +560,8 @@ Escalations: none
 
 | Step | Actions | Requires confirm |
 |------|---------|-----------------|
-| 1. Doctor | Root-cause diagnosis, auth refresh, webhook re-register, port conflict resolution, LaunchAgent repair, channel restart, session cleanup | No |
+| 1. Doctor (app-layer) | Root-cause diagnosis, auth refresh, webhook re-register, channel restart, session cleanup, config reload | No |
+| 1b. Controller (host-layer) | Port conflict resolution, LaunchAgent repair, service restart — Controller handles these directly, not via OpenClaw doctor | No |
 | 2. Restart | Restart gateway process | Yes — "Doctor couldn't fix this. Restart gateway?" |
 | 3. Rebuild | Clear session store, rebuild sandbox images | Yes — "WARNING: this may lose in-progress conversations." |
 
