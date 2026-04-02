@@ -1527,6 +1527,7 @@ function QqbotModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is supplementary to Escape key */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
@@ -1576,6 +1577,7 @@ function DingtalkModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is supplementary to Escape key */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
@@ -1625,6 +1627,7 @@ function WecomModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is supplementary to Escape key */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}

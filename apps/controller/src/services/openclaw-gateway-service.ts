@@ -486,7 +486,7 @@ export class OpenClawGatewayService {
       return {
         ready,
         connected: snapshot.connected ?? false,
-        running: snapshot.running ?? (isConfiguredReady ? true : false),
+        running: snapshot.running ?? isConfiguredReady,
         configured: snapshot.configured ?? false,
         lastError: snapshot.lastError ?? null,
         gatewayConnected: true,
