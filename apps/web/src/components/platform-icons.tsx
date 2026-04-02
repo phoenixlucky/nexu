@@ -7,6 +7,7 @@ export type PlatformIconName =
   | "slack"
   | "discord"
   | "feishu"
+  | "wecom"
   | "qqbot"
   | "wechat"
   | "openclaw-weixin"
@@ -54,6 +55,18 @@ export function FeishuIcon({ size = 16 }: { size?: number }) {
       height={size}
       alt="Feishu"
       src="/feishu-logo.png"
+      style={{ objectFit: "contain" }}
+    />
+  );
+}
+
+export function WecomIcon({ size = 16 }: { size?: number }) {
+  return (
+    <img
+      width={size}
+      height={size}
+      alt="WeCom"
+      src="/wecom-logo.svg"
       style={{ objectFit: "contain" }}
     />
   );
@@ -192,6 +205,8 @@ export function PlatformIcon({
       return <DiscordIcon size={size} />;
     case "feishu":
       return <FeishuIcon size={size} />;
+    case "wecom":
+      return <WecomIcon size={size} />;
     case "qqbot":
       return <QqbotIcon size={size} />;
     case "wechat":

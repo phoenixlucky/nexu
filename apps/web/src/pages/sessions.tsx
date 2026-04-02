@@ -249,6 +249,7 @@ type Platform =
   | "telegram"
   | "web"
   | "feishu"
+  | "wecom"
   | "wechat"
   | "qqbot";
 
@@ -301,6 +302,12 @@ const PLATFORM_CONFIG: Record<Platform, PlatformConfig> = {
       "border-[rgba(51,112,255,0.14)] bg-[rgba(51,112,255,0.08)] text-[#3370FF]",
     label: "Feishu",
     openLabel: "Open in Feishu",
+  },
+  wecom: {
+    badgeClass:
+      "border-[rgba(7,193,96,0.14)] bg-[rgba(7,193,96,0.08)] text-[#07C160]",
+    label: "WeCom",
+    openLabel: "Open in WeCom",
   },
   wechat: {
     badgeClass:

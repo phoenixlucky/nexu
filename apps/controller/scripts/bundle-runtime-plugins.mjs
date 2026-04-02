@@ -1,5 +1,5 @@
 import { readdirSync, realpathSync } from "node:fs";
-import { cp, mkdir, readFile, realpath, rm } from "node:fs/promises";
+import { cp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname } from "node:path";
 import path from "node:path";
@@ -13,10 +13,18 @@ const requireFromRepo = createRequire(path.join(repoRoot, "package.json"));
 
 const bundledPlugins = [
   {
+    id: "wecom",
+    npmName: "@wecom/wecom-openclaw-plugin",
+  },
+  {
     id: "openclaw-qqbot",
     npmName: "@tencent-connect/openclaw-qqbot",
   },
 ];
+
+const MANIFEST_ID_FIXES = {
+  "wecom-openclaw-plugin": "wecom",
+};
 
 function getVirtualStoreNodeModules(realPkgPath) {
   let currentPath = realPkgPath;
@@ -65,6 +73,69 @@ async function readJson(filePath) {
   return JSON.parse(await readFile(filePath, "utf8"));
 }
 
+async function maybeFixPluginManifest(outputDir) {
+  const manifestPath = path.join(outputDir, "openclaw.plugin.json");
+  try {
+    const manifest = await readJson(manifestPath);
+    const oldId = manifest.id;
+    if (typeof oldId === "string" && MANIFEST_ID_FIXES[oldId]) {
+      manifest.id = MANIFEST_ID_FIXES[oldId];
+      await writeFile(
+        manifestPath,
+        `${JSON.stringify(manifest, null, 2)}\n`,
+        "utf8",
+      );
+    }
+  } catch {
+    // Ignore plugins that do not ship a manifest at bundle time.
+  }
+
+  const pkgPath = path.join(outputDir, "package.json");
+  try {
+    const pkg = await readJson(pkgPath);
+    let modified = false;
+    for (const [oldId, newId] of Object.entries(MANIFEST_ID_FIXES)) {
+      if (typeof pkg.name === "string" && pkg.name.includes(oldId)) {
+        pkg.name = pkg.name.replaceAll(oldId, newId);
+        modified = true;
+      }
+    }
+    if (modified) {
+      await writeFile(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, "utf8");
+    }
+
+    const entryFiles = [pkg.main, pkg.module].filter(
+      (value) => typeof value === "string" && value.length > 0,
+    );
+    for (const entryFile of entryFiles) {
+      const entryPath = path.join(outputDir, entryFile);
+      try {
+        let content = await readFile(entryPath, "utf8");
+        let patched = false;
+        for (const [oldId, newId] of Object.entries(MANIFEST_ID_FIXES)) {
+          const escapedOldId = oldId.replaceAll("-", "\\-");
+          const pattern = new RegExp(
+            `(\\bid\\s*:\\s*)(["'])${escapedOldId}\\2`,
+            "g",
+          );
+          const nextContent = content.replace(pattern, `$1$2${newId}$2`);
+          if (nextContent !== content) {
+            content = nextContent;
+            patched = true;
+          }
+        }
+        if (patched) {
+          await writeFile(entryPath, content, "utf8");
+        }
+      } catch {
+        // Ignore missing entry files during bundle-time fixups.
+      }
+    }
+  } catch {
+    // Ignore plugins without a package manifest.
+  }
+}
+
 async function bundlePlugin({ id, npmName }) {
   let packageJsonPath;
   try {
@@ -84,6 +155,7 @@ async function bundlePlugin({ id, npmName }) {
     dereference: true,
     filter: (source) => path.basename(source) !== ".bin",
   });
+  await maybeFixPluginManifest(outputDir);
 
   const rootVirtualNodeModules = getVirtualStoreNodeModules(sourcePackageRoot);
   if (!rootVirtualNodeModules) {

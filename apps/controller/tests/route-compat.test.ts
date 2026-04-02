@@ -430,6 +430,72 @@ describe("controller route compatibility", () => {
     expect(payload.appId).toBe("123456");
   });
 
+  it("supports wecom connect when the plugin is installed", async () => {
+    await mkdir(path.join(container.env.openclawExtensionsDir, "wecom"), {
+      recursive: true,
+    });
+    await writeFile(
+      path.join(
+        container.env.openclawExtensionsDir,
+        "wecom",
+        "openclaw.plugin.json",
+      ),
+      JSON.stringify({ id: "wecom", channels: ["wecom"] }),
+      "utf8",
+    );
+
+    const app = createApp(container);
+    const response = await app.request("/api/v1/channels/wecom/connect", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        botId: "wecom-bot-123",
+        secret: "wecom-secret",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      channelType: string;
+      appId?: string;
+    };
+    expect(payload.channelType).toBe("wecom");
+    expect(payload.appId).toBe("wecom-bot-123");
+  });
+
+  it("supports wecom connectivity tests when the plugin is installed", async () => {
+    await mkdir(path.join(container.env.openclawExtensionsDir, "wecom"), {
+      recursive: true,
+    });
+    await writeFile(
+      path.join(
+        container.env.openclawExtensionsDir,
+        "wecom",
+        "openclaw.plugin.json",
+      ),
+      JSON.stringify({ id: "wecom", channels: ["wecom"] }),
+      "utf8",
+    );
+
+    const app = createApp(container);
+    const response = await app.request("/api/v1/channels/wecom/test", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        botId: "wecom-bot-123",
+        secret: "wecom-secret",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      success: boolean;
+      message: string;
+    };
+    expect(payload.success).toBe(true);
+    expect(payload.message).toContain("wecom-bot-123");
+  });
+
   it("supports qqbot connectivity tests when the plugin is installed", async () => {
     await mkdir(
       path.join(container.env.openclawExtensionsDir, "openclaw-qqbot"),

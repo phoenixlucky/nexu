@@ -115,6 +115,25 @@ describe("NexuConfigStore", () => {
     );
   });
 
+  it("persists wecom channels with bot secrets in the secret store", async () => {
+    const store = new NexuConfigStore(env);
+
+    const channel = await store.connectWecom({
+      botId: "wecom-bot-123",
+      secret: "wecom-secret",
+    });
+
+    expect(channel.channelType).toBe("wecom");
+    expect(channel.accountId).toBe("default");
+    expect(channel.appId).toBe("wecom-bot-123");
+    expect(await store.getSecret(`channel:${channel.id}:botId`)).toBe(
+      "wecom-bot-123",
+    );
+    expect(await store.getSecret(`channel:${channel.id}:secret`)).toBe(
+      "wecom-secret",
+    );
+  });
+
   it("clears an existing provider API key when null is explicitly provided", async () => {
     const store = new NexuConfigStore(env);
 

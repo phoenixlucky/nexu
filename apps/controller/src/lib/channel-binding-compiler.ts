@@ -18,6 +18,7 @@ const INTERNAL_WECHAT_PREWARM_ACCOUNT_ID = `${NEXU_INTERNAL_ACCOUNT_PREFIX}wecha
 
 export const MANAGED_CHANNEL_PLUGIN_IDS: Partial<Record<ChannelType, string>> =
   {
+    wecom: "wecom",
     qqbot: "openclaw-qqbot",
     wechat: "openclaw-weixin",
   };
@@ -84,6 +85,7 @@ export function compileChannelsConfig(params: {
   const telegramAccounts: Record<string, TelegramAccountConfig> = {};
   const whatsappAccounts: Record<string, WhatsappAccountConfig> = {};
   const wechatAccounts: Record<string, { enabled: boolean }> = {};
+  let wecomChannel: OpenClawConfig["channels"]["wecom"] | undefined;
   let qqbotChannel: OpenClawConfig["channels"]["qqbot"] | undefined;
   const socketAppToken = process.env.SLACK_SOCKET_MODE_APP_TOKEN;
   const useSlackSocketMode =
@@ -171,6 +173,20 @@ export function compileChannelsConfig(params: {
                 : {}),
             }
           : {}),
+      };
+      continue;
+    }
+
+    if (channel.channelType === "wecom") {
+      wecomChannel = {
+        enabled: true,
+        botId: secret("botId") || channel.appId || "",
+        secret: secret("secret"),
+        dmPolicy: "open",
+        allowFrom: ["*"],
+        groupPolicy: "open",
+        groupAllowFrom: ["*"],
+        sendThinkingMessage: true,
       };
       continue;
     }
@@ -282,6 +298,7 @@ export function compileChannelsConfig(params: {
           },
         }
       : {}),
+    ...(wecomChannel ? { wecom: wecomChannel } : {}),
     ...(qqbotChannel ? { qqbot: qqbotChannel } : {}),
     "openclaw-weixin": {
       enabled: true,

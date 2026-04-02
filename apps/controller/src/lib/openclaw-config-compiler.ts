@@ -437,6 +437,13 @@ function compilePlugins(
       "openclaw-weixin": {
         enabled: true,
       },
+      ...(connectedPluginIds.includes("wecom")
+        ? {
+            wecom: {
+              enabled: true,
+            },
+          }
+        : {}),
       ...(connectedPluginIds.includes("openclaw-qqbot")
         ? {
             "openclaw-qqbot": {

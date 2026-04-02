@@ -9,11 +9,13 @@ import {
   connectSlackSchema,
   connectTelegramSchema,
   connectWechatSchema,
+  connectWecomSchema,
   connectWhatsappSchema,
   qqbotConnectivityResponseSchema,
   slackOAuthUrlResponseSchema,
   wechatQrStartResponseSchema,
   wechatQrWaitResponseSchema,
+  wecomConnectivityResponseSchema,
   whatsappQrStartResponseSchema,
   whatsappQrWaitRequestSchema,
   whatsappQrWaitResponseSchema,
@@ -206,6 +208,90 @@ export function registerChannelRoutes(
           {
             message:
               error instanceof Error ? error.message : "Feishu connect failed",
+          },
+          409,
+        );
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/channels/wecom/connect",
+      tags: ["Channels"],
+      request: {
+        body: {
+          content: { "application/json": { schema: connectWecomSchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: { "application/json": { schema: channelResponseSchema } },
+          description: "Connected wecom channel",
+        },
+        409: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Invalid credentials or plugin missing",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        return c.json(
+          await container.channelService.connectWecom(c.req.valid("json")),
+          200,
+        );
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error ? error.message : "WeCom connect failed",
+          },
+          409,
+        );
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/channels/wecom/test",
+      tags: ["Channels"],
+      request: {
+        body: {
+          content: { "application/json": { schema: connectWecomSchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: wecomConnectivityResponseSchema },
+          },
+          description: "WeCom connectivity test result",
+        },
+        409: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Invalid credentials or plugin missing",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        return c.json(
+          await container.channelService.testWecomConnectivity(
+            c.req.valid("json"),
+          ),
+          200,
+        );
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error
+                ? error.message
+                : "WeCom connectivity test failed",
           },
           409,
         );

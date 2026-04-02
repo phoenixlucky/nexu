@@ -38,6 +38,7 @@ function formatRelativeTime(
 
 const CHANNEL_LABELS: Record<string, string> = {
   feishu: "飞书",
+  wecom: "企微",
   slack: "Slack",
   discord: "Discord",
   telegram: "Telegram",

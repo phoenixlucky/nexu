@@ -2,7 +2,7 @@ import { access, cp, mkdir, readdir, rm } from "node:fs/promises";
 import path, { basename } from "node:path";
 import type { ControllerEnv } from "../app/env.js";
 
-const BUNDLED_PLUGIN_IDS = new Set(["openclaw-qqbot"]);
+const BUNDLED_PLUGIN_IDS = new Set(["wecom", "openclaw-qqbot"]);
 
 export class OpenClawRuntimePluginWriter {
   constructor(private readonly env: ControllerEnv) {}

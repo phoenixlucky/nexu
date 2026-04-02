@@ -21,6 +21,7 @@ import type {
   ConnectQqbotInput,
   ConnectSlackInput,
   ConnectTelegramInput,
+  ConnectWecomInput,
 } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
@@ -52,6 +53,8 @@ const WHATSAPP_RUNTIME_RESTART_TIMEOUT_MS = 45_000;
 const WHATSAPP_RUNTIME_RESTART_POLL_MS = 500;
 const WHATSAPP_READY_TIMEOUT_MS = 45_000;
 const WHATSAPP_READY_POLL_MS = 1_500;
+const WECOM_PLUGIN_ID = "wecom";
+const LEGACY_WECOM_PLUGIN_ID = "wecom-openclaw-plugin";
 const QQBOT_PLUGIN_ID = "openclaw-qqbot";
 
 type ActiveWechatLogin = {
@@ -267,12 +270,15 @@ function resolveWhatsAppAccountDir(
   );
 }
 
-function hasPluginManifestWithId(dirPath: string, pluginId: string): boolean {
+function hasPluginManifestWithId(
+  dirPath: string,
+  pluginIds: readonly string[],
+): boolean {
   try {
     const manifestPath = path.join(dirPath, "openclaw.plugin.json");
     const raw = readFileSync(manifestPath, "utf-8");
     const parsed = JSON.parse(raw) as { id?: unknown };
-    return parsed.id === pluginId;
+    return pluginIds.includes(parsed.id as string);
   } catch {
     return false;
   }
@@ -281,7 +287,10 @@ function hasPluginManifestWithId(dirPath: string, pluginId: string): boolean {
 function resolveInstalledPluginDir(
   env: ControllerEnv,
   pluginId: string,
+  aliases: string[] = [],
+  manifestIds: string[] = [pluginId],
 ): string | null {
+  const candidateDirNames = [...new Set([pluginId, ...aliases])];
   const candidateRoots = [
     env.openclawExtensionsDir,
     env.openclawBuiltinExtensionsDir,
@@ -290,9 +299,12 @@ function resolveInstalledPluginDir(
   );
 
   for (const root of candidateRoots) {
-    for (const dirName of [pluginId, "qqbot"]) {
+    for (const dirName of candidateDirNames) {
       const dirPath = path.join(root, dirName);
-      if (existsSync(dirPath) && hasPluginManifestWithId(dirPath, pluginId)) {
+      if (
+        existsSync(dirPath) &&
+        hasPluginManifestWithId(dirPath, manifestIds)
+      ) {
         return dirPath;
       }
     }
@@ -944,12 +956,34 @@ export class ChannelService {
     return channel;
   }
 
+  async connectWecom(input: ConnectWecomInput) {
+    this.ensureWecomPluginInstalled();
+    const { botId, secret } = this.verifyWecomCredentials(input);
+
+    const channel = await this.configStore.connectWecom({
+      botId,
+      secret,
+    });
+    await this.syncService.writePlatformTemplatesForBot(channel.botId);
+    await this.syncService.syncAll();
+    return channel;
+  }
+
   async testQqbotConnectivity(input: ConnectQqbotInput) {
     this.ensureQqbotPluginInstalled();
     const { appId } = await this.verifyQqbotCredentials(input);
     return {
       success: true,
       message: `QQ credentials are valid for App ID ${appId}`,
+    };
+  }
+
+  async testWecomConnectivity(input: ConnectWecomInput) {
+    this.ensureWecomPluginInstalled();
+    const { botId } = this.verifyWecomCredentials(input);
+    return {
+      success: true,
+      message: `WeCom credentials are configured for Bot ID ${botId}`,
     };
   }
 
@@ -1327,10 +1361,36 @@ export class ChannelService {
   }
 
   private ensureQqbotPluginInstalled(): void {
-    const pluginDir = resolveInstalledPluginDir(this.env, QQBOT_PLUGIN_ID);
+    const pluginDir = resolveInstalledPluginDir(this.env, QQBOT_PLUGIN_ID, [
+      "qqbot",
+    ]);
     if (!pluginDir) {
       throw new Error(`QQ plugin not installed: ${QQBOT_PLUGIN_ID}`);
     }
+  }
+
+  private ensureWecomPluginInstalled(): void {
+    const pluginDir = resolveInstalledPluginDir(
+      this.env,
+      WECOM_PLUGIN_ID,
+      [LEGACY_WECOM_PLUGIN_ID],
+      [WECOM_PLUGIN_ID, LEGACY_WECOM_PLUGIN_ID],
+    );
+    if (!pluginDir) {
+      throw new Error(`WeCom plugin not installed: ${WECOM_PLUGIN_ID}`);
+    }
+  }
+
+  private verifyWecomCredentials(input: ConnectWecomInput): {
+    botId: string;
+    secret: string;
+  } {
+    const botId = input.botId.trim();
+    const secret = input.secret.trim();
+    if (!botId || !secret) {
+      throw new Error("WeCom Bot ID and Secret are required");
+    }
+    return { botId, secret };
   }
 
   private async verifyQqbotCredentials(input: ConnectQqbotInput): Promise<{

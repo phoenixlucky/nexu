@@ -5,10 +5,12 @@ export type AnalyticsAuthSource = "welcome_page" | "settings";
 export type AnalyticsChannel =
   | "wechat"
   | "feishu"
+  | "wecom"
   | "slack"
   | "discord"
   | "telegram"
-  | "whatsapp";
+  | "whatsapp"
+  | "qqbot";
 export type AnalyticsSidebarTarget =
   | "home"
   | "conversations"
@@ -56,10 +58,12 @@ export function normalizeChannel(
   }
   if (
     channel === "feishu" ||
+    channel === "wecom" ||
     channel === "slack" ||
     channel === "discord" ||
     channel === "telegram" ||
-    channel === "whatsapp"
+    channel === "whatsapp" ||
+    channel === "qqbot"
   ) {
     return channel;
   }

@@ -7,6 +7,7 @@ import type {
   ConnectFeishuInput,
   ConnectQqbotInput,
   ConnectSlackInput,
+  ConnectWecomInput,
 } from "@nexu/shared";
 import {
   type cloudProfileSchema,
@@ -979,6 +980,40 @@ export class NexuConfigStore {
                 input.verificationToken,
             }
           : {}),
+      },
+    }));
+
+    return channel;
+  }
+
+  async connectWecom(input: ConnectWecomInput): Promise<ChannelResponse> {
+    const bot = await this.getOrCreateDefaultBot();
+    const connectedAt = now();
+    const channel: ChannelResponse = {
+      id: crypto.randomUUID(),
+      botId: bot.id,
+      channelType: "wecom",
+      accountId: QQBOT_DEFAULT_ACCOUNT_ID,
+      status: "connected",
+      teamName: null,
+      appId: input.botId,
+      botUserId: null,
+      createdAt: connectedAt,
+      updatedAt: connectedAt,
+    };
+
+    await this.store.update((config) => ({
+      ...config,
+      channels: [
+        ...config.channels.filter(
+          (existing) => existing.channelType !== channel.channelType,
+        ),
+        channel,
+      ],
+      secrets: {
+        ...config.secrets,
+        [`channel:${channel.id}:botId`]: input.botId,
+        [`channel:${channel.id}:secret`]: input.secret,
       },
     }));
 

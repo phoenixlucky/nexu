@@ -189,6 +189,34 @@ describe("OpenClawRuntimePluginWriter", () => {
     ).toBe("bundled\n");
   });
 
+  it("prefers bundled wecom over the legacy runtime plugin source", async () => {
+    const bundledPluginDir = path.join(env.bundledRuntimePluginsDir, "wecom");
+    const legacyPluginDir = path.join(env.runtimePluginTemplatesDir, "wecom");
+
+    await mkdir(bundledPluginDir, { recursive: true });
+    await mkdir(legacyPluginDir, { recursive: true });
+    await writeFile(
+      path.join(bundledPluginDir, "manifest.txt"),
+      "bundled\n",
+      "utf8",
+    );
+    await writeFile(
+      path.join(legacyPluginDir, "manifest.txt"),
+      "legacy\n",
+      "utf8",
+    );
+
+    const writer = new OpenClawRuntimePluginWriter(env);
+    await writer.ensurePlugins();
+
+    expect(
+      await readFile(
+        path.join(env.openclawExtensionsDir, "wecom", "manifest.txt"),
+        "utf8",
+      ),
+    ).toBe("bundled\n");
+  });
+
   it("still copies legacy plugins when no bundled runtime artifact exists", async () => {
     const legacyPluginDir = path.join(
       env.runtimePluginTemplatesDir,
