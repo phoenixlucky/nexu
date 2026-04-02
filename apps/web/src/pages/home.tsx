@@ -713,15 +713,15 @@ export function HomePage() {
               </div>
             </div>
           </div>
-        </div>
 
-        {showSeedancePromo ? (
-          <SeedancePromoBanner
-            isDismissed={false}
-            onOpen={() => setSeedancePromoOpen(true)}
-            onDismiss={dismissSeedancePromo}
-          />
-        ) : null}
+          {showSeedancePromo ? (
+            <SeedancePromoBanner
+              isDismissed={false}
+              onOpen={() => setSeedancePromoOpen(true)}
+              onDismiss={dismissSeedancePromo}
+            />
+          ) : null}
+        </div>
 
         {modalChannel && (
           <ChannelConnectModal
