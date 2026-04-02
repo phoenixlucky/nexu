@@ -11,12 +11,12 @@ import {
   WechatIcon,
   WhatsAppIcon,
 } from "@/components/platform-icons";
-import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import {
   SEEDANCE_PROMO_DISMISS_KEY,
   SeedancePromoBanner,
   SeedancePromoModal,
 } from "@/components/seedance-promo";
+import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { getChannelChatUrl } from "@/lib/channel-links";
 import { normalizeChannel, track } from "@/lib/tracking";
