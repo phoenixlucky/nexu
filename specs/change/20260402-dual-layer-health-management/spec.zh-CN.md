@@ -498,26 +498,15 @@ Controller 将相关信号转发给 OpenClaw（如 `host_sleep_resumed`），其
 
 ## 10. IM 命令
 
-### 10.1 授权模型
+### 10.1 `/diagnose` — 自检报告
 
-`/diagnose` 和 `/fix` 需要**操作员级别授权**：
-
-- **操作员白名单**：在 gateway 配置中设定，按 channel 指定授权用户 ID
-- **Channel 限制**：可选择仅限管理员指定的 channel 执行命令
-- **身份验证**：gateway 必须在执行任何命令前验证发送者身份是否在操作员白名单中
-- **未授权响应**："权限不足。此命令需要操作员访问权限。"
-- **审计追踪**：所有 `/fix` 执行均记录发送者身份、channel、时间戳和执行的操作
-
-### 10.2 `/diagnose` — 自检报告
-
-**触发**：授权操作员在允许的 IM channel 中发送 `/diagnose`。
+**触发**：用户在任意已连接 IM channel 中发送 `/diagnose`。
 
 **流程**：
-1. 验证发送者是否为授权操作员（未授权则拒绝）
-2. Controller 调用 OpenClaw `run_diagnose(depth: "full")`
-3. Controller 附加自身视角（探针历史、进程统计、升级状态）
-4. Desktop 附加宿主上下文（sleep/wake 日志、renderer 状态）
-5. 合并报告返回至 IM
+1. Controller 调用 OpenClaw `run_diagnose(depth: "full")`
+2. Controller 附加自身视角（探针历史、进程统计、升级状态）
+3. Desktop 附加宿主上下文（sleep/wake 日志、renderer 状态）
+4. 合并报告返回至 IM
 
 **报告内容**：
 ```
@@ -534,13 +523,12 @@ Controller 探针：0 次连续失败
 升级请求：无
 ```
 
-### 10.3 `/fix` — 触发修复
+### 10.2 `/fix` — 触发修复
 
-**触发**：授权操作员在允许的 IM channel 中发送 `/fix`。
+**触发**：用户在任意已连接 IM channel 中发送 `/fix`。
 
 **流程**：
-1. 验证发送者是否为授权操作员（未授权则拒绝）
-2. Controller 调用 OpenClaw `run_fix(scope: "safe")`
+1. Controller 调用 OpenClaw `run_fix(scope: "safe")`
 3. OpenClaw 执行安全修复（auth 刷新、channel 重启、session 清理）
 4. 结果返回至 IM
 5. 如果安全修复不够，IM 询问："部分问题需要重启 gateway（短暂断连）。是否继续？回复 `/fix confirm`"

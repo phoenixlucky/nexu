@@ -500,26 +500,15 @@ Reuse existing `diagnostics-export.ts` with additions:
 
 ## 10. IM Commands
 
-### 10.1 Authorization Model
+### 10.1 `/diagnose` — Self-Check Report
 
-`/diagnose` and `/fix` require **operator-level authorization**:
-
-- **Operator allowlist**: configured in gateway config, specifying authorized user IDs per channel
-- **Channel restriction**: optionally restrict commands to designated admin channels only
-- **Identity verification**: gateway MUST verify the sender identity against the operator allowlist before executing any command
-- **Unauthorized response**: "Permission denied. This command requires operator access."
-- **Audit trail**: all `/fix` executions are logged with sender identity, channel, timestamp, and actions taken
-
-### 10.2 `/diagnose` — Self-Check Report
-
-**Trigger**: authorized operator sends `/diagnose` in an allowed IM channel.
+**Trigger**: user sends `/diagnose` in any connected IM channel.
 
 **Flow**:
-1. Verify sender is authorized operator (reject if not)
-2. Controller calls OpenClaw `run_diagnose(depth: "full")`
-3. Controller appends its own perspective (probe history, process stats, escalation state)
-4. Desktop appends host context (sleep/wake log, renderer state)
-5. Combined report returned to IM
+1. Controller calls OpenClaw `run_diagnose(depth: "full")`
+2. Controller appends its own perspective (probe history, process stats, escalation state)
+3. Desktop appends host context (sleep/wake log, renderer state)
+4. Combined report returned to IM
 
 **Report contents**:
 ```
@@ -536,13 +525,12 @@ Self-healing: 1 active recovery (telegram channel restart)
 Escalations: none
 ```
 
-### 10.3 `/fix` — Trigger Repair
+### 10.2 `/fix` — Trigger Repair
 
-**Trigger**: authorized operator sends `/fix` in an allowed IM channel.
+**Trigger**: user sends `/fix` in any connected IM channel.
 
 **Flow**:
-1. Verify sender is authorized operator (reject if not)
-2. Controller calls OpenClaw `run_fix(scope: "safe")`
+1. Controller calls OpenClaw `run_fix(scope: "safe")`
 3. OpenClaw executes safe repairs (auth refresh, channel restart, session cleanup)
 4. Results returned to IM
 5. If safe repairs insufficient, IM asks: "Some issues require restarting the gateway (brief disconnection). Proceed? Reply `/fix confirm`"
