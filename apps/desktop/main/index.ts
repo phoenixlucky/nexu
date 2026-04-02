@@ -685,6 +685,7 @@ async function runLaunchdColdStart(): Promise<void> {
     skillNodePath,
     openclawTmpDir,
     proxyEnv,
+    amplitudeApiKey: process.env.AMPLITUDE_API_KEY,
     log: (message: string) => logColdStart(message),
     appVersion: app.getVersion(),
     userDataPath: app.getPath("userData"),
