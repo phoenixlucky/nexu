@@ -21,21 +21,23 @@ This is an **end-to-end self-healing loop**: the system resolves most issues sil
 
 ## 2. Current Gap
 
-Today, neither OpenClaw nor Desktop can deliver this loop alone:
+Today, no single component can deliver this loop alone:
 
 - **OpenClaw** has strong internal monitoring (channel health, session stuck detection, tool loop circuit breakers, auth expiry) and can self-heal many application-level faults. But it cannot detect its own process-level wedge, has no way to escalate when internal recovery fails, and does not report to any remote system.
 
-- **Desktop** runs HTTP probes against OpenClaw and can restart the process. But it treats health as binary alive/dead — it cannot tell a real deadlock from a config reload or channel reconnection, leading to false-positive alarms on benign operations.
+- **Controller** runs HTTP probes against OpenClaw and manages the OpenClaw lifecycle (start, restart, health loop). But it treats health as binary alive/dead — it cannot tell a real deadlock from a config reload or channel reconnection, leading to false-positive alarms on benign operations.
 
-- **The gap is coordination**: both sides have capabilities, but no shared language. Desktop doesn't know OpenClaw is self-healing; OpenClaw can't ask Desktop for help. There is no unified escalation path, no remote reporting trigger, and no user-facing repair entry point.
+- **Desktop** provides the host context (sleep/wake, renderer, macOS permissions) and owns the user-facing surface (diagnostics export, Sentry upload, UX). But it has no structured way to receive escalation signals from Controller or OpenClaw.
+
+- **The gap is coordination**: all three have capabilities, but no shared language. Controller doesn't know OpenClaw is self-healing; OpenClaw can't ask Controller for help; Desktop can't contribute host context back. There is no unified escalation path, no remote reporting trigger, and no user-facing repair entry point.
 
 This is a solvable integration problem, not a missing-capability problem.
 
 ## 3. Goals
 
 1. **End-to-end self-healing loop** — from anomaly detection through self-repair to remote reporting and user-reachable IM commands, as a single coherent system.
-2. **Layered responsibility** — OpenClaw owns application-internal faults; Desktop owns process-external faults. Each layer tries to resolve before escalating.
-3. **Semantic health coordination** — a formal protocol between OpenClaw and Desktop replaces implicit probe-only monitoring, so Desktop understands what OpenClaw is doing and vice versa.
+2. **Three-layer responsibility** — OpenClaw owns application-internal faults; Controller is the sole runtime coordinator (probe, lifecycle, escalation decisions); Desktop provides host context and owns UX/reporting.
+3. **Semantic health coordination** — a formal protocol between OpenClaw and Controller replaces implicit probe-only monitoring, so Controller understands what OpenClaw is doing.
 4. **Minimal noise** — only report what the system truly cannot fix. Self-healed issues produce no alerts, no Sentry events, no user interruptions.
 5. **User-reachable repair** — IM commands (`/diagnose`, `/fix`) let users inspect and repair from chat, without touching CLI or desktop UI.
 
@@ -50,38 +52,42 @@ This is a solvable integration problem, not a missing-capability problem.
 
 ## 5. Architecture
 
-### Responsibility Boundary
+### 5.1 Role Definitions
+
+**OpenClaw (Application Layer)** — the gateway process itself.
+- Owns: channel, session, tool, auth, config anomalies
+- Actions: retry, restart channel, circuit break, doctor
+- Output: structured diagnostic events + semantic health status via `/health`
+- When self-heal fails: transitions health to `unhealthy`, emits `escalation_requested`
+
+**Controller (Runtime Coordinator)** — the sole authority for OpenClaw lifecycle.
+- Owns: HTTP health probe, OpenClaw process lifecycle (start/stop/restart), health loop, escalation decisions, wedge detection
+- Consumes: OpenClaw health responses + runtime events via the controller-owned event pipe
+- Decides: whether to restart, escalate to Desktop, or wait
+- Provides: host-context signals to OpenClaw (sleep/wake resume, prepare-for-restart)
+- Boundary: Controller talks to OpenClaw; Desktop talks to Controller. No Desktop ↔ OpenClaw direct control path.
+
+**Desktop (Host Context + UX + Reporting)** — the Electron shell.
+- Owns: sleep/wake detection, renderer lifecycle, macOS permissions, diagnostics export, Sentry upload, user-facing IM notifications
+- Provides to Controller: host signals (sleep/wake state, renderer health)
+- Receives from Controller: escalation triggers, diagnostic snapshots
+- Does NOT directly probe or restart OpenClaw
+
+### 5.2 Interaction Model
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     OpenClaw (Application Layer)                │
-│                                                                 │
-│  Owns: channel, session, tool, auth, config anomalies           │
-│  Actions: retry, restart channel, circuit break, doctor         │
-│  Output: structured diagnostic events + semantic health status  │
-│                                                                 │
-│  If self-heal fails → emit escalation_requested event           │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ abnormal / recovery / escalation events
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│               Desktop / Controller (Supervision Layer)          │
-│                                                                 │
-│  Owns: process wedge, cold-start failure, renderer crash,       │
-│        sleep/wake recovery, macOS permissions, port conflicts    │
-│  Coordinates: sleep state, maintenance windows, self-heal       │
-│               awareness (avoids conflicting with OpenClaw)      │
-│  Escalates to: Sentry upload, IM notification, user interaction │
-└─────────────────────────────────────────────────────────────────┘
+                    Controller-owned event pipe
+OpenClaw ──── /health response ──────→ Controller
+OpenClaw ──── runtime events ────────→ Controller
+Controller ── RPC commands ──────────→ OpenClaw  (diagnose, fix, prepare_for_restart)
+
+                    Desktop ↔ Controller interface
+Desktop ──── host signals ──────────→ Controller (sleep_resumed, renderer_state)
+Controller ── escalation triggers ──→ Desktop    (report_to_sentry, notify_user)
+Desktop ──── diagnostics/Sentry ────→ External   (Sentry, local export)
 ```
 
-### Interaction Model
-
-```
-Desktop ──── HTTP probe (5s) ────→ OpenClaw /health (semantic response)
-Desktop ──── RPC commands ───────→ OpenClaw (diagnose, fix, prepare_for_restart, ...)
-OpenClaw ─── WS/event channel ──→ Desktop  (abnormal signals, escalation, recovery)
-```
+**Key constraint**: all OpenClaw coordination flows through Controller. Desktop never sends commands directly to OpenClaw. This prevents dual control paths and keeps Controller as the single source of truth for runtime state.
 
 ---
 
@@ -89,26 +95,68 @@ OpenClaw ─── WS/event channel ──→ Desktop  (abnormal signals, escala
 
 ### 6.1 Health Status Enum
 
-OpenClaw's `/health` response transitions from a binary alive/dead to a semantic state machine:
+OpenClaw's `/health` response transitions from binary alive/dead to a semantic state machine:
 
 ```typescript
 type HealthStatus = "healthy" | "degraded" | "recovering" | "maintenance" | "unhealthy";
 ```
 
-| Status | Meaning | Desktop should... |
-|--------|---------|-------------------|
-| `healthy` | All systems nominal | Normal probe cadence |
-| `degraded` | Partial functionality loss, aware and handling | Log, extend wedge threshold |
-| `recovering` | Active self-healing in progress | Pause wedge counter, wait for outcome |
-| `maintenance` | Intentional operation (config reload, upgrade) | Suppress alarms entirely |
-| `unhealthy` | Self-healing exhausted, needs external help | Begin Desktop-level intervention |
+### 6.2 State Transition Rules
 
-### 6.2 Enhanced Health Response Schema
+```
+                    ┌──────────────┐
+         ┌─────────│   healthy    │←────────────────┐
+         │         └──────┬───────┘                  │
+         │                │ anomaly detected          │ all clear
+         │                ▼                           │ (+ RECOVERY_HYSTERESIS)
+         │         ┌──────────────┐                  │
+         │    ┌───→│   degraded   │───┐              │
+         │    │    └──────┬───────┘   │              │
+         │    │           │ self-heal  │ self-heal    │
+         │    │           │ started    │ succeeds     │
+         │    │           ▼            │              │
+         │    │    ┌──────────────┐   │              │
+         │    │    │  recovering  │───┘              │
+         │    │    └──────┬───────┘                  │
+         │    │           │ MAX_RECOVERING_DURATION  │
+         │    │           │ exceeded or self-heal    │
+         │    │           │ fails                    │
+         │    │           ▼                          │
+         │    │    ┌──────────────┐    restart/fix   │
+         │    └────│  unhealthy   │──────────────────┘
+         │         └──────────────┘
+         │
+         │  (explicit operation)
+         │         ┌──────────────┐
+         └────────→│ maintenance  │─── MAINTENANCE_TTL exceeded
+                   └──────┬───────┘    → unhealthy
+                          │ operation completes
+                          └──────────→ healthy
+```
+
+### 6.3 State Timing Constraints
+
+| State | Max Dwell Time | On Timeout |
+|-------|---------------|------------|
+| `healthy` | Unlimited | — |
+| `degraded` | 5 min (`MAX_DEGRADED_DURATION`) | → `unhealthy` |
+| `recovering` | 10 min (`MAX_RECOVERING_DURATION`) | → `unhealthy` + emit `escalation_requested` |
+| `maintenance` | 15 min (`MAINTENANCE_TTL`) | → `unhealthy` (maintenance stuck) |
+| `unhealthy` | Unlimited (waiting for external intervention) | — |
+
+### 6.4 Anti-Flap Rules
+
+- **Recovery hysteresis**: after transitioning from `unhealthy` → `healthy`, maintain a 60s `RECOVERY_HYSTERESIS` window. During this window, health is reported as `healthy` but Controller keeps its wedge counter at a non-zero "watch" level rather than resetting to 0.
+- **Degraded debounce**: do not enter `degraded` for transient issues lasting < 5s. Only transition after the anomaly persists for `DEGRADED_DEBOUNCE` (5s).
+- **Counter reset**: `consecutiveFailures` resets to 0 only after `RECOVERY_HYSTERESIS` elapses with continuous `healthy` status.
+
+### 6.5 Enhanced Health Response Schema
 
 ```typescript
 interface HealthResponse {
   status: HealthStatus;
   uptime: number;                // seconds since gateway start
+  statusSince: number;           // epoch ms when current status began (enables TTL checks)
 
   // Why are we not healthy?
   degradedReasons?: string[];    // e.g. ["channel:telegram:reconnecting", "auth:claude:expiring"]
@@ -122,39 +170,50 @@ interface HealthResponse {
     estimatedDurationMs?: number;
   }>;
 
-  // Do we need Desktop to step in?
+  // Do we need Controller to step in?
   escalationRequested: boolean;
   escalationReason?: string;     // "channel_restart_exhausted" | "self_heal_timeout"
 }
 ```
 
-### 6.3 Desktop Probe Behavior (updated from PR #725)
+### 6.6 Controller Probe Behavior (updated from PR #725)
 
 ```
 on probe response:
   if status == "healthy":
-    reset consecutiveFailures = 0
-    clear wedgeReported
+    if within RECOVERY_HYSTERESIS window:
+      keep consecutiveFailures at "watch" level (do not fully reset)
+    else:
+      reset consecutiveFailures = 0
+      clear wedgeReported
 
-  if status == "degraded" && selfHealingInProgress:
-    // OpenClaw is aware and working on it — don't count as failure
+  if status == "degraded":
+    // OpenClaw is aware — don't count as failure
     hold consecutiveFailures (no increment)
-    extend wedge threshold to 24 (double grace period)
-    // BUT: cap suppression at SELF_HEAL_TIMEOUT (default 10 min).
-    // If degraded+selfHealing persists beyond this, treat as unhealthy.
-    if degradedDuration >= SELF_HEAL_TIMEOUT:
-      trigger Desktop-level intervention
+    // BUT: check statusSince. If degraded longer than MAX_DEGRADED_DURATION,
+    // Controller treats as unhealthy.
+    if now - statusSince >= MAX_DEGRADED_DURATION:
+      trigger Controller-level intervention
+
+  if status == "recovering":
+    // Active self-healing — pause wedge counter, wait
+    hold consecutiveFailures (no increment)
+    // BUT: cap at MAX_RECOVERING_DURATION
+    if now - statusSince >= MAX_RECOVERING_DURATION:
+      trigger Controller-level intervention
 
   if status == "maintenance":
-    // intentional operation — fully suppress
+    // Intentional operation — suppress, but respect TTL
     reset consecutiveFailures = 0
+    if now - statusSince >= MAINTENANCE_TTL:
+      trigger Controller-level intervention (maintenance stuck)
 
   if status == "unhealthy" || escalationRequested:
-    // OpenClaw gave up — skip wedge threshold, intervene immediately
-    trigger Desktop-level intervention
+    // OpenClaw gave up — intervene, but scope-aware (see §8)
+    trigger Controller-level intervention
 
   if probe fails (timeout / connection refused):
-    // can't reach OpenClaw at all — true failure
+    // Can't reach OpenClaw at all — true failure
     increment consecutiveFailures
     if consecutiveFailures >= WEDGE_THRESHOLD:
       trigger wedge detection (existing PR #725 logic)
@@ -164,14 +223,25 @@ on probe response:
 
 ## 7. Coordination Protocol
 
-### 7.1 OpenClaw → Desktop Events
+### 7.1 Protocol Channel
 
-Structured events emitted over the existing WS/event channel:
+All OpenClaw → Controller events flow through the **controller-owned runtime event pipe** (the existing mechanism by which Controller subscribes to OpenClaw runtime events). This is NOT a new channel — it extends the existing `runtime/events` subscription with new event types.
+
+Controller → OpenClaw commands use the **existing RPC interface** (HTTP/WS methods on OpenClaw's gateway server).
+
+Desktop ↔ Controller communication uses the **existing controller API** (the internal interface Desktop already uses to interact with Controller).
+
+**No new transport is introduced.** All changes are additive event types and RPC methods on existing channels.
+
+### 7.2 OpenClaw → Controller Events
+
+New event types emitted on the existing runtime event pipe:
 
 ```typescript
 // OpenClaw is attempting internal recovery
 interface SelfHealingStarted {
   type: "self_healing_started";
+  scope: IncidentScope;    // what category of thing is broken
   target: string;          // what is being healed
   strategy: string;        // "channel_restart" | "auth_refresh" | "circuit_break"
   timestamp: number;
@@ -179,6 +249,7 @@ interface SelfHealingStarted {
 
 interface SelfHealingSucceeded {
   type: "self_healing_succeeded";
+  scope: IncidentScope;
   target: string;
   strategy: string;
   durationMs: number;
@@ -187,22 +258,24 @@ interface SelfHealingSucceeded {
 
 interface SelfHealingFailed {
   type: "self_healing_failed";
+  scope: IncidentScope;
   target: string;
   strategy: string;
   attempts: number;
-  lastError: string;
+  lastError: string;       // redacted error message (no tokens/secrets)
   timestamp: number;
 }
 
-// OpenClaw cannot recover — requesting Desktop intervention
+// OpenClaw cannot recover — requesting Controller intervention
 interface EscalationRequested {
   type: "escalation_requested";
+  scope: IncidentScope;
+  severity: "warning" | "critical";
   reason: string;            // "channel_restart_loop_exhausted" | "auth_refresh_failed"
-  context: Record<string, unknown>;  // diagnostic context for Sentry/diagnostics
-  // IMPORTANT: context MUST be redacted before emission — no tokens, secrets,
-  // or credentials. Use the existing redaction layer (redaction.ts) as the
-  // mandatory filter. Only allowlisted fields pass through.
-  suggestedAction?: "restart_gateway" | "notify_user" | "report_sentry";
+  context: EscalationContext;
+  recommendedAction: EscalationAction;
+  reportable: boolean;       // should this be sent to Sentry?
+  dedupeKey: string;         // for per-episode dedup (e.g. "channel:telegram:bot1")
   timestamp: number;
 }
 
@@ -222,14 +295,64 @@ interface MaintenanceFinished {
 }
 ```
 
-### 7.2 Desktop → OpenClaw Commands
+### 7.3 Incident Scope & Escalation Model
+
+Not every escalation means "restart the gateway." The escalation carries a scope so Controller can choose the right response:
+
+```typescript
+type IncidentScope = "channel" | "auth" | "config" | "session" | "process";
+
+type EscalationAction =
+  | "restart_channel"     // scope: channel — restart specific channel
+  | "refresh_auth"        // scope: auth — re-trigger auth flow
+  | "reload_config"       // scope: config — reload configuration
+  | "clear_session"       // scope: session — clean stuck session
+  | "restart_gateway"     // scope: process — full process restart (last resort)
+  | "notify_user"         // any scope — just tell the user
+  | "report_sentry";      // any scope — report to Sentry
+
+// Controller decision matrix:
+//   scope: channel   → try restart_channel first, then escalate to Desktop
+//   scope: auth      → try refresh_auth, notify user if manual re-auth needed
+//   scope: config    → try reload_config, restart_gateway only if reload fails
+//   scope: session   → clear_session, no restart needed
+//   scope: process   → restart_gateway (only scope that warrants it by default)
+```
+
+### 7.4 Escalation Context Schema
+
+The `context` field uses a **typed allowlist schema**, not an open `Record<string, unknown>`:
+
+```typescript
+interface EscalationContext {
+  // Required fields
+  errorMessage: string;        // redacted — no tokens, secrets, or credentials
+  errorCode?: string;          // e.g. "ECONNREFUSED", "AUTH_EXPIRED"
+  component: string;           // e.g. "channel-health-monitor", "auth-health"
+
+  // Scope-specific fields (all optional, allowlisted)
+  channelType?: string;        // "telegram" | "discord" | "slack" | ...
+  channelAccount?: string;     // account identifier (redacted)
+  authProvider?: string;       // "claude" | "openai" | ...
+  selfHealAttempts?: number;
+  selfHealDurationMs?: number;
+  lastHealthStatus?: HealthStatus;
+
+  // Size constraint: serialized context MUST be < 4KB.
+  // Fields exceeding this are truncated, not omitted.
+}
+```
+
+**Redaction rule**: all `EscalationContext` fields pass through OpenClaw's existing redaction layer (`redaction.ts`) before emission. Any field not in this allowlist is stripped. This is enforced at the event emission site, not at the consumer.
+
+### 7.5 Controller → OpenClaw Commands
 
 RPC methods added to OpenClaw's `server-methods/`:
 
 ```typescript
-// Inform OpenClaw of Desktop-side context
-interface DesktopSleepResumed {
-  method: "desktop_sleep_resumed";
+// Inform OpenClaw of host-side context (from Desktop via Controller)
+interface HostSleepResumed {
+  method: "host_sleep_resumed";
   sleepDurationMs: number;    // how long was the machine asleep
 }
 
@@ -253,66 +376,90 @@ interface RunFix {
   targets?: string[];         // optional: specific subsystems to fix
 }
 
-// Tell OpenClaw to reset transient counters after Desktop intervention
+// Tell OpenClaw to reset transient counters after Controller intervention
 interface ResetTransientHealthCounters {
   method: "reset_transient_health_counters";
   reason: string;             // "post_restart" | "post_sleep_resume"
 }
 ```
 
+### 7.6 Desktop → Controller Signals
+
+Desktop provides host context to Controller through the existing controller API:
+
+```typescript
+// Desktop notifies Controller of host events
+interface HostSleepWakeEvent {
+  type: "host_sleep_resumed";
+  sleepDurationMs: number;
+}
+
+interface RendererStateEvent {
+  type: "renderer_state_changed";
+  state: "healthy" | "crashed" | "unresponsive";
+}
+```
+
+Controller forwards relevant signals to OpenClaw (e.g., `host_sleep_resumed`) and uses others for its own decisions (e.g., renderer crash → Sentry report via Desktop).
+
 ---
 
 ## 8. Recovery Flow
 
-Layered escalation with noise minimization:
+Layered escalation with scope-aware response:
 
 ```
 ┌─ Layer 1: OpenClaw Internal ─────────────────────────────────┐
 │                                                               │
 │  Anomaly detected (channel monitor / diagnostic event)        │
 │    → Attempt self-heal (retry / restart / circuit break)      │
-│    → Emit self_healing_started                                │
+│    → Emit self_healing_started { scope, target, strategy }    │
 │                                                               │
 │  Outcome A: Recovery succeeds                                 │
 │    → Emit self_healing_succeeded                              │
-│    → Health returns to "healthy"                              │
+│    → Health returns to "healthy" (after RECOVERY_HYSTERESIS)  │
 │    → END (no noise, no report)                                │
 │                                                               │
-│  Outcome B: Recovery fails after max attempts                 │
+│  Outcome B: Recovery fails / state TTL exceeded               │
 │    → Emit self_healing_failed                                 │
-│    → Emit escalation_requested                                │
+│    → Emit escalation_requested { scope, recommendedAction }   │
 │    → Health transitions to "unhealthy"                        │
 │                                                               │
 └───────────────────────────────────┬───────────────────────────┘
-                                    │ escalation
+                                    │ escalation (via controller event pipe)
                                     ▼
-┌─ Layer 2: Desktop Intervention ──────────────────────────────┐
+┌─ Layer 2: Controller Intervention ───────────────────────────┐
 │                                                               │
-│  Desktop receives escalation_requested OR wedge detected      │
-│    → Send prepare_for_restart to OpenClaw                     │
-│    → Wait grace period for state flush                        │
-│    → Execute process restart                                  │
-│    → Send reset_transient_health_counters                     │
+│  Controller receives escalation_requested OR detects wedge    │
 │                                                               │
-│  Outcome A: Restart succeeds, health returns to "healthy"     │
-│    → Log gateway_recovery, END                                │
+│  Scope-aware response:                                        │
+│    scope: channel → restart_channel (targeted, no downtime)   │
+│    scope: auth    → refresh_auth or notify user               │
+│    scope: config  → reload_config, restart only if fails      │
+│    scope: session → clear_session                             │
+│    scope: process → prepare_for_restart → restart gateway     │
+│    (probe-unreachable / wedge → always restart gateway)       │
 │                                                               │
-│  Outcome B: Restart fails OR restart loop exhausted           │
-│    → Proceed to Layer 3                                       │
+│  Outcome A: Intervention succeeds, health → "healthy"         │
+│    → Log recovery, END                                        │
+│                                                               │
+│  Outcome B: Intervention fails OR restart loop exhausted      │
+│    → Controller signals Desktop to escalate to Layer 3        │
 │                                                               │
 └───────────────────────────────────┬───────────────────────────┘
                                     │ still broken
                                     ▼
-┌─ Layer 3: Remote Report + User Reach ────────────────────────┐
+┌─ Layer 3: Desktop — Report + User Reach ─────────────────────┐
 │                                                               │
-│  Trigger three parallel outputs:                              │
+│  Desktop receives escalation trigger from Controller.         │
+│  Triggers three parallel outputs:                             │
 │                                                               │
 │  1. Sentry: captureMessage + diagnostics ZIP attachment       │
-│     (includes OpenClaw diagnostic context from escalation)    │
+│     (includes escalation context from Controller)             │
 │                                                               │
 │  2. IM notification to user:                                  │
-│     "Detected persistent gateway issue. Reply /diagnose       │
-│      for details or /fix to attempt repair."                  │
+│     "Detected persistent issue. Reply /diagnose for details   │
+│      or /fix to attempt repair."                              │
 │                                                               │
 │  3. Local diagnostics snapshot (existing export mechanism)    │
 │                                                               │
@@ -331,125 +478,187 @@ Only report when escalation has genuinely failed — not on every diagnostic eve
 |---------|-------------|
 | `wedge_confirmed` | HTTP probe consecutive failures exceeded threshold, process unresponsive |
 | `cold_start_failed` | Gateway failed to reach healthy state within boot timeout |
-| `self_healing_failed_and_escalated` | OpenClaw exhausted internal recovery, requested Desktop help, Desktop intervention also failed |
+| `self_healing_failed_and_escalated` | OpenClaw exhausted internal recovery, Controller intervention also failed |
 | `renderer_crash_before_ready` | Electron renderer process died before initialization complete |
-| `restart_loop_exhausted` | Desktop restarted gateway N times within window, still unhealthy |
+| `restart_loop_exhausted` | Controller restarted gateway N times within window, still unhealthy |
 
 ### 9.2 Deduplication & Rate Limiting
 
-- **Per-episode dedup**: one Sentry event per failure episode (reuse PR #725's `wedgeReported` flag pattern)
+- **Per-episode dedup**: one Sentry event per failure episode, keyed by `dedupeKey` from `EscalationRequested`
 - **Rate limit**: max 3 Sentry events per hour across all trigger types
-- **Recovery reset**: all counters and flags reset when health returns to "healthy"
-- **Cooldown**: after a Sentry report, suppress same trigger type for 30 minutes
+- **Recovery reset**: all counters and flags reset after `RECOVERY_HYSTERESIS` elapses with healthy status
+- **Cooldown**: after a Sentry report, suppress same `dedupeKey` for 30 minutes
 
 ### 9.3 Diagnostics Payload
 
 Reuse existing `diagnostics-export.ts` with additions:
 
 - Existing: runtime state, recent events, startup state, renderer failures, health metrics
-- Added: OpenClaw's `escalation_requested` event context, self-healing attempt history, last N health responses with semantic status
+- Added: `EscalationContext` from the triggering event, self-healing attempt history, last N health responses with semantic status and `statusSince` timestamps
 
 ---
 
 ## 10. IM Commands
 
-### 10.1 `/diagnose` — Self-Check Report
+### 10.1 Authorization Model
 
-**Trigger**: user sends `/diagnose` in any connected IM channel.
+`/diagnose` and `/fix` require **operator-level authorization**:
+
+- **Operator allowlist**: configured in gateway config, specifying authorized user IDs per channel
+- **Channel restriction**: optionally restrict commands to designated admin channels only
+- **Identity verification**: gateway MUST verify the sender identity against the operator allowlist before executing any command
+- **Unauthorized response**: "Permission denied. This command requires operator access."
+- **Audit trail**: all `/fix` executions are logged with sender identity, channel, timestamp, and actions taken
+
+### 10.2 `/diagnose` — Self-Check Report
+
+**Trigger**: authorized operator sends `/diagnose` in an allowed IM channel.
 
 **Flow**:
-1. Channel routes command to gateway (bypass AI agent path)
-2. Gateway calls OpenClaw `run_diagnose(depth: "full")`
-3. Desktop appends its own perspective (probe history, process stats, sleep/wake log)
-4. Combined report returned to IM
+1. Verify sender is authorized operator (reject if not)
+2. Controller calls OpenClaw `run_diagnose(depth: "full")`
+3. Controller appends its own perspective (probe history, process stats, escalation state)
+4. Desktop appends host context (sleep/wake log, renderer state)
+5. Combined report returned to IM
 
 **Report contents**:
 ```
-Gateway Health: degraded
+Gateway Health: degraded (since 45s ago)
   - telegram:bot1: reconnecting (3rd attempt, started 45s ago)
   - auth:claude: expires in 2h
   - sessions: 3 active, 0 stuck
 
 Process: running (PID 12345, uptime 6h)
-Desktop probe: 0 consecutive failures
+Controller probe: 0 consecutive failures
 Last sleep/wake: 2h ago, recovered normally
 
 Self-healing: 1 active recovery (telegram channel restart)
 Escalations: none
 ```
 
-### 10.2 `/fix` — Trigger Repair
+### 10.3 `/fix` — Trigger Repair
 
-**Trigger**: user sends `/fix` in any connected IM channel.
-
-**Authorization**: `/fix` (and `/diagnose`) require operator-level authorization. Only designated admin users or allowlisted channels may execute these commands. In shared channels, the gateway MUST verify the sender identity against an operator allowlist before executing any repair action. Unauthorized senders receive a "permission denied" response.
+**Trigger**: authorized operator sends `/fix` in an allowed IM channel.
 
 **Flow**:
-1. Verify sender is an authorized operator (reject if not)
-2. Gateway calls OpenClaw `run_fix(scope: "safe")`
-2. OpenClaw executes safe repairs (auth refresh, channel restart, session cleanup)
-3. Results returned to IM
-4. If safe repairs insufficient, IM asks: "Some issues require restarting the gateway (brief disconnection). Proceed? Reply `/fix confirm`"
-5. On confirm: Desktop executes `prepare_for_restart` → process restart → `reset_transient_health_counters`
+1. Verify sender is authorized operator (reject if not)
+2. Controller calls OpenClaw `run_fix(scope: "safe")`
+3. OpenClaw executes safe repairs (auth refresh, channel restart, session cleanup)
+4. Results returned to IM
+5. If safe repairs insufficient, IM asks: "Some issues require restarting the gateway (brief disconnection). Proceed? Reply `/fix confirm`"
+6. On confirm: Controller executes `prepare_for_restart` → process restart → `reset_transient_health_counters`
 
 **Action tiers**:
 
 | Tier | Actions | Requires confirm |
 |------|---------|-----------------|
 | Safe | Refresh auth tokens, restart unhealthy channels, clean stuck sessions | No |
-| Moderate | Restart gateway process, reload config | Yes |
-| Restricted | Clear session store, rebuild sandbox images | Yes + warning |
+| Moderate | Restart gateway process, reload config | Yes — "This will briefly disconnect all channels. Proceed?" |
+| Restricted | Clear session store, rebuild sandbox images | Yes — "WARNING: this may lose in-progress conversations. Proceed?" |
+
+**Degraded mode**: when OpenClaw is unreachable (wedge/crash), `/fix` falls back to Controller-only actions: process restart, diagnostics export. IM response indicates reduced capability.
 
 ---
 
-## 11. Rollout
+## 11. Upstream Dependencies
+
+This spec requires changes in both Nexu and OpenClaw. Not all changes can be made from the Nexu side.
+
+### 11.1 Nexu-Side (Can Implement Now)
+
+These changes live entirely within the Nexu repo and can proceed without OpenClaw upstream changes:
+
+| Change | Component | Notes |
+|--------|-----------|-------|
+| Controller probe logic respects semantic health | Controller | Evolve PR #725 to handle new status values |
+| Controller escalation decision engine | Controller | Scope-aware response logic |
+| Desktop ↔ Controller host signal interface | Desktop + Controller | sleep/wake, renderer state |
+| Desktop Sentry reporting on Layer 3 triggers | Desktop | Extend handled-failure-reporter |
+| Desktop diagnostics payload enrichment | Desktop | Add escalation context to ZIP |
+| IM `/diagnose` and `/fix` command routing | Controller | Command dispatch, authorization |
+| State timing enforcement (TTLs) | Controller | Monitor `statusSince` in probe responses |
+
+### 11.2 OpenClaw Upstream (Requires Coordination)
+
+These changes require modifications to OpenClaw source code:
+
+| Change | Priority | Fallback without it |
+|--------|----------|---------------------|
+| `/health` returns `HealthStatus` enum + `statusSince` | **Phase 1 — critical** | Controller treats all non-200 as failure (current behavior) |
+| `/health` returns `selfHealingInProgress` + `activeRecoveries` | Phase 1 | Controller cannot suppress alarms during self-healing; higher false-positive rate |
+| `self_healing_*` events on runtime event pipe | Phase 2 | Controller relies solely on `/health` polling; less responsive |
+| `escalation_requested` event with scope + context | Phase 2 | Controller detects escalation-worthy situations only via health status timeout |
+| `maintenance_started` / `maintenance_finished` events | Phase 2 | Controller uses `maintenance` health status only (no advance notice) |
+| `run_diagnose` RPC method | Phase 4 | `/diagnose` returns Controller-only perspective |
+| `run_fix` RPC method | Phase 4 | `/fix` limited to Controller-side actions (process restart) |
+| `host_sleep_resumed` RPC method | Phase 2 | OpenClaw doesn't know about sleep/wake; no counter reset |
+| `prepare_for_restart` RPC method | Phase 2 | Controller kills OpenClaw without graceful shutdown |
+| `EscalationContext` allowlist schema + redaction | Phase 2 | No structured context in Sentry reports |
+
+### 11.3 Phased Approach
+
+The rollout phases are ordered so that Nexu-side work can start immediately, and OpenClaw upstream changes are requested incrementally:
+
+- **Phase 1**: Nexu-side probe logic + OpenClaw `/health` enhancement (smallest upstream ask)
+- **Phase 2**: Full coordination protocol (larger upstream ask, but builds on Phase 1)
+- **Phase 3**: Sentry integration (Nexu-side only, consuming Phase 2 events)
+- **Phase 4**: IM commands (requires OpenClaw `run_diagnose` / `run_fix`)
+
+If OpenClaw upstream changes are delayed, each phase has a documented fallback that delivers partial value with Nexu-only changes.
+
+---
+
+## 12. Rollout
 
 ### Phase 1: Health Semantics
 
-- Enhance OpenClaw `/health` endpoint with `HealthResponse` schema (status enum, degradedReasons, selfHealingInProgress, escalationRequested)
-- Update Desktop probe logic to respect semantic states (PR #725 evolution)
+- **OpenClaw upstream**: enhance `/health` to return `HealthStatus` enum, `statusSince`, `degradedReasons`, `selfHealingInProgress`, `escalationRequested`
+- **Nexu (Controller)**: update probe logic to respect semantic states, enforce TTLs via `statusSince`, implement anti-flap rules
+- **Fallback**: if upstream is delayed, Controller adds its own timeout-based degraded detection (less accurate but functional)
 - **Validation**: no more false-positive wedge alarms during config reload or channel reconnection
 
 ### Phase 2: Coordination Protocol
 
-- Implement OpenClaw → Desktop events (self_healing_*, escalation_requested, maintenance_*)
-- Implement Desktop → OpenClaw commands (desktop_sleep_resumed, prepare_for_restart, reset_transient_health_counters)
-- Wire Desktop's sleep/wake listener to send `desktop_sleep_resumed`
-- **Validation**: Desktop correctly pauses wedge counting during OpenClaw self-healing
+- **OpenClaw upstream**: emit `self_healing_*`, `escalation_requested`, `maintenance_*` events; accept `host_sleep_resumed`, `prepare_for_restart`, `reset_transient_health_counters` commands
+- **Nexu (Controller)**: consume events, implement scope-aware escalation decisions, forward host signals from Desktop
+- **Nexu (Desktop)**: send sleep/wake and renderer signals to Controller
+- **Fallback**: if upstream events are delayed, Controller infers escalation from health status TTL expiry
+- **Validation**: Controller correctly pauses wedge counting during self-healing; scope-aware response avoids unnecessary restarts
 
 ### Phase 3: Escalation & Reporting
 
+- **Nexu only** (no upstream dependency beyond Phase 2 events)
 - Implement layered recovery flow (Layer 1 → 2 → 3)
 - Wire Sentry reporting to Layer 3 triggers only (per reporting policy)
-- Include OpenClaw escalation context in diagnostics ZIP
+- Include `EscalationContext` in diagnostics ZIP
 - **Validation**: Sentry events only fire on genuine unrecoverable failures
 
 ### Phase 4: IM Commands
 
-- Register `/diagnose` and `/fix` as gateway commands (bypass agent routing)
-- Implement `run_diagnose` and `run_fix` server methods in OpenClaw
-- Desktop contributes its perspective to `/diagnose` output
-- Implement confirmation flow for moderate/restricted `/fix` actions
-- **Validation**: user can diagnose and repair from IM without touching CLI or desktop UI
+- **OpenClaw upstream**: implement `run_diagnose` and `run_fix` server methods
+- **Nexu (Controller)**: register `/diagnose` and `/fix` command routing, authorization enforcement
+- **Nexu (Desktop)**: contribute host context to `/diagnose` output
+- **Fallback**: without upstream `run_diagnose`/`run_fix`, commands return Controller-only perspective and can only do process-level actions
+- **Validation**: authorized operator can diagnose and repair from IM without touching CLI or desktop UI
 
 ---
 
-## 12. Outstanding Questions
+## 13. Outstanding Questions
 
-1. Should `maintenance_started` / `maintenance_finished` be auto-emitted by OpenClaw on config reload, or explicitly triggered?
-2. What's the right `escalation_requested` timeout — how long should OpenClaw try before giving up?
-3. Should `/diagnose` and `/fix` be available on all channels or restricted to admin-designated channels?
-4. How does this interact with multi-device scenarios (multiple Desktops connected to one OpenClaw)?
-5. Should the IM notification on Layer 3 failure include a summary of what went wrong, or just a prompt to run `/diagnose`?
+1. Should `maintenance_started` / `maintenance_finished` be auto-emitted by OpenClaw on config reload, or explicitly triggered by the operation?
+2. What's the right `MAX_RECOVERING_DURATION` — 10 min is the current proposal, but channel reconnection over flaky networks may legitimately take longer.
+3. How does this interact with multi-device scenarios (multiple Desktops connected to one Controller)?
+4. Should the IM notification on Layer 3 failure include a summary of what went wrong, or just a prompt to run `/diagnose`?
+5. What is the process for proposing the OpenClaw upstream changes — RFC, issue, or direct PR?
 
 ---
 
-## 13. References
+## 14. References
 
 - OpenClaw health infrastructure: `src/commands/health.ts`, `src/gateway/server-methods/health.ts`, `src/gateway/channel-health-monitor.ts`
 - OpenClaw diagnostic events: `src/infra/diagnostic-events.ts`, `src/logging/diagnostic.ts`
 - OpenClaw doctor/repair: `src/commands/doctor.ts`, `src/commands/doctor-gateway-daemon-flow.ts`
 - OpenClaw tool loop detection: `src/agents/tool-loop-detection.ts`
-- Desktop health probe: `apps/controller/src/runtime/runtime-health.ts` (PR #725)
-- Desktop wedge detection: `apps/controller/src/runtime/loops.ts` (PR #725)
+- Controller health probe: `apps/controller/src/runtime/runtime-health.ts` (PR #725)
+- Controller wedge detection: `apps/controller/src/runtime/loops.ts` (PR #725)
 - Sentry handled failure spec: `specs/change/20260326-desktop-handled-failure-sentry/spec.md`
