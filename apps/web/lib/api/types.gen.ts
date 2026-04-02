@@ -1045,6 +1045,7 @@ export type GetApiInternalDesktopRewardsResponses = {
             totalRecharged: number;
             totalConsumed: number;
         };
+        autoFallbackTriggered?: boolean;
     };
 };
 
@@ -1097,6 +1098,7 @@ export type PostApiInternalDesktopRewardsClaimResponses = {
                 totalRecharged: number;
                 totalConsumed: number;
             };
+            autoFallbackTriggered?: boolean;
         };
     };
 };

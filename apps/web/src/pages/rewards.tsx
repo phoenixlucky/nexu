@@ -386,101 +386,121 @@ export function RewardsPage() {
         ) : null}
 
         <div className="space-y-3">
-          {groupedTasks.map((group) => (
-            <section key={group.key}>
-              <div className="mb-1 pl-0.5 text-[11px] font-semibold uppercase tracking-widest text-text-tertiary">
-                {t(group.labelKey)}
-              </div>
-              <div className="space-y-0">
-                {group.tasks.map((task, index) => {
-                  const actionLabel = task.isClaimed
-                    ? t("budget.cta.done").replace(
-                        "${n}",
-                        formatRewardAmount(task.reward),
-                      )
-                    : loading
-                      ? "..."
-                      : task.repeatMode === "daily"
-                        ? t("budget.cta.checkin")
-                        : task.shareMode === "image"
-                          ? t("budget.cta.download")
-                          : task.shareMode === "tweet"
-                            ? t("budget.cta.share")
-                            : t("budget.cta.go");
+          {loading ? (
+            <div className="animate-pulse space-y-3">
+              {["daily", "opensource", "social"].map((group) => (
+                <section key={group}>
+                  <div className="mb-1 h-3 w-16 rounded-full bg-border/60" />
+                  <div className="space-y-0">
+                    <div className="flex items-center gap-3 rounded-lg px-3 py-3">
+                      <div className="h-8 w-8 shrink-0 rounded-[10px] bg-border/60" />
+                      <div className="flex-1 space-y-1.5">
+                        <div className="h-3 w-24 rounded-full bg-border/70" />
+                        <div className="h-2.5 w-36 rounded-full bg-border/50" />
+                      </div>
+                      <div className="h-[26px] w-16 rounded-full bg-border/50" />
+                    </div>
+                  </div>
+                </section>
+              ))}
+            </div>
+          ) : null}
+          {!loading &&
+            groupedTasks.map((group) => (
+              <section key={group.key}>
+                <div className="mb-1 pl-0.5 text-[11px] font-semibold uppercase tracking-widest text-text-tertiary">
+                  {t(group.labelKey)}
+                </div>
+                <div className="space-y-0">
+                  {group.tasks.map((task, index) => {
+                    const actionLabel = task.isClaimed
+                      ? t("budget.cta.done").replace(
+                          "${n}",
+                          formatRewardAmount(task.reward),
+                        )
+                      : loading
+                        ? "..."
+                        : task.repeatMode === "daily"
+                          ? t("budget.cta.checkin")
+                          : task.shareMode === "image"
+                            ? t("budget.cta.download")
+                            : task.shareMode === "tweet"
+                              ? t("budget.cta.share")
+                              : t("budget.cta.go");
 
-                  return (
-                    <div
-                      key={task.id}
-                      className={cn(
-                        "flex items-center gap-3 rounded-lg px-3 py-3",
-                        index > 0 && "border-t border-border/50",
-                      )}
-                    >
+                    return (
                       <div
+                        key={task.id}
                         className={cn(
-                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border transition-colors",
-                          task.isClaimed
-                            ? "border-border/50 bg-surface-2 opacity-50"
-                            : "border-border bg-white",
+                          "flex items-center gap-3 rounded-lg px-3 py-3",
+                          index > 0 && "border-t border-border/50",
                         )}
                       >
-                        <RewardTaskIcon icon={task.icon} size={16} />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={cn(
-                              "text-[13px] font-medium leading-tight",
-                              task.isClaimed
-                                ? "text-text-muted"
-                                : "text-text-primary",
-                            )}
-                          >
-                            {t(`reward.${task.id}.name`)}
-                          </span>
-                          <span className="text-[11px] font-semibold leading-none tabular-nums text-[var(--color-success)]">
-                            +${formatRewardAmount(task.reward)}
-                          </span>
-                        </div>
                         <div
                           className={cn(
-                            "mt-0.5 text-[11px]",
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border transition-colors",
                             task.isClaimed
-                              ? "text-text-muted/60"
-                              : "text-text-muted",
+                              ? "border-border/50 bg-surface-2 opacity-50"
+                              : "border-border bg-white",
                           )}
                         >
-                          {t(`reward.${task.id}.desc`)}
+                          <RewardTaskIcon icon={task.icon} size={16} />
                         </div>
-                      </div>
 
-                      <button
-                        type="button"
-                        disabled={
-                          loading ||
-                          task.isClaimed ||
-                          claimingTaskId === task.id
-                        }
-                        onClick={() => void handleTaskAction(task)}
-                        className={cn(
-                          "inline-flex h-[26px] shrink-0 items-center justify-center gap-2 rounded-full px-3 text-[11px] font-medium leading-none transition-all",
-                          task.isClaimed
-                            ? "bg-[var(--color-success)]/8 text-[var(--color-success)]"
-                            : "border border-[var(--color-brand-primary)]/30 text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary)]/5",
-                        )}
-                      >
-                        {claimingTaskId === task.id ? (
-                          <Loader2 size={13} className="animate-spin" />
-                        ) : null}
-                        {actionLabel}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={cn(
+                                "text-[13px] font-medium leading-tight",
+                                task.isClaimed
+                                  ? "text-text-muted"
+                                  : "text-text-primary",
+                              )}
+                            >
+                              {t(`reward.${task.id}.name`)}
+                            </span>
+                            <span className="text-[11px] font-semibold leading-none tabular-nums text-[var(--color-success)]">
+                              +${formatRewardAmount(task.reward)}
+                            </span>
+                          </div>
+                          <div
+                            className={cn(
+                              "mt-0.5 text-[11px]",
+                              task.isClaimed
+                                ? "text-text-muted/60"
+                                : "text-text-muted",
+                            )}
+                          >
+                            {t(`reward.${task.id}.desc`)}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={
+                            loading ||
+                            task.isClaimed ||
+                            claimingTaskId === task.id
+                          }
+                          onClick={() => void handleTaskAction(task)}
+                          className={cn(
+                            "inline-flex h-[26px] shrink-0 items-center justify-center gap-2 rounded-full px-3 text-[11px] font-medium leading-none transition-all",
+                            task.isClaimed
+                              ? "bg-[var(--color-success)]/8 text-[var(--color-success)]"
+                              : "border border-[var(--color-brand-primary)]/30 text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary)]/5",
+                          )}
+                        >
+                          {claimingTaskId === task.id ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : null}
+                          {actionLabel}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
         </div>
 
         {status.tasks.some(

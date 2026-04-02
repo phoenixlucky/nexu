@@ -350,6 +350,8 @@ const en = {
   "budget.banner.upgrade": "Upgrade plan",
   "budget.banner.earnCredits": "Earn credits",
   "budget.banner.byok": "Use your API key",
+  "budget.autoFallback.toast":
+    "Cloud credits depleted — automatically switched to your API key to keep things running.",
   "rewards.action.claimed": "Claimed",
   "rewards.action.checkIn": "Check in",
   "rewards.action.download": "Download",

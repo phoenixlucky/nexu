@@ -341,6 +341,8 @@ const zhCN = {
   "budget.banner.upgrade": "升级套餐",
   "budget.banner.earnCredits": "做任务赚积分",
   "budget.banner.byok": "自带 API Key",
+  "budget.autoFallback.toast":
+    "云端额度已用尽，已自动切换到你的 API Key 继续运行。",
   "rewards.action.claimed": "已领取",
   "rewards.action.checkIn": "打卡",
   "rewards.action.download": "下载",

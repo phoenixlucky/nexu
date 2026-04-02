@@ -208,6 +208,7 @@ export const desktopRewardsStatusSchema = z.object({
   progress: rewardProgressSchema,
   tasks: z.array(rewardTaskStatusSchema),
   cloudBalance: cloudCreditBalanceSchema.default(null),
+  autoFallbackTriggered: z.boolean().optional(),
 });
 
 export const claimDesktopRewardRequestSchema = z.object({

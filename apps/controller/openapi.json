@@ -2987,6 +2987,9 @@
                         "totalRecharged",
                         "totalConsumed"
                       ]
+                    },
+                    "autoFallbackTriggered": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -3215,6 +3218,9 @@
                             "totalRecharged",
                             "totalConsumed"
                           ]
+                        },
+                        "autoFallbackTriggered": {
+                          "type": "boolean"
                         }
                       },
                       "required": [

@@ -52,7 +52,9 @@ export function registerDesktopRewardsRoutes(
         return c.json(status, 200);
       }
 
-      return c.json(await container.configStore.getDesktopRewardsStatus(), 200);
+      const updatedStatus =
+        await container.configStore.getDesktopRewardsStatus();
+      return c.json({ ...updatedStatus, autoFallbackTriggered: true }, 200);
     },
   );
 

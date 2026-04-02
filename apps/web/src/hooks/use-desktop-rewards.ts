@@ -8,6 +8,9 @@ import {
   rewardTasks,
 } from "@nexu/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import {
   getApiInternalDesktopRewards,
   postApiInternalDesktopRewardsClaim,
@@ -65,11 +68,24 @@ async function claimDesktopReward(taskId: RewardTaskId) {
 }
 
 export function useDesktopRewardsStatus() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const fallbackNotified = useRef(false);
   const rewardsQuery = useQuery({
     queryKey: DESKTOP_REWARDS_QUERY_KEY,
     queryFn: fetchDesktopRewardsStatus,
+    refetchInterval: 60_000,
   });
+
+  useEffect(() => {
+    if (rewardsQuery.data?.autoFallbackTriggered && !fallbackNotified.current) {
+      fallbackNotified.current = true;
+      toast.warning(t("budget.autoFallback.toast"), { duration: 8000 });
+    }
+    if (!rewardsQuery.data?.autoFallbackTriggered) {
+      fallbackNotified.current = false;
+    }
+  }, [rewardsQuery.data?.autoFallbackTriggered, t]);
 
   const claimMutation = useMutation({
     mutationFn: claimDesktopReward,
