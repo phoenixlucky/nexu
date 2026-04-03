@@ -21,6 +21,7 @@ import {
   Gift,
   Globe,
   Home,
+  Info,
   LogOut,
   Mail,
   Menu,
@@ -194,24 +195,14 @@ function LanguageToggle({ collapsed }: { collapsed: boolean }) {
 
 const SETUP_COMPLETE_KEY = "nexu_setup_complete";
 const GITHUB_URL = "https://github.com/nexu-io/nexu";
-const PRODUCTION_BILLING_URL = "https://nexu.net/bill";
-const TEST_BILLING_URL = "https://nexu.powerformer.net/bill";
-
-function resolveBillingUrl(cloudUrl?: string | null): string {
-  if (!cloudUrl) {
-    return PRODUCTION_BILLING_URL;
-  }
-
+function resolveCloudUsageUrl(cloudUrl?: string | null): string {
+  if (!cloudUrl) return "https://nexu.net/workspace/usage";
   try {
-    const { hostname } = new URL(cloudUrl);
-    if (hostname === "nexu.powerformer.net") {
-      return TEST_BILLING_URL;
-    }
+    const origin = new URL(cloudUrl).origin;
+    return `${origin}/workspace/usage`;
   } catch {
-    return PRODUCTION_BILLING_URL;
+    return "https://nexu.net/workspace/usage";
   }
-
-  return PRODUCTION_BILLING_URL;
 }
 
 const GitHubIcon = () => (
@@ -435,9 +426,11 @@ function WorkspaceLayoutInner() {
     [sidebarWidth],
   );
 
+  const [showBalancePopup, setShowBalancePopup] = useState(false);
   const logoutRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
+  const balanceRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { data: session } = authClient.useSession();
@@ -515,6 +508,20 @@ function WorkspaceLayoutInner() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [showLangMenu]);
+
+  useEffect(() => {
+    if (!showBalancePopup) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        balanceRef.current &&
+        !balanceRef.current.contains(e.target as Node)
+      ) {
+        setShowBalancePopup(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showBalancePopup]);
 
   useEffect(() => {
     if (!mobileDrawerOpen) return;
@@ -627,7 +634,6 @@ function WorkspaceLayoutInner() {
   const updateFloatWidth = Math.max(140, sidebarWidth - 20);
   const updateFloatLeft = 10;
   const updateFloatBottom = 52;
-  const billingUrl = resolveBillingUrl(desktopCloudStatus?.cloudUrl);
 
   return (
     <div
@@ -973,14 +979,18 @@ function WorkspaceLayoutInner() {
                   />
                 </Link>
               )}
-              <div className="group/balance px-3 mb-1.5 relative">
-                <Link
-                  to="/workspace/rewards"
+              <div className="px-3 mb-1.5 relative" ref={balanceRef}>
+                <button
+                  type="button"
                   data-sidebar-rewards-balance="true"
-                  className="group block w-full rounded-[8px] px-2.5 py-2 transition-colors hover:bg-black/5"
+                  className="group block w-full rounded-[8px] px-2.5 py-2 transition-colors hover:bg-black/5 text-left"
                   onClick={() => {
-                    track("workspace_rewards_click");
-                    track("workspace_sidebar_click", { target: "credits" });
+                    if (rewardsStatus.cloudBalance) {
+                      setShowBalancePopup((prev) => !prev);
+                    } else {
+                      track("workspace_rewards_click");
+                      track("workspace_sidebar_click", { target: "credits" });
+                    }
                   }}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -996,11 +1006,11 @@ function WorkspaceLayoutInner() {
                       {rewardBalanceValue}
                     </span>
                   </div>
-                </Link>
-                {rewardsStatus.cloudBalance ? (
+                </button>
+                {rewardsStatus.cloudBalance && showBalancePopup ? (
                   <div
                     data-sidebar-rewards-balance-popup="true"
-                    className="pointer-events-none absolute bottom-full left-3 right-3 z-30 pb-2 opacity-0 transition-opacity duration-150 group-hover/balance:pointer-events-auto group-hover/balance:opacity-100 group-focus-within/balance:pointer-events-auto group-focus-within/balance:opacity-100"
+                    className="absolute bottom-full left-0 right-0 z-30 pb-2"
                   >
                     <div className="rounded-xl border border-border bg-surface-1 p-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
                       <div className="mb-3 flex items-center justify-between">
@@ -1013,16 +1023,32 @@ function WorkspaceLayoutInner() {
                       </div>
                       <div className="space-y-2 border-t border-border/60 pt-2.5">
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px] text-text-muted">
+                          <span className="flex items-center gap-1 text-[11px] text-text-muted">
                             {t("layout.sidebar.balancePopup.recharged")}
+                            <span
+                              title={t(
+                                "layout.sidebar.balancePopup.rechargedTooltip",
+                              )}
+                              className="cursor-default"
+                            >
+                              <Info size={10} className="text-text-muted/60" />
+                            </span>
                           </span>
                           <span className="tabular-nums text-[11px] font-medium text-text-secondary">
                             {rewardsStatus.cloudBalance.totalRecharged}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px] text-text-muted">
+                          <span className="flex items-center gap-1 text-[11px] text-text-muted">
                             {t("layout.sidebar.balancePopup.earned")}
+                            <span
+                              title={t(
+                                "layout.sidebar.balancePopup.earnedTooltip",
+                              )}
+                              className="cursor-default"
+                            >
+                              <Info size={10} className="text-text-muted/60" />
+                            </span>
                           </span>
                           <span className="tabular-nums text-[11px] font-medium text-text-secondary">
                             {rewardsStatus.progress.earnedCredits}
@@ -1037,21 +1063,21 @@ function WorkspaceLayoutInner() {
                           </span>
                         </div>
                       </div>
-                      <a
-                        href={billingUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        type="button"
                         data-sidebar-rewards-balance-detail="true"
-                        className="mt-2.5 flex items-center justify-between border-t border-border/60 pt-2.5 text-[11px] font-medium text-text-secondary transition-colors hover:text-text-primary"
+                        className="mt-2.5 flex w-full items-center justify-between border-t border-border/60 pt-2.5 text-[11px] font-medium text-text-secondary transition-colors hover:text-text-primary"
                         onClick={() => {
+                          setShowBalancePopup(false);
                           track("workspace_sidebar_click", {
                             target: "credits_popup_detail",
                           });
+                          navigate("/workspace/rewards");
                         }}
                       >
                         {t("layout.sidebar.balancePopup.viewDetail")}
                         <ChevronRight size={12} />
-                      </a>
+                      </button>
                     </div>
                   </div>
                 ) : null}

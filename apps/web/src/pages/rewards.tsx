@@ -1,5 +1,6 @@
 import { formatRewardAmount } from "@/components/rewards/home-rewards-teaser";
 import { RewardTaskIcon } from "@/components/rewards/reward-task-icon";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCloudConnect } from "@/hooks/use-cloud-connect";
 import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { openExternalUrl } from "@/lib/desktop-links";
@@ -16,7 +17,14 @@ import {
   rewardTaskRequiresUrlProof,
   validateRewardProofUrl,
 } from "@nexu/shared";
-import { Check, Download, ExternalLink, Loader2 } from "lucide-react";
+import {
+  Check,
+  Download,
+  ExternalLink,
+  Loader2,
+  Smartphone,
+} from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -214,16 +222,9 @@ function RewardConfirmModal({
 }
 
 export function RewardsPage() {
-  const { t } = useTranslation();
-  const {
-    status,
-    loading,
-    refresh,
-    claimTask,
-    claimingTaskId,
-    prepareGithubStarSession,
-    isPreparingGithubStarSession,
-  } = useDesktopRewardsStatus();
+  const { t, i18n } = useTranslation();
+  const { status, loading, refresh, claimTask, claimingTaskId } =
+    useDesktopRewardsStatus();
   const [confirmTaskId, setConfirmTaskId] = useState<
     RewardTaskStatus["id"] | null
   >(null);
@@ -256,6 +257,13 @@ export function RewardsPage() {
       return;
     }
 
+    // #818 + #816: 未登录时直接引导登录，不发起 claim 请求
+    if (!status.viewer.cloudConnected) {
+      toast.info(t("rewards.loginRequired"));
+      void handleCloudConnect();
+      return;
+    }
+
     if (task.id === "daily_checkin") {
       try {
         const result = await claimTask({ taskId: task.id });
@@ -272,19 +280,14 @@ export function RewardsPage() {
       return;
     }
 
+    // #819: github_star 当前后端不可用，直接返回
+    if (rewardTaskRequiresGithubStarSession(task.id)) {
+      return;
+    }
+
     setConfirmPhase("idle");
     setConfirmProofUrl("");
     setConfirmGithubSessionId(null);
-
-    if (rewardTaskRequiresGithubStarSession(task.id)) {
-      try {
-        const session = await prepareGithubStarSession();
-        setConfirmGithubSessionId(session.sessionId);
-      } catch {
-        toast.error(t("rewards.githubSessionFailed"));
-        return;
-      }
-    }
 
     if (task.shareMode !== "image" && task.actionUrl) {
       await openExternalUrl(task.actionUrl);
@@ -292,6 +295,10 @@ export function RewardsPage() {
 
     setConfirmTaskId(task.id);
   };
+
+  // #819: github_star 后端已禁用，按钮显示"暂不可用"
+  const isGithubStarUnavailable = (task: RewardTaskStatus) =>
+    rewardTaskRequiresGithubStarSession(task.id);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -303,7 +310,7 @@ export function RewardsPage() {
           <p className="text-[13px] text-text-secondary">
             {t("rewards.desc")}{" "}
             <a
-              href="https://docs.nexu.io/rewards"
+              href={`https://docs.nexu.io${i18n.language === "zh" ? "/zh" : ""}/guide/rewards`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-[var(--color-brand-primary)] hover:underline"
@@ -419,27 +426,28 @@ export function RewardsPage() {
             </div>
           ) : null}
           {!loading &&
-            groupedTasks.map((group) => (
-              <section key={group.key}>
-                <div className="mb-1 pl-0.5 text-[11px] font-semibold uppercase tracking-widest text-text-tertiary">
-                  {t(group.labelKey)}
-                </div>
+            groupedTasks.map((group) => {
+              const renderTaskList = (tasks: RewardTaskStatus[]) => (
                 <div className="space-y-0">
-                  {group.tasks.map((task, index) => {
+                  {tasks.map((task, index) => {
+                    // #819: github_star 后端已禁用
+                    const githubUnavailable = isGithubStarUnavailable(task);
                     const actionLabel = task.isClaimed
                       ? t("budget.cta.done").replace(
                           "${n}",
                           formatRewardAmount(task.reward),
                         )
-                      : loading
-                        ? "..."
-                        : task.repeatMode === "daily"
-                          ? t("budget.cta.checkin")
-                          : task.shareMode === "image"
-                            ? t("budget.cta.download")
-                            : task.shareMode === "tweet"
-                              ? t("budget.cta.share")
-                              : t("budget.cta.go");
+                      : githubUnavailable
+                        ? t("rewards.githubUnavailable")
+                        : loading
+                          ? "..."
+                          : task.repeatMode === "daily"
+                            ? t("budget.cta.checkin")
+                            : task.shareMode === "image"
+                              ? t("budget.cta.download")
+                              : task.shareMode === "tweet"
+                                ? t("budget.cta.share")
+                                : t("budget.cta.go");
 
                     return (
                       <div
@@ -452,7 +460,7 @@ export function RewardsPage() {
                         <div
                           className={cn(
                             "flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border transition-colors",
-                            task.isClaimed
+                            task.isClaimed || githubUnavailable
                               ? "border-border/50 bg-surface-2 opacity-50"
                               : "border-border bg-white",
                           )}
@@ -465,7 +473,7 @@ export function RewardsPage() {
                             <span
                               className={cn(
                                 "text-[13px] font-medium leading-tight",
-                                task.isClaimed
+                                task.isClaimed || githubUnavailable
                                   ? "text-text-muted"
                                   : "text-text-primary",
                               )}
@@ -480,7 +488,7 @@ export function RewardsPage() {
                           <div
                             className={cn(
                               "mt-0.5 text-[11px]",
-                              task.isClaimed
+                              task.isClaimed || githubUnavailable
                                 ? "text-text-muted/60"
                                 : "text-text-muted",
                             )}
@@ -494,22 +502,18 @@ export function RewardsPage() {
                           disabled={
                             loading ||
                             task.isClaimed ||
-                            claimingTaskId === task.id ||
-                            (isPreparingGithubStarSession &&
-                              task.id === "github_star")
+                            githubUnavailable ||
+                            claimingTaskId === task.id
                           }
                           onClick={() => void handleTaskAction(task)}
                           className={cn(
                             "inline-flex h-[26px] shrink-0 items-center justify-center gap-2 rounded-full px-3 text-[11px] font-medium leading-none transition-all",
-                            task.isClaimed
-                              ? "bg-[var(--color-success)]/8 text-[var(--color-success)]"
+                            task.isClaimed || githubUnavailable
+                              ? "bg-surface-2 text-text-muted"
                               : "border border-[var(--color-brand-primary)]/30 text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary)]/5",
                           )}
                         >
                           {claimingTaskId === task.id ? (
-                            <Loader2 size={13} className="animate-spin" />
-                          ) : isPreparingGithubStarSession &&
-                            task.id === "github_star" ? (
                             <Loader2 size={13} className="animate-spin" />
                           ) : null}
                           {actionLabel}
@@ -518,8 +522,141 @@ export function RewardsPage() {
                     );
                   })}
                 </div>
-              </section>
-            ))}
+              );
+
+              const webTasks = group.tasks.filter(
+                (task) => task.shareMode !== "image",
+              );
+              const mobileTasks = group.tasks.filter(
+                (task) => task.shareMode === "image",
+              );
+
+              return (
+                <section key={group.key}>
+                  <div className="mb-1 pl-0.5 text-[11px] font-semibold uppercase tracking-widest text-text-tertiary">
+                    {t(group.labelKey)}
+                  </div>
+                  {group.key === "social" ? (
+                    <Tabs defaultValue="web">
+                      <TabsList className="mb-1 h-7 rounded-md bg-surface-2 p-0.5">
+                        <TabsTrigger
+                          value="web"
+                          className="h-6 rounded px-2.5 text-[11px] data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                        >
+                          {t("rewards.tab.web")}
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="mobile"
+                          className="h-6 rounded px-2.5 text-[11px] data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                        >
+                          <Smartphone size={11} className="mr-1" />
+                          {t("rewards.tab.mobile")}
+                        </TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="web">
+                        {renderTaskList(webTasks)}
+                      </TabsContent>
+                      <TabsContent value="mobile">
+                        <div className="flex items-center gap-4 rounded-lg px-3 py-3">
+                          <div className="shrink-0 rounded-xl border border-border bg-white p-1.5">
+                            <QRCodeSVG
+                              value="https://github.com/nexu-io/nexu"
+                              size={56}
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[13px] font-medium text-text-primary">
+                                {t("rewards.mobileQrHint")}
+                              </span>
+                              <span className="text-[11px] font-semibold leading-none tabular-nums text-[var(--color-success)]">
+                                +
+                                {formatRewardAmount(
+                                  mobileTasks.reduce(
+                                    (sum, task) => sum + task.reward,
+                                    0,
+                                  ),
+                                )}{" "}
+                                {t("layout.sidebar.balanceUnit")}
+                              </span>
+                            </div>
+                            <p className="mt-0.5 text-[11px] text-text-muted">
+                              {t("rewards.mobileQrDesc")}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={
+                              loading ||
+                              mobileTasks.every((task) => task.isClaimed) ||
+                              mobileTasks.some(
+                                (task) => claimingTaskId === task.id,
+                              )
+                            }
+                            onClick={async () => {
+                              if (!status.viewer.cloudConnected) {
+                                toast.info(t("rewards.loginRequired"));
+                                void handleCloudConnect();
+                                return;
+                              }
+                              const unclaimed = mobileTasks.filter(
+                                (task) => !task.isClaimed,
+                              );
+                              let earned = 0;
+                              for (const task of unclaimed) {
+                                try {
+                                  const result = await claimTask({
+                                    taskId: task.id,
+                                  });
+                                  if (result.ok && !result.alreadyClaimed) {
+                                    earned += task.reward;
+                                  }
+                                } catch {
+                                  /* continue claiming remaining tasks */
+                                }
+                              }
+                              if (earned > 0) {
+                                toast.success(
+                                  t("rewards.claimSuccess") +
+                                    ` +${formatRewardAmount(earned)} ${t("layout.sidebar.balanceUnit")}`,
+                                );
+                              } else {
+                                toast.success(t("rewards.claimAlreadyDone"));
+                              }
+                            }}
+                            className={cn(
+                              "inline-flex h-[26px] shrink-0 items-center justify-center gap-2 rounded-full px-3 text-[11px] font-medium leading-none transition-all",
+                              mobileTasks.every((task) => task.isClaimed)
+                                ? "bg-surface-2 text-text-muted"
+                                : "border border-[var(--color-brand-primary)]/30 text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary)]/5",
+                            )}
+                          >
+                            {mobileTasks.some(
+                              (task) => claimingTaskId === task.id,
+                            ) ? (
+                              <Loader2 size={13} className="animate-spin" />
+                            ) : null}
+                            {mobileTasks.every((task) => task.isClaimed)
+                              ? t("budget.cta.done").replace(
+                                  "${n}",
+                                  formatRewardAmount(
+                                    mobileTasks.reduce(
+                                      (sum, task) => sum + task.reward,
+                                      0,
+                                    ),
+                                  ),
+                                )
+                              : t("budget.cta.go")}
+                          </button>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  ) : (
+                    renderTaskList(group.tasks)
+                  )}
+                </section>
+              );
+            })}
         </div>
 
         {status.tasks.some(

@@ -160,8 +160,12 @@ const en = {
   "layout.sidebar.balancePlaceholder": "Balance syncing…",
   "layout.sidebar.rewardsCta": "Open",
   "layout.sidebar.balancePopup.total": "Total credits",
-  "layout.sidebar.balancePopup.recharged": "Plan credits",
-  "layout.sidebar.balancePopup.earned": "Reward credits",
+  "layout.sidebar.balancePopup.recharged": "Plan credits (cumulative)",
+  "layout.sidebar.balancePopup.rechargedTooltip":
+    "Total credits added from your subscription plan",
+  "layout.sidebar.balancePopup.earned": "Reward credits (cumulative)",
+  "layout.sidebar.balancePopup.earnedTooltip":
+    "Total bonus credits earned from rewards and promotions",
   "layout.sidebar.balancePopup.consumed": "Consumed",
   "layout.sidebar.balancePopup.viewDetail": "View details",
   "layout.mobile.settings": "Settings",
@@ -299,6 +303,11 @@ const en = {
   "rewards.group.daily": "Daily",
   "rewards.group.opensource": "Open Source",
   "rewards.group.social": "Social & messaging",
+  "rewards.tab.web": "Web",
+  "rewards.tab.mobile": "Mobile",
+  "rewards.mobileQrHint": "Scan to complete tasks and earn credits",
+  "rewards.mobileQrDesc":
+    "Open nexu on mobile, complete sharing tasks to earn credits",
   "rewards.cloudBalance": "Cloud Balance",
   "rewards.totalEarned": "Total earned",
   "rewards.totalUsed": "Total used",
@@ -314,6 +323,8 @@ const en = {
   "rewards.claimSuccess": "Reward claimed",
   "rewards.claimAlreadyDone": "Reward already claimed for this period",
   "rewards.claimFailed": "Failed to claim reward",
+  "rewards.loginRequired": "Please sign in to your nexu account first",
+  "rewards.githubUnavailable": "Unavailable",
   "rewards.downloadFailed": "Failed to download share card",
   "rewards.githubSessionFailed":
     "Failed to start GitHub star verification. Please try again.",
