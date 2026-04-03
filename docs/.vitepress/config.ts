@@ -143,6 +143,11 @@ const zhSidebar = [
       },
       { text: "模型配置", link: "/zh/guide/models" },
       { text: "技能安装", link: "/zh/guide/skills" },
+      { text: "Seedance 2.0 视频生成", link: "/zh/guide/seedance" },
+      {
+        text: "Seedance 2.0 视频生成（Windows 版）",
+        link: "https://docs.nexu.io/zh/guide/seedance-windows",
+      },
     ],
   },
   {
