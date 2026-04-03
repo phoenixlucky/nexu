@@ -173,6 +173,15 @@ const FAILOVER_ERROR_PRIORITY_SEARCH =
   '}) : void 0) || lastAssistant?.errorMessage?.trim() || (timedOut ? "LLM request timed out." : rateLimitFailure ? "LLM request rate limited." : billingFailure ? formatBillingErrorMessage(activeErrorContext.provider, activeErrorContext.model) : authFailure ? "LLM request unauthorized." : "LLM request failed.");';
 const FAILOVER_ERROR_PRIORITY_REPLACEMENT =
   '}) : void 0) || (timedOut ? "LLM request timed out." : rateLimitFailure ? "LLM request rate limited." : billingFailure ? formatBillingErrorMessage(activeErrorContext.provider, activeErrorContext.model) : authFailure ? "LLM request unauthorized." : lastAssistant?.errorMessage?.trim() || "LLM request failed.");';
+// Fast-exit patch: when billing/auth errors repeat 3+ times in the failover
+// loop, break immediately instead of continuing to rotate through profiles.
+// These errors won't resolve by retrying — the account/key is the problem.
+// The counter uses a property on the params object (available in scope)
+// to survive across loop iterations without needing a new variable declaration.
+const FAST_EXIT_BILLING_AUTH_SEARCH =
+  'const authFailure = isAuthAssistantError(lastAssistant);';
+const FAST_EXIT_BILLING_AUTH_REPLACEMENT =
+  'const authFailure = isAuthAssistantError(lastAssistant);\n\t\t\t\tparams.__nexuNrCount = (params.__nexuNrCount || 0);\n\t\t\t\tif (isAuthAssistantError(lastAssistant) || isBillingAssistantError(lastAssistant)) { params.__nexuNrCount++; if (params.__nexuNrCount >= 3) break; } else { params.__nexuNrCount = 0; }';
 // Locale reader: reads nexu-credit-guard-state.json from OPENCLAW_STATE_DIR.
 // Cached by mtime. Falls back to "zh-CN" if file missing or unreadable.
 const LOCALE_READER_LINES = [
@@ -1088,6 +1097,19 @@ async function patchReplyOutcomeBridge(openclawPackageRoot) {
 
         console.log(
           `[openclaw-sidecar] patched failover error priority in ${bundleName}`,
+        );
+      }
+
+      if (source.includes(FAST_EXIT_BILLING_AUTH_SEARCH)) {
+        source = applyExactReplacement(
+          source,
+          FAST_EXIT_BILLING_AUTH_SEARCH,
+          FAST_EXIT_BILLING_AUTH_REPLACEMENT,
+          `${bundleName}: fast-exit billing/auth retry`,
+        );
+
+        console.log(
+          `[openclaw-sidecar] patched fast-exit billing/auth retry in ${bundleName}`,
         );
       }
 
