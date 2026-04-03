@@ -326,7 +326,7 @@ const en = {
   "models.managed.disconnect": "Disconnect",
   "models.managed.loginPrompt": "Sign in to use nexu official models",
   "models.managed.loginDescription":
-    "Sign in with your nexu account to access unlimited premium models like Claude Opus 4.6, GPT-5.4, and more — no API key needed.",
+    "Sign in with your nexu account to access unlimited premium models — no API key needed.",
   "models.managed.waitingLogin": "Waiting for browser login...",
   "models.managed.loginButton": "Sign in to nexu",
   "models.managed.availableModels": "Available models",

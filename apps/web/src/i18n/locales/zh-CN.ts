@@ -312,7 +312,7 @@ const zhCN = {
   "models.managed.disconnect": "断开",
   "models.managed.loginPrompt": "登录以使用 nexu 官方模型",
   "models.managed.loginDescription":
-    "登录 nexu 账号后，即可无限使用 Claude Opus 4.6、GPT-5.4 等高级模型，无需 API Key。",
+    "登录 nexu 账号后，即可无限使用高级模型，无需 API Key。",
   "models.managed.waitingLogin": "等待浏览器登录...",
   "models.managed.loginButton": "登录 nexu 账号",
   "models.managed.availableModels": "可用模型",
