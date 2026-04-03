@@ -9,7 +9,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import ReactDOM from "react-dom/client";
+import { type Root, createRoot } from "react-dom/client";
 import { Toaster, toast } from "sonner";
 import setupLoopVideoUrl from "../assets/setup-animation-loop.mp4";
 import setupVideoUrl from "../assets/setup-animation.mp4";
@@ -343,10 +343,7 @@ function SummaryCard({
 }
 
 function getWebviewPreloadUrl(): string {
-  return new URL(
-    "../dist-electron/preload/webview-preload.js",
-    document.location.href,
-  ).href;
+  return window.nexuHost.bootstrap.webviewPreloadUrl;
 }
 
 // SurfaceFrame is imported from the shared component — see components/surface-frame.tsx
@@ -1137,7 +1134,7 @@ function DesktopShell() {
       <aside className="desktop-sidebar">
         <div className="desktop-sidebar-brand">
           <span className="desktop-shell-eyebrow">nexu desktop</span>
-          <h1>Runtime Console</h1>
+          <h1>Runtime Console Ready</h1>
           <p>
             One local shell for bootstrap health, web verification, and gateway
             inspection.
@@ -1448,7 +1445,14 @@ if (!rootElement) {
 
 sendRendererStartupProbe("renderer:react-render:start", "ok");
 
-ReactDOM.createRoot(rootElement).render(
+const rootWindow = window as Window & {
+  __nexuDesktopRoot?: Root;
+};
+const appRoot = rootWindow.__nexuDesktopRoot ?? createRoot(rootElement);
+
+rootWindow.__nexuDesktopRoot = appRoot;
+
+appRoot.render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <RendererStartupSentinel />
