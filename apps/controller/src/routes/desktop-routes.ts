@@ -252,12 +252,9 @@ export function registerDesktopRoutes(
     }),
     async (c) => {
       const body = c.req.valid("json");
-      return c.json(
-        {
-          locale: await container.configStore.setDesktopLocale(body.locale),
-        },
-        200,
-      );
+      const locale = await container.configStore.setDesktopLocale(body.locale);
+      await container.openclawSyncService.syncAll();
+      return c.json({ locale }, 200);
     },
   );
 }

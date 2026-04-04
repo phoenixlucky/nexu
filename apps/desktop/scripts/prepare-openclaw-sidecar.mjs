@@ -178,10 +178,18 @@ const FAILOVER_ERROR_PRIORITY_REPLACEMENT =
 // These errors won't resolve by retrying — the account/key is the problem.
 // The counter uses a property on the params object (available in scope)
 // to survive across loop iterations without needing a new variable declaration.
+// Universal fast-exit: break after 3 consecutive failures of ANY type.
 const FAST_EXIT_BILLING_AUTH_SEARCH =
   'const authFailure = isAuthAssistantError(lastAssistant);';
 const FAST_EXIT_BILLING_AUTH_REPLACEMENT =
-  'const authFailure = isAuthAssistantError(lastAssistant);\n\t\t\t\tparams.__nexuNrCount = (params.__nexuNrCount || 0);\n\t\t\t\tif (isAuthAssistantError(lastAssistant) || isBillingAssistantError(lastAssistant)) { params.__nexuNrCount++; if (params.__nexuNrCount >= 3) break; } else { params.__nexuNrCount = 0; }';
+  'const authFailure = isAuthAssistantError(lastAssistant);\n\t\t\t\tparams.__nexuNrCount = (params.__nexuNrCount || 0) + 1; if (params.__nexuNrCount >= 2) break;';
+// Fallback reply patch: when the outer agent-runner loop exits with
+// kind "success" but runResult has no payloads (all LLM calls failed),
+// convert to a "final" reply so the user always gets feedback.
+const EMPTY_PAYLOADS_FALLBACK_SEARCH =
+  '\treturn {\n\t\tkind: "success",\n\t\trunId,\n\t\trunResult,';
+const EMPTY_PAYLOADS_FALLBACK_REPLACEMENT =
+  '\tif (!runResult?.payloads?.length && runResult?.meta?.error) {\n\t\tconst _errMsg = runResult.meta.error.message || runResult.meta.error;\n\t\treturn {\n\t\t\tkind: "final",\n\t\t\tpayload: { text: typeof _errMsg === "string" ? _errMsg : "⚠️ An error occurred. Please try again." }\n\t\t};\n\t}\n\treturn {\n\t\tkind: "success",\n\t\trunId,\n\t\trunResult,';
 // Locale reader: reads nexu-credit-guard-state.json from OPENCLAW_STATE_DIR.
 // Cached by mtime. Falls back to "zh-CN" if file missing or unreadable.
 const LOCALE_READER_LINES = [
@@ -1110,6 +1118,19 @@ async function patchReplyOutcomeBridge(openclawPackageRoot) {
 
         console.log(
           `[openclaw-sidecar] patched fast-exit billing/auth retry in ${bundleName}`,
+        );
+      }
+
+      if (source.includes(EMPTY_PAYLOADS_FALLBACK_SEARCH)) {
+        source = applyExactReplacement(
+          source,
+          EMPTY_PAYLOADS_FALLBACK_SEARCH,
+          EMPTY_PAYLOADS_FALLBACK_REPLACEMENT,
+          `${bundleName}: empty payloads fallback reply`,
+        );
+
+        console.log(
+          `[openclaw-sidecar] patched empty payloads fallback in ${bundleName}`,
         );
       }
 
