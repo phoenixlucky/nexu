@@ -203,6 +203,13 @@ const EMPTY_PAYLOAD_ARRAY_SEARCH =
   'const payloadArray = runResult.payloads ?? [];\n\t\t\tif (payloadArray.length === 0) return;';
 const EMPTY_PAYLOAD_ARRAY_REPLACEMENT =
   'const payloadArray = runResult.payloads ?? [];\n\t\t\tif (payloadArray.length === 0) {\n\t\t\t\tconst _fallbackErr = runResult.meta?.error?.message || runResult.meta?.error;\n\t\t\t\tif (_fallbackErr) {\n\t\t\t\t\tpayloadArray.push({ text: typeof _fallbackErr === "string" ? _fallbackErr : "\\u26a0\\ufe0f An error occurred. Please try again.", isError: true });\n\t\t\t\t} else {\n\t\t\t\t\treturn;\n\t\t\t\t}\n\t\t\t}';
+// Stop followup turn on empty payloads: when all LLM calls fail and
+// payloads are empty, just return instead of triggering a followup turn
+// which causes an infinite retry loop.
+const STOP_FOLLOWUP_ON_EMPTY_SEARCH =
+  'if (payloadArray.length === 0) return finalizeWithFollowup(void 0, queueKey, runFollowupTurn);';
+const STOP_FOLLOWUP_ON_EMPTY_REPLACEMENT =
+  'if (payloadArray.length === 0) return;';
 // Locale reader: reads nexu-credit-guard-state.json from OPENCLAW_STATE_DIR.
 // Cached by mtime. Falls back to "zh-CN" if file missing or unreadable.
 const LOCALE_READER_LINES = [
@@ -1170,6 +1177,19 @@ async function patchReplyOutcomeBridge(openclawPackageRoot) {
 
         console.log(
           `[openclaw-sidecar] patched empty payload array fallback in ${bundleName}`,
+        );
+      }
+
+      if (source.includes(STOP_FOLLOWUP_ON_EMPTY_SEARCH)) {
+        source = applyExactReplacement(
+          source,
+          STOP_FOLLOWUP_ON_EMPTY_SEARCH,
+          STOP_FOLLOWUP_ON_EMPTY_REPLACEMENT,
+          `${bundleName}: stop followup on empty payloads`,
+        );
+
+        console.log(
+          `[openclaw-sidecar] patched stop followup on empty payloads in ${bundleName}`,
         );
       }
 
