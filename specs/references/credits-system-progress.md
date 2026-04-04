@@ -85,7 +85,16 @@ https://github.com/nexu-io/nexu/pull/834
 - **影响**：从 10 分钟沉默改善到 2 分钟等待+有回复，但仍不够快
 - **可能的修复**：在 fast-exit break 后跳过 `markAuthProfileGood/Used` 的 await
 
-### 3. Emergency compaction 没有用户反馈
+### 3. Safeguard compaction 的 "正在整理" 消息未显示
+- **根因**：Pi auto-compaction 通过 `session_before_compact` extension API 触发 safeguard，**不经过 subscriber handler**，所以 `onAgentEvent({ stream: "compaction" })` 不会收到事件
+- **我们的 patch 只覆盖**：emergency compaction（run.ts 显式调 `contextEngine.compact()`）→ subscriber → `onAgentEvent`
+- **验证结果**：debug 日志确认 safeguard 的 `session_before_compact` 被调用了（`messagesToSummarize=1, real=true`），compaction LLM 调用也发了，但 `onAgentEvent` 没收到事件
+- **可行方案**：
+  1. 在 `compactionSafeguardExtension` 函数里（`compact-*.js`），cancel 检查通过后、LLM 调用前，直接写一个特殊日志 → controller 的 `openclaw-process.ts` log processor 检测 → `gatewayService.sendChannelMessage()` 发独立消息
+  2. 或者 patch `handleAutoCompactionStart`（`pi-embedded-subscribe.handlers.compaction.ts`）让它也在 safeguard 路径触发
+- **当前状态**：compaction 时用户看到 bot 延迟回复（几秒到几十秒），但不会沉默，回复最终会来
+
+### 4. Emergency compaction 没有用户反馈
 - **现象**：emergency compaction（run.ts 内层直接调 `contextEngine.compact()`）不经过 `onAgentEvent`，我们的 compaction feedback patch 不触发
 - **影响**：用户只看到 "对话内容已超出上限" 的最终消息，看不到 "正在整理"
 - **原因**：emergency compaction 8ms 就被 safeguard 取消了（新 session 没有足够的对话消息），即使有反馈也来不及显示
