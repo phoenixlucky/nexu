@@ -171,8 +171,14 @@ curl -X PUT http://localhost:50800/api/internal/desktop/default-model \
 - **可行方案**：在 `handleAutoCompactionStart` 里 `console.error("NEXU_EVENT compaction.started <payload>")`，controller 的 `emitRuntimeEventFromLine` 捕获，然后通过 `gatewayService.sendChannelMessage()` 发独立消息
 - 需要两层改动：patch `handleAutoCompactionStart` + controller 加 `compaction.started` 事件处理
 - **已实现**：patch + controller handler 代码都已提交
-- **验证阻塞**：Pi tokenizer 自己估算 prompt token 数（不用 mock server 报的 usage），且 link provider 的 context window 由 catalog 决定（不受本地 config 覆盖）。本地 mock 无法触发 safeguard compaction。需要真实用户长对话自然触发来验证
-- **`openclaw agent` 命令用的是 agent 绑定的 model**，不是 runtime-model 的选择（即使通过 API 切了 model，agent 命令仍用 agent config 里的）
+- **✅ 已验证**（2026-04-04）：
+  - 触发条件：`contextWindow=16000` + `recentTurnsPreserve=1` + `keepRecentTokens=2000` + mock server fill 模式（大段回复）
+  - 结果：safeguard PASSED（`messagesToSummarize=4, real=true`），NEXU_EVENT 成功 emit
+  - Controller handler 收到事件但 `channel=null`（`openclaw agent` 用 main session 无 channel）
+  - 飞书场景下 `channel="feishu"` + `to="ou_xxx"`（从 session key 解析），handler 会调 `sendChannelMessage`
+- **注意**：`doSync()` 会覆盖手动改的 `openclaw.json`，测试时需在 `openclaw-sync-service.ts` 的 `compiled` 后临时注入 context window 覆盖
+- **Pi tokenizer 不用 mock server 报的 usage**，只用自己的 tokenizer 估算。mock server 的 `usage` 字段对 compaction 决策无影响
+- **Provider catalog** 会覆盖本地设的 context window（link provider 的 model catalog 优先级高于 config）
 
 ### 切换模型 API
 ```bash

@@ -162,12 +162,11 @@ export async function createContainer(): Promise<ControllerContainer> {
       | undefined;
     if (!payload?.sessionKey) return;
 
-    // Parse channel target from sessionKey: agent:<id>:direct:<userId>
+    // Parse target from sessionKey: agent:<id>:direct:<userId>
     const parts = (payload.sessionKey as string).split(":");
-    const channel =
-      payload.channel ?? (parts.length >= 4 ? parts[2] : undefined);
+    const channel = payload.channel;
     const to = parts.length >= 4 ? parts.slice(3).join(":") : undefined;
-    if (!channel || channel === "direct" || !to) return;
+    if (!channel || !to) return;
 
     const locale = configStore
       .getDesktopLocale()

@@ -52,6 +52,19 @@ When `compaction.mode === "safeguard"`, the `compactionSafeguardExtension` regis
 - "no API key available" — can't call LLM for summarization
 - Both ctx.model and runtime.model undefined
 
+### Pi auto-compaction trigger mechanism
+
+Pi framework uses its **internal tokenizer** to estimate prompt token count before each LLM call. If the estimate approaches the model's `contextWindow`, it triggers compaction. Key findings:
+
+- **Provider-reported usage is ignored** — mock server's `usage.prompt_tokens` has no effect on compaction decisions
+- **Provider catalog context window takes priority** — link provider's model catalog overrides locally-set `contextWindow` values
+- **BYOK provider context windows** can be overridden via `openclaw.json` and survive hot-reload (if not overwritten by `doSync()`)
+- **`doSync()` overwrites `openclaw.json`** — manual config changes lost on next sync. To persist, inject values in `openclaw-sync-service.ts` after `compileOpenClawConfig()`
+
+### Critical: onAgentEvent execution context separation
+
+The subscriber handler's `ctx.params.onAgentEvent` and `agent-runner-execution.ts`'s `onAgentEvent` are **different execution contexts**. Compaction events emitted by `handleAutoCompactionStart` via subscriber don't reach `agent-runner-execution.ts`'s handler. Solution: emit `NEXU_EVENT` via `console.error()` → controller captures from stderr → sends channel message via `gatewayService.sendChannelMessage()`.
+
 ### Compaction config parameters
 
 | Parameter | Default | Effect |
