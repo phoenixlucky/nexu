@@ -1,12 +1,9 @@
-import { join } from "node:path";
-
 import {
   createNodeOptions,
   ensureDirectory,
   ensureParentDirectory,
   getListeningPortPid,
   isProcessRunning,
-  prepareOpenclawRuntimeStage,
   readDevLock,
   removeDevLock,
   repoRootPath,
@@ -15,7 +12,7 @@ import {
   terminateProcess,
   waitForProcessStart,
 } from "@nexu/dev-utils";
-import { resolveOpenClawRepoLocalLayout } from "@nexu/openclaw-runtime";
+import { prepareRepoLocalDevOpenclawRuntime } from "@nexu/openclaw-runtime";
 import { ensure } from "@nexu/shared";
 
 import {
@@ -261,22 +258,19 @@ async function prepareOpenclawEntryPath(): Promise<string> {
     component: "openclaw-service",
     service: "openclaw",
   });
-  const layout = resolveOpenClawRepoLocalLayout();
-  const stage = await prepareOpenclawRuntimeStage({
-    sourceOpenclawRoot: layout.openclawStageSourceRootPath,
-    patchRoot: layout.openclawPatchRootPath,
-    targetStageRoot: getOpenclawRuntimeStageRootPath(),
+  const preparedRuntime = await prepareRepoLocalDevOpenclawRuntime({
     log: (message) => logger.info(message),
   });
 
   logger.info("using patched staged openclaw runtime", {
-    stagedOpenclawRoot: stage.stagedOpenclawRoot,
-    fingerprint: stage.fingerprint,
-    reused: stage.reused,
-    patchedFileCount: stage.patchedFileCount,
+    stagedOpenclawRoot: preparedRuntime.stagedOpenclawRoot,
+    fingerprint: preparedRuntime.fingerprint,
+    reused: preparedRuntime.reused,
+    patchedFileCount: preparedRuntime.patchedFileCount,
+    manifestPath: preparedRuntime.manifestPath,
   });
 
-  return join(stage.stagedOpenclawRoot, "openclaw.mjs");
+  return preparedRuntime.entryPath;
 }
 
 export async function startOpenclawDevProcess(options: {
@@ -364,7 +358,7 @@ export async function startOpenclawDevProcess(options: {
 
   try {
     listenerPid = await waitForOpenclawPortPid(supervisorPid);
-  } catch (error) {
+  } catch {
     await waitForOpenclawPortProcessLaunch(supervisorPid);
     listenerPid = await waitForOpenclawPortPid(supervisorPid);
   }

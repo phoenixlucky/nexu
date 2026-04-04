@@ -12,6 +12,14 @@
       "development": "./src/index.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./runtime-policy": {
+      "import": "./runtime-policy.mjs",
+      "default": "./runtime-policy.mjs"
+    },
+    "./runtime-maintenance": {
+      "import": "./runtime-maintenance.mjs",
+      "default": "./runtime-maintenance.mjs"
     }
   },
   "scripts": {

@@ -1,5 +1,7 @@
 import path from "node:path";
 
+import { resolveRepoLocalOpenClawInstallLayout } from "./install-layout.js";
+
 export type OpenClawLaunchLayout = {
   openclawPath: string;
   openclawCwd: string;
@@ -31,14 +33,10 @@ export function resolvePackagedOpenClawLaunchLayout(
 export function resolveRepoLocalOpenClawLaunchLayout(
   repoRoot: string,
 ): OpenClawLaunchLayout {
+  const installLayout = resolveRepoLocalOpenClawInstallLayout(repoRoot);
+
   return {
-    openclawPath: path.join(
-      repoRoot,
-      "openclaw-runtime",
-      "node_modules",
-      "openclaw",
-      "openclaw.mjs",
-    ),
+    openclawPath: installLayout.runtimeEntryPath,
     openclawCwd: repoRoot,
     openclawBinPath: path.join(
       repoRoot,

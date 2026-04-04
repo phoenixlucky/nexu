@@ -14,6 +14,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveRepoLocalOpenClawInstallLayout } from "@nexu/openclaw-runtime";
 import {
   electronRoot,
   getSidecarRoot,
@@ -26,8 +27,8 @@ import {
 } from "./lib/sidecar-paths.mjs";
 import { resolveBuildTargetPlatform } from "./platforms/platform-resolver.mjs";
 
-const openclawRuntimeRoot = resolve(repoRoot, "openclaw-runtime");
-const openclawRuntimeNodeModules = resolve(openclawRuntimeRoot, "node_modules");
+const openclawInstallLayout = resolveRepoLocalOpenClawInstallLayout(repoRoot);
+const openclawRuntimeNodeModules = openclawInstallLayout.runtimeNodeModulesPath;
 const openclawRoot = resolve(openclawRuntimeNodeModules, "openclaw");
 const openclawRuntimePatchesRoot = resolve(
   repoRoot,
@@ -420,8 +421,8 @@ async function hashFingerprintInputs(files) {
 
 async function collectOpenclawSidecarFingerprintInputs() {
   const files = [
-    resolve(openclawRuntimeRoot, ".postinstall-cache.json"),
-    resolve(openclawRuntimeRoot, "package.json"),
+    openclawInstallLayout.runtimePostinstallCachePath,
+    openclawInstallLayout.runtimePackageJsonPath,
     resolve(openclawRoot, "package.json"),
     resolve(electronRoot, "package.json"),
     fileURLToPath(import.meta.url),

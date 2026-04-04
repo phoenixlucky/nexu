@@ -17,6 +17,7 @@ import * as path from "node:path";
 import { promisify } from "node:util";
 import {
   resolvePackagedOpenClawLaunchLayout,
+  resolveRepoLocalOpenClawInstallLayout,
   resolveRepoLocalOpenClawLaunchLayout,
 } from "@nexu/openclaw-runtime";
 
@@ -1306,6 +1307,8 @@ function escapeRegexLiteral(value: string): string {
 function getNexuProcessPatterns(): string[] {
   const repoRoot = getWorkspaceRoot();
   const nexuHome = path.join(os.homedir(), ".nexu");
+  const repoLocalOpenClawLaunchLayout =
+    resolveRepoLocalOpenClawLaunchLayout(repoRoot);
   const patterns = new Set<string>([
     escapeRegexLiteral(
       path.join(nexuHome, "runtime", "controller-sidecar", "dist", "index.js"),
@@ -1314,15 +1317,7 @@ function getNexuProcessPatterns(): string[] {
     escapeRegexLiteral(
       path.join(repoRoot, "apps", "controller", "dist", "index.js"),
     ),
-    escapeRegexLiteral(
-      path.join(
-        repoRoot,
-        "openclaw-runtime",
-        "node_modules",
-        "openclaw",
-        "openclaw.mjs",
-      ),
-    ),
+    escapeRegexLiteral(repoLocalOpenClawLaunchLayout.openclawPath),
     ...getNexuOpenclawProcessPatterns(),
   ]);
 
@@ -1345,21 +1340,15 @@ function getNexuProcessPatterns(): string[] {
 
 function getNexuOpenclawProcessPatterns(): string[] {
   const repoRoot = getWorkspaceRoot();
+  const repoLocalOpenClawLaunchLayout =
+    resolveRepoLocalOpenClawLaunchLayout(repoRoot);
+  const repoLocalOpenClawInstallLayout =
+    resolveRepoLocalOpenClawInstallLayout(repoRoot);
   const patterns = new Set<string>([
     "\\.nexu/(runtime/)?openclaw-sidecar",
     "\\.nexu/(runtime/)?openclaw-sidecar/.*/openclaw-gateway",
-    escapeRegexLiteral(
-      path.join(
-        repoRoot,
-        "openclaw-runtime",
-        "node_modules",
-        "openclaw",
-        "openclaw.mjs",
-      ),
-    ),
-    escapeRegexLiteral(
-      path.join(repoRoot, "openclaw-runtime", "bin", "openclaw-gateway"),
-    ),
+    escapeRegexLiteral(repoLocalOpenClawLaunchLayout.openclawPath),
+    escapeRegexLiteral(repoLocalOpenClawInstallLayout.runtimeGatewayBinPath),
   ]);
 
   if (process.resourcesPath) {

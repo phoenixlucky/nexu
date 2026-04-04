@@ -13,6 +13,7 @@ import {
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveRepoLocalOpenClawInstallLayout } from "@nexu/openclaw-runtime";
 import { resolveBuildTargetPlatform } from "./platforms/platform-resolver.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -104,13 +105,15 @@ async function ensureExistingBuildArtifacts() {
 }
 
 async function ensureExistingRuntimeInstall() {
+  const runtimeInstallLayout = resolveRepoLocalOpenClawInstallLayout(repoRoot);
+
   await Promise.all([
     ensureExistingPath(
-      resolve(repoRoot, "openclaw-runtime/node_modules"),
+      runtimeInstallLayout.runtimeNodeModulesPath,
       "openclaw-runtime install",
     ),
     ensureExistingPath(
-      resolve(repoRoot, "openclaw-runtime/.postinstall-cache.json"),
+      runtimeInstallLayout.runtimePostinstallCachePath,
       "openclaw-runtime cache",
     ),
   ]);

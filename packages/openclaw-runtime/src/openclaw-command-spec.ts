@@ -1,6 +1,8 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 
+import { resolveRepoLocalOpenClawInstallLayout } from "./install-layout.js";
+
 export interface OpenClawCommandSpecInput {
   openclawBin: string;
   openclawElectronExecutable?: string | null;
@@ -57,13 +59,7 @@ export function resolveOpenClawEntryPath(
   const workspaceRoot =
     input.workspaceRoot?.trim() || findWorkspaceRoot(process.cwd());
   const runtimeEntryPath = workspaceRoot
-    ? path.join(
-        workspaceRoot,
-        "openclaw-runtime",
-        "node_modules",
-        "openclaw",
-        "openclaw.mjs",
-      )
+    ? resolveRepoLocalOpenClawInstallLayout(workspaceRoot).runtimeEntryPath
     : null;
 
   const openclawEntryFromBin = resolveOpenclawEntryFromBin(input.openclawBin);
@@ -94,13 +90,7 @@ export function getOpenClawCommandSpec(
   const workspaceRoot =
     input.workspaceRoot?.trim() || findWorkspaceRoot(process.cwd());
   const runtimeEntryPath = workspaceRoot
-    ? path.join(
-        workspaceRoot,
-        "openclaw-runtime",
-        "node_modules",
-        "openclaw",
-        "openclaw.mjs",
-      )
+    ? resolveRepoLocalOpenClawInstallLayout(workspaceRoot).runtimeEntryPath
     : null;
 
   if (input.openclawElectronExecutable) {

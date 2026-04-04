@@ -2,7 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { devTmpPath, repoRootPath } from "@nexu/dev-utils";
-import { resolveOpenClawRepoLocalLayout } from "@nexu/openclaw-runtime";
+import {
+  getPreparedDevOpenclawManifestPath,
+  resolveOpenClawRepoLocalLayout,
+  resolvePreparedDevOpenclawLayout,
+} from "@nexu/openclaw-runtime";
 
 import { controllerWorkingDirectoryPath, scriptsDevPath } from "./paths.js";
 
@@ -126,15 +130,22 @@ export function getScriptsDevRuntimeConfig(): ScriptsDevRuntimeConfig {
     mergedEnv.NEXU_DEV_OPENCLAW_LOG_DIR,
     join(devTmpPath, "openclaw", "logs"),
   );
-  const defaultLayout = resolveOpenClawRepoLocalLayout();
+  const preparedDevRuntimeLayout = existsSync(
+    getPreparedDevOpenclawManifestPath(),
+  )
+    ? resolvePreparedDevOpenclawLayout()
+    : null;
+  const repoLocalLayout = resolveOpenClawRepoLocalLayout();
   const openclawEntryPath = resolvePath(
     mergedEnv.NEXU_DEV_OPENCLAW_ENTRY_PATH,
-    defaultLayout.openclawEntryPath,
+    preparedDevRuntimeLayout?.entryPath ?? repoLocalLayout.openclawEntryPath,
   );
   const openclawBuiltinExtensionsDir = resolvePath(
     mergedEnv.OPENCLAW_EXTENSIONS_DIR,
-    resolveOpenClawRepoLocalLayout({ openclawEntryPath })
-      .openclawBuiltinExtensionsDir,
+    preparedDevRuntimeLayout
+      ? preparedDevRuntimeLayout.builtinExtensionsDir
+      : resolveOpenClawRepoLocalLayout({ openclawEntryPath })
+          .openclawBuiltinExtensionsDir,
   );
 
   cachedConfig = {

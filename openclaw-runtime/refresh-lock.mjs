@@ -1,14 +1,14 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { pruneOpenClawRuntimePaths } from "@nexu/openclaw-runtime/runtime-maintenance";
+
+import { refreshRepoLocalOpenClawRuntimeLock } from "@nexu/openclaw-runtime/runtime-maintenance";
+
 import { pruneTargets } from "@nexu/openclaw-runtime/runtime-policy";
 
 const runtimeDir = path.dirname(fileURLToPath(import.meta.url));
-const isDryRun = process.argv.includes("--dry-run");
 
-await pruneOpenClawRuntimePaths({
+await refreshRepoLocalOpenClawRuntimeLock({
   runtimeDir,
   pruneTargets,
-  dryRun: isDryRun,
   logger: console,
 });
