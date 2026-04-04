@@ -192,10 +192,13 @@ const EMPTY_PAYLOADS_FALLBACK_REPLACEMENT =
   '\tif (!runResult?.payloads?.length && runResult?.meta?.error) {\n\t\tconst _errMsg = runResult.meta.error.message || runResult.meta.error;\n\t\treturn {\n\t\t\tkind: "final",\n\t\t\tpayload: { text: typeof _errMsg === "string" ? _errMsg : "⚠️ An error occurred. Please try again." }\n\t\t};\n\t}\n\treturn {\n\t\tkind: "success",\n\t\trunId,\n\t\trunResult,';
 // Compaction NEXU_EVENT: emit a NEXU_EVENT from handleAutoCompactionStart
 // so the controller can send an independent channel message.
+// Compaction HTTP notify: when compaction starts, POST to controller
+// so it can send a status message to the user's channel.
+// Uses HTTP because in launchd mode controller can't read OpenClaw stderr.
 const COMPACTION_NEXU_EVENT_SEARCH =
   'function handleAutoCompactionStart(ctx) {';
 const COMPACTION_NEXU_EVENT_REPLACEMENT =
-  'function handleAutoCompactionStart(ctx) {\n\tconsole.error("NEXU_EVENT compaction.started " + JSON.stringify({ sessionKey: ctx.params.sessionKey || null, channel: ctx.params.messageChannel || null, runId: ctx.params.runId || null }));';
+  'function handleAutoCompactionStart(ctx) {\n\tfetch("http://127.0.0.1:" + (process.env.CONTROLLER_PORT || "50800") + "/api/internal/compaction-notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionKey: ctx.params.sessionKey, channel: ctx.params.messageChannel, runId: ctx.params.runId }) }).catch(() => {});';
 // Compaction status feedback: send a typing delta to the channel when
 // compaction starts so the user sees "⏳ Compacting..." instead of silence.
 const COMPACTION_FEEDBACK_SEARCH =
