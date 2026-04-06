@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --dir ./scripts/dev exec tsx ./src/index.ts",
+    "pkg": "node ./scripts/pkg/dist/index.js",
     "build": "pnpm -r build",
     "check:esm-imports": "node scripts/check-esm-specifiers.mjs",
     "typecheck": "pnpm -r typecheck",
@@ -31,7 +32,8 @@
     "dist:mac:unsigned": "pnpm --filter @nexu/desktop dist:mac:unsigned",
     "dist:mac:unsigned:arm64": "pnpm --filter @nexu/desktop dist:mac:unsigned:arm64",
     "dist:mac:unsigned:x64": "pnpm --filter @nexu/desktop dist:mac:unsigned:x64",
-    "dist:win:local": "pnpm --filter @nexu/desktop dist:win:local"
+    "dist:win": "node ./scripts/pkg/dist/index.js windows --full",
+    "dist:win:local": "node ./scripts/pkg/dist/index.js windows --local"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
