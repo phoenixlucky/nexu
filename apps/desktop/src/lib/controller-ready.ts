@@ -15,6 +15,7 @@ export interface EnsureDesktopControllerReadyOptions {
   startController?: (() => Promise<void>) | null;
   fetchImpl?: ControllerReadyFetch;
   attemptTimeoutMs?: number;
+  finalAttemptTimeoutMs?: number;
   pollIntervalMs?: number;
   requestTimeoutMs?: number;
   recoveryAttempts?: number;
@@ -100,14 +101,20 @@ export async function ensureDesktopControllerReady(
   const recoveryAttempts =
     options.recoveryAttempts ?? (startController === null ? 0 : 1);
   const attemptTimeoutMs = options.attemptTimeoutMs ?? 15_000;
+  const finalAttemptTimeoutMs =
+    options.finalAttemptTimeoutMs ?? attemptTimeoutMs * 4;
   const pollIntervalMs = options.pollIntervalMs ?? 1_000;
   const requestTimeoutMs = options.requestTimeoutMs ?? 3_000;
 
   for (let attempt = 0; attempt <= recoveryAttempts; attempt += 1) {
     options.onStatusChange?.("polling");
     const isFinalAttempt = attempt === recoveryAttempts;
+    // Final attempt gets a longer but still bounded timeout so that a crash-looping
+    // controller eventually surfaces as `false` instead of leaking polling loops.
     const pollTimeoutMs =
-      startController !== null && isFinalAttempt ? undefined : attemptTimeoutMs;
+      startController !== null && isFinalAttempt
+        ? finalAttemptTimeoutMs
+        : attemptTimeoutMs;
 
     const ready = await pollUntilReady({
       readyUrl: options.readyUrl,

@@ -33,7 +33,7 @@ describe("rewardShareAssets", () => {
       .filter((task) => task.shareMode === "image")
       .map((task) => task.id);
 
-    expect(imageTaskIds).toEqual(["xiaohongshu", "jike", "wechat", "feishu"]);
+    expect(imageTaskIds).toEqual(["mobile_share"]);
     expect(rewardShareAssets).toHaveLength(6);
   });
 });

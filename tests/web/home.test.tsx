@@ -318,11 +318,11 @@ describe("RewardsPage", () => {
     expect(markup).toContain("reward.whatsapp.name");
   });
 
-  it("renders svg-based reward icons for Xiaohongshu and Jike instead of letter placeholders", () => {
+  it("renders svg-based reward icons for branded social tasks instead of letter placeholders", () => {
     const markup = renderRewardsPage();
 
-    expect(markup).toContain('data-reward-task-icon="xiaohongshu"');
-    expect(markup).toContain('data-reward-task-icon="jike"');
+    expect(markup).toContain('data-reward-task-icon="reddit"');
+    expect(markup).toContain('data-reward-task-icon="lingying"');
     expect(markup).not.toContain(">R<");
     expect(markup).not.toContain(">J<");
   });
@@ -331,7 +331,7 @@ describe("RewardsPage", () => {
     const markup = renderRewardsPage();
 
     expect(markup).toContain("budget.viral.rules");
-    expect(markup).toContain("https://docs.nexu.io/rewards");
+    expect(markup).toContain("https://docs.nexu.io/guide/rewards");
   });
 
   it("uses the积分 copy and hides the redundant cloud balance summary card", () => {
@@ -365,8 +365,7 @@ describe("Rewards locale parity", () => {
     );
     expect(zhCN["reward.github_star.name"]).toBe("Star us");
     expect(zhCN["reward.reddit.name"]).toBe("发帖到 Reddit");
-    expect(zhCN["reward.xiaohongshu.name"]).toBe("发帖到小红书");
+    expect(zhCN["reward.mobile_share.name"]).toBe("移动端扫码分享");
     expect(zhCN["reward.lingying.name"]).toBe("发帖到瓴英");
-    expect(zhCN["reward.jike.name"]).toBe("发帖到即刻");
   });
 });

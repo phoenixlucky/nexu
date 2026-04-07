@@ -1138,6 +1138,12 @@ function ManagedProviderDetail({
         setLoginBusy(false);
         return;
       }
+      // Another surface/process already kicked off login — treat as pending and
+      // let the polling effect detect completion instead of dropping the user
+      // into an error state.
+      if (data?.error === "Connection attempt already in progress") {
+        return;
+      }
       if (data?.error) {
         setLoginError(data.error ?? t("welcome.connectFailed"));
         setLoginBusy(false);

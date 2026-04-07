@@ -92,6 +92,7 @@ describe("ensureDesktopControllerReady", () => {
       fetchImpl,
       startController,
       attemptTimeoutMs: 0,
+      finalAttemptTimeoutMs: 10_000,
       pollIntervalMs: 0,
       requestTimeoutMs: 10,
     });
@@ -99,5 +100,23 @@ describe("ensureDesktopControllerReady", () => {
     expect(ready).toBe(true);
     expect(startController).toHaveBeenCalledTimes(1);
     expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("gives up the final recovery attempt once the bounded timeout elapses", async () => {
+    const fetchImpl = vi.fn(async () => createReadyResponse(false));
+    const startController = vi.fn(async () => undefined);
+
+    const ready = await ensureDesktopControllerReady({
+      readyUrl: "http://127.0.0.1:50810/api/internal/desktop/ready",
+      fetchImpl,
+      startController,
+      attemptTimeoutMs: 0,
+      finalAttemptTimeoutMs: 0,
+      pollIntervalMs: 0,
+      requestTimeoutMs: 10,
+    });
+
+    expect(ready).toBe(false);
+    expect(startController).toHaveBeenCalledTimes(1);
   });
 });
