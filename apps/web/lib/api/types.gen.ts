@@ -513,6 +513,33 @@ export type PatchApiInternalDesktopPreferencesResponses = {
 
 export type PatchApiInternalDesktopPreferencesResponse = PatchApiInternalDesktopPreferencesResponses[keyof PatchApiInternalDesktopPreferencesResponses];
 
+export type GetApiAuthGetSessionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/auth/get-session';
+};
+
+export type GetApiAuthGetSessionResponses = {
+    /**
+     * Desktop-local auth session
+     */
+    200: {
+        session: {
+            id: string;
+            expiresAt: string;
+        };
+        user: {
+            id: string;
+            email: string;
+            name: string;
+            image: string;
+        };
+    };
+};
+
+export type GetApiAuthGetSessionResponse = GetApiAuthGetSessionResponses[keyof GetApiAuthGetSessionResponses];
+
 export type GetApiInternalDesktopCloudStatusData = {
     body?: never;
     path?: never;
@@ -1054,7 +1081,7 @@ export type GetApiInternalDesktopRewardsResponses = {
             availableCredits?: number;
         };
         tasks: Array<{
-            id: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'xiaohongshu' | 'lingying' | 'jike' | 'wechat' | 'feishu' | 'facebook' | 'whatsapp';
+            id: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'mobile_share' | 'lingying' | 'facebook' | 'whatsapp';
             group: 'daily' | 'opensource' | 'social';
             icon: string;
             reward: number;
@@ -1112,7 +1139,7 @@ export type PostApiInternalDesktopRewardsGithubStarSessionResponse = PostApiInte
 
 export type PostApiInternalDesktopRewardsClaimData = {
     body?: {
-        taskId: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'xiaohongshu' | 'lingying' | 'jike' | 'wechat' | 'feishu' | 'facebook' | 'whatsapp';
+        taskId: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'mobile_share' | 'lingying' | 'facebook' | 'whatsapp';
         proof?: {
             url?: string;
             githubSessionId?: string;
@@ -1155,7 +1182,7 @@ export type PostApiInternalDesktopRewardsClaimResponses = {
                 availableCredits?: number;
             };
             tasks: Array<{
-                id: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'xiaohongshu' | 'lingying' | 'jike' | 'wechat' | 'feishu' | 'facebook' | 'whatsapp';
+                id: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'mobile_share' | 'lingying' | 'facebook' | 'whatsapp';
                 group: 'daily' | 'opensource' | 'social';
                 icon: string;
                 reward: number;

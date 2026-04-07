@@ -2,9 +2,9 @@ import { formatRewardAmount } from "@/components/rewards/home-rewards-teaser";
 import { RewardTaskIcon } from "@/components/rewards/reward-task-icon";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCloudConnect } from "@/hooks/use-cloud-connect";
+import { useDesktopCloudStatus } from "@/hooks/use-desktop-cloud-status";
 import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { openExternalUrl } from "@/lib/desktop-links";
-import { downloadRandomRewardShareAsset } from "@/lib/reward-share-assets";
 import {
   type RewardConfirmPhase,
   completeRewardWithVirtualCheck,
@@ -17,18 +17,21 @@ import {
   rewardTaskRequiresUrlProof,
   validateRewardProofUrl,
 } from "@nexu/shared";
-import {
-  Check,
-  Download,
-  ExternalLink,
-  Loader2,
-  Smartphone,
-} from "lucide-react";
+import { ExternalLink, Loader2, Smartphone } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+
+function resolveCloudShareUrl(cloudUrl?: string | null): string {
+  if (!cloudUrl) return "https://nexu.net";
+  try {
+    return new URL(cloudUrl).origin;
+  } catch {
+    return "https://nexu.net";
+  }
+}
 
 const REWARD_GROUPS: Array<{
   key: RewardTaskStatus["group"];
@@ -55,7 +58,6 @@ function RewardConfirmModal({
   onConfirm: () => Promise<void>;
 }) {
   const { t } = useTranslation();
-  const [imageDownloaded, setImageDownloaded] = useState(false);
   const amount = formatRewardAmount(task.reward);
   const isDaily = task.repeatMode === "daily";
   const isImage = task.shareMode === "image";
@@ -79,7 +81,7 @@ function RewardConfirmModal({
           : task.requiresScreenshot
             ? "budget.confirm.screenshotDesc"
             : "budget.confirm.desc";
-  const canConfirm = (!isImage || imageDownloaded) && proofUrlValid;
+  const canConfirm = proofUrlValid;
   const title = isChecking
     ? t("budget.confirm.checkingTitle")
     : isClaiming
@@ -132,33 +134,23 @@ function RewardConfirmModal({
             +{amount} {t("layout.sidebar.balanceUnit")}
           </div>
 
-          {isImage && !imageDownloaded && !isBusy ? (
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  downloadRandomRewardShareAsset();
-                  setImageDownloaded(true);
-                } catch {
-                  toast.error(t("rewards.downloadFailed"));
-                }
-              }}
-              className="mb-3 flex h-[36px] w-full items-center justify-center gap-2 rounded-[10px] bg-[var(--color-brand-primary)] text-[13px] font-medium text-white transition-all hover:opacity-90 active:scale-[0.98]"
-            >
-              <Download size={14} />
-              {t("budget.confirm.downloadImage")}
-            </button>
-          ) : null}
-
-          {isImage && imageDownloaded && !isBusy ? (
-            <div className="mb-3 flex items-center gap-1.5 text-[12px] font-medium text-[var(--color-success)]">
-              <Check size={14} />
-              {t("budget.confirm.downloadImage")} ✓
-            </div>
-          ) : null}
-
           {requiresUrlProof ? (
             <div className="mb-3 w-full text-left">
+              {task.actionUrl ? (
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={() => {
+                    if (task.actionUrl) {
+                      void openExternalUrl(task.actionUrl);
+                    }
+                  }}
+                  className="mb-2 inline-flex h-[28px] items-center justify-center gap-1.5 rounded-full border border-border bg-surface-1 px-3 text-[11px] font-medium text-text-secondary transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <ExternalLink size={12} />
+                  {t("rewards.proofUrlReopen")}
+                </button>
+              ) : null}
               <label
                 htmlFor={`reward-proof-url-${task.id}`}
                 className="mb-1.5 block text-[12px] font-medium text-text-primary"
@@ -193,6 +185,11 @@ function RewardConfirmModal({
                   </span>
                 )}
               </div>
+              {task.actionUrl ? (
+                <div className="mt-1.5 text-[11px] leading-5 text-text-muted">
+                  {t("rewards.proofUrlLoginGuidance")}
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -240,6 +237,8 @@ export function RewardsPage() {
   const [confirmGithubSessionId, setConfirmGithubSessionId] = useState<
     string | null
   >(null);
+
+  const { data: desktopCloudStatus } = useDesktopCloudStatus();
 
   const { cloudConnecting, handleCloudConnect } = useCloudConnect({
     cloudConnected: status.viewer.cloudConnected,
@@ -545,9 +544,8 @@ export function RewardsPage() {
               const webTasks = group.tasks.filter(
                 (task) => task.shareMode !== "image",
               );
-              const mobileTasks = group.tasks.filter(
-                (task) => task.shareMode === "image",
-              );
+              const mobileShareTask =
+                group.tasks.find((task) => task.id === "mobile_share") ?? null;
 
               return (
                 <section key={group.key}>
@@ -575,82 +573,59 @@ export function RewardsPage() {
                         {renderTaskList(webTasks)}
                       </TabsContent>
                       <TabsContent value="mobile">
-                        <div className="flex items-center gap-4 rounded-lg px-3 py-3">
-                          <div className="shrink-0 rounded-xl border border-border bg-white p-1.5">
-                            <QRCodeSVG
-                              value="https://github.com/nexu-io/nexu"
-                              size={56}
-                            />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[13px] font-medium text-text-primary">
-                                {t("rewards.mobileQrHint")}
-                              </span>
-                              <span className="text-[11px] font-semibold leading-none tabular-nums text-[var(--color-success)]">
-                                +200 {t("layout.sidebar.balanceUnit")}
-                              </span>
+                        {mobileShareTask ? (
+                          <div className="flex items-center gap-4 rounded-lg px-3 py-3">
+                            <div className="shrink-0 rounded-xl border border-border bg-white p-1.5">
+                              <QRCodeSVG
+                                value={resolveCloudShareUrl(
+                                  desktopCloudStatus?.cloudUrl,
+                                )}
+                                size={56}
+                              />
                             </div>
-                            <p className="mt-0.5 text-[11px] text-text-muted">
-                              {t("rewards.mobileQrDesc")}
-                            </p>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[13px] font-medium text-text-primary">
+                                  {t("rewards.mobileQrHint")}
+                                </span>
+                                <span className="text-[11px] font-semibold leading-none tabular-nums text-[var(--color-success)]">
+                                  +{formatRewardAmount(mobileShareTask.reward)}{" "}
+                                  {t("layout.sidebar.balanceUnit")}
+                                </span>
+                              </div>
+                              <p className="mt-0.5 text-[11px] text-text-muted">
+                                {t("rewards.mobileQrDesc")}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={
+                                loading ||
+                                mobileShareTask.isClaimed ||
+                                claimingTaskId === mobileShareTask.id
+                              }
+                              onClick={() =>
+                                void handleTaskAction(mobileShareTask)
+                              }
+                              className={cn(
+                                "inline-flex h-[26px] shrink-0 items-center justify-center gap-2 rounded-full px-3 text-[11px] font-medium leading-none transition-all",
+                                mobileShareTask.isClaimed
+                                  ? "bg-surface-2 text-text-muted"
+                                  : "border border-[var(--color-brand-primary)]/30 text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary)]/5",
+                              )}
+                            >
+                              {claimingTaskId === mobileShareTask.id ? (
+                                <Loader2 size={13} className="animate-spin" />
+                              ) : null}
+                              {mobileShareTask.isClaimed
+                                ? t("budget.cta.done").replace(
+                                    "${n}",
+                                    formatRewardAmount(mobileShareTask.reward),
+                                  )
+                                : t("budget.cta.go")}
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            disabled={
-                              loading ||
-                              mobileTasks.every((task) => task.isClaimed) ||
-                              mobileTasks.some(
-                                (task) => claimingTaskId === task.id,
-                              )
-                            }
-                            onClick={async () => {
-                              if (!status.viewer.cloudConnected) {
-                                toast.info(t("rewards.loginRequired"));
-                                void handleCloudConnect();
-                                return;
-                              }
-                              const unclaimed = mobileTasks.filter(
-                                (task) => !task.isClaimed,
-                              );
-                              let earned = 0;
-                              for (const task of unclaimed) {
-                                try {
-                                  const result = await claimTask({
-                                    taskId: task.id,
-                                  });
-                                  if (result.ok && !result.alreadyClaimed) {
-                                    earned += task.reward;
-                                  }
-                                } catch {
-                                  /* continue claiming remaining tasks */
-                                }
-                              }
-                              if (earned > 0) {
-                                toast.success(
-                                  `${t("rewards.claimSuccess")} +${formatRewardAmount(earned)} ${t("layout.sidebar.balanceUnit")}`,
-                                );
-                              } else {
-                                toast.success(t("rewards.claimAlreadyDone"));
-                              }
-                            }}
-                            className={cn(
-                              "inline-flex h-[26px] shrink-0 items-center justify-center gap-2 rounded-full px-3 text-[11px] font-medium leading-none transition-all",
-                              mobileTasks.every((task) => task.isClaimed)
-                                ? "bg-surface-2 text-text-muted"
-                                : "border border-[var(--color-brand-primary)]/30 text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary)]/5",
-                            )}
-                          >
-                            {mobileTasks.some(
-                              (task) => claimingTaskId === task.id,
-                            ) ? (
-                              <Loader2 size={13} className="animate-spin" />
-                            ) : null}
-                            {mobileTasks.every((task) => task.isClaimed)
-                              ? t("budget.cta.done").replace("${n}", "200")
-                              : t("budget.cta.go")}
-                          </button>
-                        </div>
+                        ) : null}
                       </TabsContent>
                     </Tabs>
                   ) : (

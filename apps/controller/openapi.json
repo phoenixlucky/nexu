@@ -1296,6 +1296,70 @@
         }
       }
     },
+    "/api/auth/get-session": {
+      "get": {
+        "tags": [
+          "Desktop"
+        ],
+        "responses": {
+          "200": {
+            "description": "Desktop-local auth session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "expiresAt"
+                      ]
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "image": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "name",
+                        "image"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "session",
+                    "user"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/internal/desktop/cloud-status": {
       "get": {
         "tags": [
@@ -2971,11 +3035,8 @@
                               "github_star",
                               "x_share",
                               "reddit",
-                              "xiaohongshu",
+                              "mobile_share",
                               "lingying",
-                              "jike",
-                              "wechat",
-                              "feishu",
                               "facebook",
                               "whatsapp"
                             ]
@@ -3170,11 +3231,8 @@
                       "github_star",
                       "x_share",
                       "reddit",
-                      "xiaohongshu",
+                      "mobile_share",
                       "lingying",
-                      "jike",
-                      "wechat",
-                      "feishu",
                       "facebook",
                       "whatsapp"
                     ]
@@ -3283,11 +3341,8 @@
                                   "github_star",
                                   "x_share",
                                   "reddit",
-                                  "xiaohongshu",
+                                  "mobile_share",
                                   "lingying",
-                                  "jike",
-                                  "wechat",
-                                  "feishu",
                                   "facebook",
                                   "whatsapp"
                                 ]

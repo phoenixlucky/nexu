@@ -1032,9 +1032,7 @@ function WorkspaceLayoutInner() {
                                 role="tooltip"
                                 className="pointer-events-none absolute bottom-full left-0 z-40 mb-1.5 w-52 rounded-md bg-neutral-800 px-2.5 py-1.5 text-left text-[11px] font-normal leading-snug text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
                               >
-                                {t(
-                                  "layout.sidebar.balancePopup.earnedTooltip",
-                                )}
+                                {t("layout.sidebar.balancePopup.earnedTooltip")}
                               </span>
                             </span>
                           </span>
