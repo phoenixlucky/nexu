@@ -157,6 +157,21 @@ export class OpenClawProcessManager {
       args = ["gateway", "run"];
     }
 
+    logger.info(
+      {
+        mode: electronExec ? "electron-entry" : "direct-bin",
+        cmd,
+        args,
+        cwd: path.resolve(this.env.openclawStateDir),
+        openclawBin: this.env.openclawBin,
+        openclawBinExists: existsSync(this.env.openclawBin),
+        electronExec,
+        electronExecExists: electronExec ? existsSync(electronExec) : null,
+        platform: process.platform,
+      },
+      "openclaw spawn contract",
+    );
+
     const child = spawn(cmd, args, {
       cwd: path.resolve(this.env.openclawStateDir),
       env: {
@@ -217,7 +232,13 @@ export class OpenClawProcessManager {
 
     child.once("error", (error) => {
       logger.error(
-        { error: error.message },
+        {
+          error: error.message,
+          code: "code" in error ? error.code : undefined,
+          path: "path" in error ? error.path : undefined,
+          syscall: "syscall" in error ? error.syscall : undefined,
+          spawnargs: "spawnargs" in error ? error.spawnargs : undefined,
+        },
         "failed to spawn openclaw process",
       );
       this.child = null;

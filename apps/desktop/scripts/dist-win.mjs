@@ -1,6 +1,7 @@
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  appendFile,
   cp,
   lstat,
   mkdir,
@@ -139,6 +140,249 @@ async function pathExists(path) {
   } catch {
     return false;
   }
+}
+
+async function collectDirectoryStats(rootPath) {
+  let fileCount = 0;
+  let totalBytes = 0;
+  const entries = await readdir(rootPath, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const entryPath = resolve(rootPath, entry.name);
+
+    if (entry.isDirectory()) {
+      const childStats = await collectDirectoryStats(entryPath);
+      fileCount += childStats.fileCount;
+      totalBytes += childStats.totalBytes;
+      continue;
+    }
+
+    if (entry.isFile()) {
+      const entryStats = await stat(entryPath);
+      fileCount += 1;
+      totalBytes += entryStats.size;
+    }
+  }
+
+  return { fileCount, totalBytes };
+}
+
+async function collectReleaseArtifacts(rootPath, predicate) {
+  if (!(await pathExists(rootPath))) {
+    return [];
+  }
+
+  const artifacts = [];
+  const entries = await readdir(rootPath, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const entryPath = resolve(rootPath, entry.name);
+
+    if (entry.isDirectory()) {
+      artifacts.push(...(await collectReleaseArtifacts(entryPath, predicate)));
+      continue;
+    }
+
+    if (!entry.isFile()) {
+      continue;
+    }
+
+    if (!predicate(entryPath)) {
+      continue;
+    }
+
+    const entryStats = await stat(entryPath);
+    artifacts.push({
+      path: entryPath,
+      size: entryStats.size,
+      mtimeMs: entryStats.mtimeMs,
+    });
+  }
+
+  return artifacts;
+}
+
+function createWindowsBuilderPhaseObserver(options) {
+  const startedAt = performance.now();
+  const logPath = resolve(
+    options.releaseRoot,
+    ".cache",
+    "dist-win",
+    "electron-builder-phase.jsonl",
+  );
+  const state = {
+    winUnpackedReady: null,
+    finalWinUnpacked: null,
+    firstNsis7z: null,
+    finalNsis7z: null,
+    installerExe: null,
+  };
+  let pollHandle = null;
+  let writeChain = Promise.resolve();
+
+  const toRelativePath = (targetPath) =>
+    targetPath.replace(`${options.releaseRoot}\\`, "");
+
+  const writeEvent = (event, fields = {}) => {
+    const payload = {
+      scope: "electron-builder-phase",
+      event,
+      ts: new Date().toISOString(),
+      elapsedMs: Math.round(performance.now() - startedAt),
+      targetPlatform: buildTargetPlatform,
+      dirOnly: options.dirOnly,
+      nsisFromExistingDir: options.nsisFromExistingDir,
+      ...fields,
+    };
+    const line = `${JSON.stringify(payload)}\n`;
+    console.log(`[dist:win][builder-phase] ${line.trim()}`);
+    writeChain = writeChain.then(async () => {
+      await mkdir(dirname(logPath), { recursive: true });
+      await appendFile(logPath, line, "utf8");
+    });
+    return writeChain;
+  };
+
+  const observeOnce = async () => {
+    const winUnpackedPath = resolve(options.releaseRoot, "win-unpacked");
+    if (!state.winUnpackedReady && (await pathExists(winUnpackedPath))) {
+      const winUnpackedStats = await collectDirectoryStats(winUnpackedPath).catch(
+        () => null,
+      );
+      if (winUnpackedStats && winUnpackedStats.fileCount > 0) {
+        state.winUnpackedReady = {
+          path: winUnpackedPath,
+          fileCount: winUnpackedStats.fileCount,
+          totalBytes: winUnpackedStats.totalBytes,
+        };
+        await writeEvent("win-unpacked-ready", {
+          path: toRelativePath(winUnpackedPath),
+          fileCount: winUnpackedStats.fileCount,
+          totalBytes: winUnpackedStats.totalBytes,
+        });
+      }
+    }
+
+    const nsisArtifacts = await collectReleaseArtifacts(
+      options.releaseRoot,
+      (artifactPath) => artifactPath.endsWith(".nsis.7z"),
+    );
+    const latestNsisArtifact = nsisArtifacts.sort(
+      (left, right) => right.mtimeMs - left.mtimeMs,
+    )[0];
+    if (latestNsisArtifact && !state.firstNsis7z) {
+      state.firstNsis7z = latestNsisArtifact;
+      await writeEvent("nsis-intermediate-first-seen", {
+        path: toRelativePath(latestNsisArtifact.path),
+        bytes: latestNsisArtifact.size,
+        mtimeMs: Math.round(latestNsisArtifact.mtimeMs),
+      });
+    }
+    if (
+      latestNsisArtifact &&
+      (!state.finalNsis7z ||
+        state.finalNsis7z.path !== latestNsisArtifact.path ||
+        state.finalNsis7z.size !== latestNsisArtifact.size ||
+        Math.round(state.finalNsis7z.mtimeMs) !==
+          Math.round(latestNsisArtifact.mtimeMs))
+    ) {
+      state.finalNsis7z = latestNsisArtifact;
+      await writeEvent("nsis-intermediate-update", {
+        path: toRelativePath(latestNsisArtifact.path),
+        bytes: latestNsisArtifact.size,
+        mtimeMs: Math.round(latestNsisArtifact.mtimeMs),
+      });
+    }
+
+    const installerArtifacts = await collectReleaseArtifacts(
+      options.releaseRoot,
+      (artifactPath) => {
+        const relativePath = toRelativePath(artifactPath);
+        return (
+          artifactPath.endsWith(".exe") &&
+          !relativePath.includes("win-unpacked\\") &&
+          !artifactPath.endsWith(".__uninstaller.exe")
+        );
+      },
+    );
+    const latestInstallerArtifact = installerArtifacts.sort(
+      (left, right) => right.mtimeMs - left.mtimeMs,
+    )[0];
+    if (
+      latestInstallerArtifact &&
+      (!state.installerExe ||
+        state.installerExe.path !== latestInstallerArtifact.path ||
+        state.installerExe.size !== latestInstallerArtifact.size ||
+        Math.round(state.installerExe.mtimeMs) !==
+          Math.round(latestInstallerArtifact.mtimeMs))
+    ) {
+      state.installerExe = latestInstallerArtifact;
+      await writeEvent("installer-exe-update", {
+        path: toRelativePath(latestInstallerArtifact.path),
+        bytes: latestInstallerArtifact.size,
+        mtimeMs: Math.round(latestInstallerArtifact.mtimeMs),
+      });
+    }
+  };
+
+  return {
+    async start() {
+      await writeEvent("start", {
+        releaseRoot: options.releaseRoot,
+        logPath,
+      });
+      await observeOnce();
+      pollHandle = setInterval(() => {
+        void observeOnce();
+      }, 1000);
+      pollHandle.unref?.();
+    },
+    async stop(status) {
+      if (pollHandle) {
+        clearInterval(pollHandle);
+      }
+      await observeOnce();
+      const winUnpackedPath = resolve(options.releaseRoot, "win-unpacked");
+      const finalWinUnpacked =
+        (await pathExists(winUnpackedPath)) && state.winUnpackedReady
+          ? await collectDirectoryStats(winUnpackedPath).catch(() => null)
+          : null;
+      state.finalWinUnpacked = finalWinUnpacked;
+      await writeEvent("complete", {
+        status,
+        winUnpackedReady: state.winUnpackedReady
+          ? {
+              path: toRelativePath(state.winUnpackedReady.path),
+              fileCount: state.winUnpackedReady.fileCount,
+              totalBytes: state.winUnpackedReady.totalBytes,
+            }
+          : null,
+        finalWinUnpacked: finalWinUnpacked,
+        firstNsis7z: state.firstNsis7z
+          ? {
+              path: toRelativePath(state.firstNsis7z.path),
+              bytes: state.firstNsis7z.size,
+              mtimeMs: Math.round(state.firstNsis7z.mtimeMs),
+            }
+          : null,
+        finalNsis7z: state.finalNsis7z
+          ? {
+              path: toRelativePath(state.finalNsis7z.path),
+              bytes: state.finalNsis7z.size,
+              mtimeMs: Math.round(state.finalNsis7z.mtimeMs),
+            }
+          : null,
+        installerExe: state.installerExe
+          ? {
+              path: toRelativePath(state.installerExe.path),
+              bytes: state.installerExe.size,
+              mtimeMs: Math.round(state.installerExe.mtimeMs),
+            }
+          : null,
+        logPath,
+      });
+    },
+  };
 }
 
 function hashString(value) {
@@ -1005,23 +1249,38 @@ async function main() {
           ? ["--config.npmRebuild=false", "--config.nodeGypRebuild=false"]
           : []),
       ];
-      await runElectronBuilder(electronBuilderArgs, {
-        cwd: electronRoot,
-        timeoutMs: diagnosticsEnabled
-          ? getStepTimeoutMs("run electron-builder")
-          : 0,
-        label: `electron-builder ${electronBuilderArgs.join(" ")}`,
-        env: {
-          ...electronBuilderEnv,
-          DEBUG:
-            electronBuilderEnv.DEBUG ?? "electron-builder,electron-builder:*",
-          ...(windowsPwdShimDir
-            ? {
-                PATH: `${windowsPwdShimDir};${electronBuilderEnv.PATH ?? process.env.PATH ?? ""}`,
-              }
-            : {}),
-        },
-      });
+      const builderPhaseObserver =
+        buildTargetPlatform === "win"
+          ? createWindowsBuilderPhaseObserver({
+              releaseRoot,
+              dirOnly,
+              nsisFromExistingDir,
+            })
+          : null;
+      await builderPhaseObserver?.start();
+      try {
+        await runElectronBuilder(electronBuilderArgs, {
+          cwd: electronRoot,
+          timeoutMs: diagnosticsEnabled
+            ? getStepTimeoutMs("run electron-builder")
+            : 0,
+          label: `electron-builder ${electronBuilderArgs.join(" ")}`,
+          env: {
+            ...electronBuilderEnv,
+            DEBUG:
+              electronBuilderEnv.DEBUG ?? "electron-builder,electron-builder:*",
+            ...(windowsPwdShimDir
+              ? {
+                  PATH: `${windowsPwdShimDir};${electronBuilderEnv.PATH ?? process.env.PATH ?? ""}`,
+                }
+              : {}),
+          },
+        });
+        await builderPhaseObserver?.stop("success");
+      } catch (error) {
+        await builderPhaseObserver?.stop("error");
+        throw error;
+      }
       if (dirOnly) {
         await writeWinUnpackedManifest(releaseRoot);
       }

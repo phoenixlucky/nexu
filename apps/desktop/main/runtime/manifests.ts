@@ -13,9 +13,13 @@ import {
   resolvePackagedOpenclawExtractedSidecarRoot,
   resolvePackagedOpenclawSidecarRoot,
 } from "@nexu/openclaw-runtime";
+import { getOpenclawSkillsDir } from "../../shared/desktop-paths";
+import { buildChildProcessProxyEnv } from "../../shared/proxy-config";
 import type { DesktopRuntimeConfig } from "../../shared/runtime-config";
+import { getWorkspaceRoot } from "../../shared/workspace-paths";
 import { resolveRuntimeManifestsRoots } from "../platforms/shared/runtime-roots";
 import { createAsyncArchiveSidecarMaterializer } from "../platforms/shared/sidecar-materializer";
+import { writeDesktopMainLog } from "./runtime-logger";
 import type { RuntimeUnitManifest } from "./types";
 
 function ensureDir(path: string): string {
@@ -75,16 +79,6 @@ function extractPackagedOpenclawSidecar(input: {
   }
 
   return input.extractedSidecarRoot;
-}
-
-function getBooleanEnv(name: string, fallback: boolean): boolean {
-  const value = process.env[name];
-
-  if (value === undefined) {
-    return fallback;
-  }
-
-  return value === "1" || value.toLowerCase() === "true";
 }
 
 function resolveElectronNodeRunner(): string {
@@ -174,6 +168,28 @@ function buildOpenclawNodePath(
   }
 
   return buildNode22Path();
+}
+
+function getDesktopLogFilePath(userDataPath: string, name: string): string {
+  return path.resolve(userDataPath, "logs", name);
+}
+
+function logManifestLifecycle(
+  userDataPath: string,
+  message: string,
+  stream: "system" | "stderr" = "system",
+): void {
+  writeDesktopMainLog({
+    source: "runtime-manifests",
+    stream,
+    kind: "lifecycle",
+    message,
+    logFilePath: getDesktopLogFilePath(userDataPath, "desktop-main.log"),
+  });
+}
+
+function formatPathSnapshotEntry(label: string, targetPath: string): string {
+  return `${label}=${existsSync(targetPath) ? "present" : "missing"}:${targetPath}`;
 }
 
 export function buildSkillNodePath(
@@ -282,11 +298,15 @@ export function createRuntimeUnitManifests(
   isPackaged: boolean,
   runtimeConfig: DesktopRuntimeConfig,
 ): RuntimeUnitManifest[] {
+  const startedAt = Date.now();
+  logManifestLifecycle(
+    userDataPath,
+    `manifest generation start packaged=${isPackaged} electronRoot=${electronRoot} userData=${userDataPath}`,
+  );
   const {
     runtimeSidecarBaseRoot,
     runtimeRoot,
     openclawSidecarRoot,
-    openclawRuntimeRoot,
     openclawConfigDir,
     openclawStateDir,
     openclawTempDir,
@@ -296,6 +316,172 @@ export function createRuntimeUnitManifests(
     electronRoot,
     runtimeConfig,
   });
+  const repoRoot = getWorkspaceRoot();
+  const controllerRoot = isPackaged
+    ? path.resolve(runtimeSidecarBaseRoot, "controller")
+    : path.resolve(repoRoot, "apps", "controller");
+  const controllerEntryPath = path.resolve(controllerRoot, "dist", "index.js");
+  const webRoot = isPackaged
+    ? path.resolve(runtimeSidecarBaseRoot, "web")
+    : path.resolve(repoRoot, "apps", "desktop", "sidecars", "web");
+  const webEntryPath = path.resolve(webRoot, "index.js");
+  const webDistRoot = path.resolve(webRoot, "dist");
+  const packagedOpenclawRoot = path.resolve(runtimeSidecarBaseRoot, "openclaw");
+  const packagedOpenclawArchive =
+    resolvePackagedOpenclawArchivePath(packagedOpenclawRoot);
+  const extractedOpenclawRoot =
+    resolvePackagedOpenclawExtractedSidecarRoot(runtimeRoot);
+  const effectiveOpenclawSidecarRoot = isPackaged
+    ? extractedOpenclawRoot
+    : openclawSidecarRoot;
+  const effectiveOpenclawBinPath = path.resolve(
+    effectiveOpenclawSidecarRoot,
+    "bin",
+    process.platform === "win32" ? "openclaw.cmd" : "openclaw",
+  );
+  const openclawNodePath = buildOpenclawNodePath(openclawSidecarRoot);
+  const openclawPort = Number(
+    new URL(runtimeConfig.urls.openclawBase).port || 18789,
+  );
+  const skillNodePath = buildSkillNodePath(electronRoot, isPackaged);
+  const proxyEnv = buildChildProcessProxyEnv(runtimeConfig.proxy);
+  const openclawSkillsDir = getOpenclawSkillsDir(userDataPath);
+  const skillhubStaticSkillsDir = isPackaged
+    ? path.resolve(electronRoot, "static", "bundled-skills")
+    : path.resolve(repoRoot, "apps", "desktop", "static", "bundled-skills");
+  const platformTemplatesDir = isPackaged
+    ? path.resolve(electronRoot, "static", "platform-templates")
+    : path.resolve(
+        repoRoot,
+        "apps",
+        "controller",
+        "static",
+        "platform-templates",
+      );
+
   ensureDir(runtimeRoot);
-  return [] as RuntimeUnitManifest[];
+  ensureDir(logsDir);
+  ensureDir(openclawConfigDir);
+  ensureDir(openclawStateDir);
+  ensureDir(openclawTempDir);
+
+  const pathSnapshot = [
+    formatPathSnapshotEntry("runtimeSidecarBaseRoot", runtimeSidecarBaseRoot),
+    formatPathSnapshotEntry("controllerRoot", controllerRoot),
+    formatPathSnapshotEntry("controllerEntry", controllerEntryPath),
+    formatPathSnapshotEntry("webRoot", webRoot),
+    formatPathSnapshotEntry("webEntry", webEntryPath),
+    formatPathSnapshotEntry("webDistRoot", webDistRoot),
+    formatPathSnapshotEntry("packagedOpenclawRoot", packagedOpenclawRoot),
+    packagedOpenclawArchive
+      ? formatPathSnapshotEntry(
+          "packagedOpenclawArchive",
+          packagedOpenclawArchive,
+        )
+      : "packagedOpenclawArchive=missing:<none>",
+    formatPathSnapshotEntry("extractedOpenclawRoot", extractedOpenclawRoot),
+    formatPathSnapshotEntry("effectiveOpenclawBin", effectiveOpenclawBinPath),
+  ].join(" ");
+  logManifestLifecycle(userDataPath, `manifest paths ${pathSnapshot}`);
+
+  const controllerManifest: RuntimeUnitManifest = {
+    id: "controller",
+    label: "Controller",
+    kind: "service",
+    launchStrategy: "managed",
+    command: resolveElectronNodeRunner(),
+    args: [controllerEntryPath],
+    cwd: controllerRoot,
+    port: runtimeConfig.ports.controller,
+    startupTimeoutMs: 15_000,
+    autoStart: false,
+    logFilePath: path.resolve(logsDir, "controller.log"),
+    dependents: ["web"],
+    env: {
+      ...proxyEnv,
+      ELECTRON_RUN_AS_NODE: "1",
+      NODE_ENV: isPackaged ? "production" : "development",
+      PORT: String(runtimeConfig.ports.controller),
+      HOST: "127.0.0.1",
+      WEB_URL: runtimeConfig.urls.web,
+      NEXU_HOME: runtimeConfig.paths.nexuHome,
+      NEXU_CONTROLLER_OPENCLAW_MODE: "internal",
+      RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
+      RUNTIME_GATEWAY_PROBE_ENABLED: "true",
+      OPENCLAW_GATEWAY_PORT: String(openclawPort),
+      OPENCLAW_GATEWAY_TOKEN: runtimeConfig.tokens.gateway,
+      OPENCLAW_BASE_URL: runtimeConfig.urls.openclawBase,
+      OPENCLAW_STATE_DIR: openclawStateDir,
+      OPENCLAW_CONFIG_PATH: path.resolve(openclawStateDir, "openclaw.json"),
+      OPENCLAW_LOG_DIR: path.resolve(
+        runtimeConfig.paths.nexuHome,
+        "logs",
+        "openclaw",
+      ),
+      OPENCLAW_SKILLS_DIR: openclawSkillsDir,
+      SKILLHUB_STATIC_SKILLS_DIR: skillhubStaticSkillsDir,
+      PLATFORM_TEMPLATES_DIR: platformTemplatesDir,
+      OPENCLAW_BIN: effectiveOpenclawBinPath,
+      ...(process.platform === "win32"
+        ? { OPENCLAW_ELECTRON_EXECUTABLE: resolveElectronNodeRunner() }
+        : {}),
+      OPENCLAW_EXTENSIONS_DIR: path.resolve(
+        effectiveOpenclawSidecarRoot,
+        "node_modules",
+        "openclaw",
+        "extensions",
+      ),
+      NODE_PATH: skillNodePath,
+      TMPDIR: openclawTempDir,
+      ...(runtimeConfig.amplitudeApiKey
+        ? { AMPLITUDE_API_KEY: runtimeConfig.amplitudeApiKey }
+        : {}),
+    },
+  };
+
+  const webManifest: RuntimeUnitManifest = {
+    id: "web",
+    label: "Web",
+    kind: "surface",
+    launchStrategy: "managed",
+    command: resolveElectronNodeRunner(),
+    args: [webEntryPath],
+    cwd: webRoot,
+    port: runtimeConfig.ports.web,
+    startupTimeoutMs: 15_000,
+    autoStart: false,
+    logFilePath: path.resolve(logsDir, "web.log"),
+    env: {
+      ...proxyEnv,
+      ELECTRON_RUN_AS_NODE: "1",
+      NODE_ENV: isPackaged ? "production" : "development",
+      WEB_HOST: "127.0.0.1",
+      WEB_PORT: String(runtimeConfig.ports.web),
+      WEB_API_ORIGIN: runtimeConfig.urls.controllerBase,
+    },
+  };
+
+  const openclawManifest: RuntimeUnitManifest = {
+    id: "openclaw",
+    label: "OpenClaw",
+    kind: "runtime",
+    launchStrategy: "external",
+    port: openclawPort,
+    autoStart: false,
+    logFilePath: path.resolve(logsDir, "openclaw.log"),
+    env: {
+      ...(openclawNodePath ? { NODE_PATH: openclawNodePath } : {}),
+      OPENCLAW_CONFIG_PATH: path.resolve(openclawStateDir, "openclaw.json"),
+      OPENCLAW_STATE_DIR: openclawStateDir,
+    },
+  };
+
+  const manifests = [controllerManifest, webManifest, openclawManifest];
+  logManifestLifecycle(
+    userDataPath,
+    `manifest generation done count=${manifests.length} ids=${manifests
+      .map((manifest) => `${manifest.id}:${manifest.launchStrategy}`)
+      .join(",")} durationMs=${Date.now() - startedAt}`,
+  );
+  return manifests;
 }

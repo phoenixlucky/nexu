@@ -52,6 +52,15 @@ type PackagedArchiveMetadata = {
   version?: string;
 };
 
+type SidecarMaterializationSnapshot = {
+  archiveFormat: string;
+  archivePath: string;
+  archiveBytes: number | null;
+  extractedSidecarRoot: string;
+  extractionNeeded: boolean;
+  cachedReuse: boolean;
+};
+
 function ensureDir(targetPath: string): string {
   mkdirSync(targetPath, { recursive: true });
   return targetPath;
@@ -85,6 +94,48 @@ function readPackagedArchiveMetadata(
   return JSON.parse(
     readFileSync(archiveMetadataPath, "utf8"),
   ) as PackagedArchiveMetadata;
+}
+
+function readArchiveBytes(archivePath: string): number | null {
+  if (!existsSync(archivePath)) {
+    return null;
+  }
+
+  return statSync(archivePath).size;
+}
+
+function buildMaterializationSnapshot(
+  resolved: ReturnType<typeof resolveSidecarPaths>,
+): SidecarMaterializationSnapshot {
+  const extractionNeeded =
+    existsSync(resolved.archivePath) &&
+    !(
+      existsSync(resolved.stampPath) &&
+      existsSync(resolved.extractedOpenclawEntry) &&
+      readFileSync(resolved.stampPath, "utf8") === resolved.archiveStamp
+    );
+
+  return {
+    archiveFormat: resolved.archiveMetadata?.format ?? "tar.gz",
+    archivePath: resolved.archivePath,
+    archiveBytes: readArchiveBytes(resolved.archivePath),
+    extractedSidecarRoot: resolved.extractedSidecarRoot,
+    extractionNeeded,
+    cachedReuse: !extractionNeeded,
+  };
+}
+
+function logSidecarMaterializationEvent(
+  event: string,
+  fields: Record<string, unknown>,
+): void {
+  console.log(
+    `[openclaw-sidecar][materialize] ${JSON.stringify({
+      event,
+      ts: new Date().toISOString(),
+      ...fields,
+    })}`,
+  );
 }
 
 async function extractZipArchive(
@@ -206,19 +257,21 @@ export function createSyncTarSidecarMaterializer(): DesktopSidecarMaterializer {
     args: MaterializePackagedSidecarArgs,
   ): string => {
     const resolved = resolveSidecarPaths(args);
+    const snapshot = buildMaterializationSnapshot(resolved);
     if (!existsSync(resolved.archivePath)) {
+      logSidecarMaterializationEvent("archive-missing", snapshot);
       return resolved.packagedSidecarRoot;
     }
 
-    if (
-      existsSync(resolved.stampPath) &&
-      existsSync(resolved.extractedOpenclawEntry) &&
-      readFileSync(resolved.stampPath, "utf8") === resolved.archiveStamp
-    ) {
+    logSidecarMaterializationEvent("check", snapshot);
+    if (!snapshot.extractionNeeded) {
+      logSidecarMaterializationEvent("cache-reuse", snapshot);
       return resolved.extractedSidecarRoot;
     }
 
     const maxRetries = 3;
+    const extractionStartedAt = performance.now();
+    logSidecarMaterializationEvent("extract-start", snapshot);
     for (let attempt = 0; attempt < maxRetries; attempt += 1) {
       try {
         if (existsSync(resolved.extractedSidecarRoot)) {
@@ -249,6 +302,11 @@ export function createSyncTarSidecarMaterializer(): DesktopSidecarMaterializer {
       }
     }
 
+    logSidecarMaterializationEvent("extract-done", {
+      ...snapshot,
+      durationMs: Math.round(performance.now() - extractionStartedAt),
+    });
+
     return resolved.extractedSidecarRoot;
   };
 
@@ -264,15 +322,15 @@ export function createAsyncArchiveSidecarMaterializer(): DesktopSidecarMateriali
   return {
     async materializePackagedOpenclawSidecar(args) {
       const resolved = resolveSidecarPaths(args);
+      const snapshot = buildMaterializationSnapshot(resolved);
       if (!existsSync(resolved.archivePath)) {
+        logSidecarMaterializationEvent("archive-missing", snapshot);
         return resolved.packagedSidecarRoot;
       }
 
-      if (
-        existsSync(resolved.stampPath) &&
-        existsSync(resolved.extractedOpenclawEntry) &&
-        readFileSync(resolved.stampPath, "utf8") === resolved.archiveStamp
-      ) {
+      logSidecarMaterializationEvent("check", snapshot);
+      if (!snapshot.extractionNeeded) {
+        logSidecarMaterializationEvent("cache-reuse", snapshot);
         return resolved.extractedSidecarRoot;
       }
 
@@ -280,6 +338,8 @@ export function createAsyncArchiveSidecarMaterializer(): DesktopSidecarMateriali
         args.runtimeRoot,
         "openclaw-sidecar.extracting",
       );
+      const extractionStartedAt = performance.now();
+      logSidecarMaterializationEvent("extract-start", snapshot);
       await rm(tempExtractedSidecarRoot, { recursive: true, force: true });
       await mkdir(tempExtractedSidecarRoot, { recursive: true });
 
@@ -311,6 +371,10 @@ export function createAsyncArchiveSidecarMaterializer(): DesktopSidecarMateriali
       rmSync(resolved.extractedSidecarRoot, { recursive: true, force: true });
       await rename(tempExtractedSidecarRoot, resolved.extractedSidecarRoot);
       writeFileSync(resolved.stampPath, resolved.archiveStamp);
+      logSidecarMaterializationEvent("extract-done", {
+        ...snapshot,
+        durationMs: Math.round(performance.now() - extractionStartedAt),
+      });
 
       return resolved.extractedSidecarRoot;
     },

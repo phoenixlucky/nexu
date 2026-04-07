@@ -1,5 +1,5 @@
 import path from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const fsState = vi.hoisted(() => ({
   paths: new Set<string>(),
@@ -27,6 +27,19 @@ vi.mock("node:util", async (importOriginal) => {
 });
 
 vi.mock("node:fs", () => ({
+  createWriteStream: vi.fn(() => ({
+    write: (
+      _chunk: unknown,
+      _encoding: unknown,
+      callback?: (error?: Error | null) => void,
+    ) => {
+      callback?.(null);
+      return true;
+    },
+    end: (callback?: () => void) => {
+      callback?.();
+    },
+  })),
   existsSync: vi.fn((target: string) => fsState.paths.has(target)),
   mkdirSync: vi.fn((target: string) => {
     fsState.paths.add(target);
@@ -113,10 +126,16 @@ function createRuntimeConfig(): DesktopRuntimeConfig {
 }
 
 describe("desktop runtime manifests", () => {
+  const originalPlatform = process.platform;
+
   beforeEach(() => {
     fsState.paths.clear();
     fsState.stampContents.clear();
     execFileSyncMock.mockReset();
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, "platform", { value: originalPlatform });
   });
 
   describe("buildSkillNodePath", () => {
@@ -581,6 +600,29 @@ describe("desktop runtime manifests", () => {
         ALL_PROXY: "socks5://proxy.example.com:1080",
         NO_PROXY: "example.com,localhost,127.0.0.1,::1",
       });
+    });
+
+    it("includes Electron executable for Windows managed controller manifests", () => {
+      Object.defineProperty(process, "platform", { value: "win32" });
+
+      const manifests = createRuntimeUnitManifests(
+        "/Applications/Nexu.app/Contents/Resources",
+        "/Users/testuser/Library/Application Support/@nexu/desktop",
+        true,
+        createRuntimeConfig(),
+      );
+
+      const controllerManifest = manifests.find(
+        (manifest) => manifest.id === "controller",
+      );
+
+      expect(controllerManifest).toBeDefined();
+      expect(controllerManifest?.env).toBeDefined();
+
+      expect(controllerManifest?.env).toMatchObject({
+        OPENCLAW_ELECTRON_EXECUTABLE: controllerManifest?.command,
+      });
+      expect(controllerManifest?.env?.OPENCLAW_BIN).toContain("openclaw.cmd");
     });
   });
 });

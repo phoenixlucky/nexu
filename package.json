@@ -31,9 +31,7 @@
     "dist:mac:x64": "pnpm --filter @nexu/desktop dist:mac:x64",
     "dist:mac:unsigned": "pnpm --filter @nexu/desktop dist:mac:unsigned",
     "dist:mac:unsigned:arm64": "pnpm --filter @nexu/desktop dist:mac:unsigned:arm64",
-    "dist:mac:unsigned:x64": "pnpm --filter @nexu/desktop dist:mac:unsigned:x64",
-    "dist:win": "node ./scripts/pkg/dist/index.js windows --full",
-    "dist:win:local": "node ./scripts/pkg/dist/index.js windows --local"
+    "dist:mac:unsigned:x64": "pnpm --filter @nexu/desktop dist:mac:unsigned:x64"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

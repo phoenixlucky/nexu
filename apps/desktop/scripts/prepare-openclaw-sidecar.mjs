@@ -268,6 +268,18 @@ function formatDurationMs(durationMs) {
   return `${(durationMs / 1000).toFixed(2)}s`;
 }
 
+function logOpenclawSidecarArchiveEvent(event, fields = {}) {
+  console.log(
+    `[openclaw-sidecar][archive] ${JSON.stringify({
+      event,
+      ts: new Date().toISOString(),
+      format: OPENCLAW_SIDECAR_ARCHIVE_FORMAT,
+      payloadFileName: OPENCLAW_SIDECAR_ARCHIVE_FILE_NAME,
+      ...fields,
+    })}`,
+  );
+}
+
 async function timedStep(stepName, fn) {
   const startedAt = performance.now();
   console.log(`[openclaw-sidecar][timing] start ${stepName}`);
@@ -1155,17 +1167,34 @@ exit 127
       `openclaw-sidecar.${OPENCLAW_SIDECAR_ARCHIVE_FORMAT}`,
     );
     await timedStep("archive openclaw sidecar", async () => {
+      const archiveStartedAt = performance.now();
       await removePathIfExists(archivePath);
-      let preArchiveStats = null;
+      const preArchiveStats = await collectDirectoryStats(sidecarRoot);
+      logOpenclawSidecarArchiveEvent("start", {
+        archivePath,
+        sidecarRoot,
+        fileCount: preArchiveStats.fileCount,
+        totalBytes: preArchiveStats.totalBytes,
+      });
       if (shouldLogOpenclawSidecarProbes) {
-        preArchiveStats = await collectDirectoryStats(sidecarRoot);
         console.log(
           `[openclaw-sidecar][probe] pre-archive files=${preArchiveStats.fileCount} bytes=${preArchiveStats.totalBytes} (${formatBytes(preArchiveStats.totalBytes)})`,
         );
       }
       await createOpenclawSidecarArchive(archivePath);
+      const archiveStats = await stat(archivePath);
+      logOpenclawSidecarArchiveEvent("done", {
+        archivePath,
+        sidecarRoot,
+        fileCount: preArchiveStats.fileCount,
+        totalBytes: preArchiveStats.totalBytes,
+        archiveBytes: archiveStats.size,
+        compressionRatio: Number(
+          (archiveStats.size / Math.max(preArchiveStats.totalBytes, 1)).toFixed(3),
+        ),
+        durationMs: Math.round(performance.now() - archiveStartedAt),
+      });
       if (shouldLogOpenclawSidecarProbes) {
-        const archiveStats = await stat(archivePath);
         console.log(
           `[openclaw-sidecar][probe] archive bytes=${archiveStats.size} (${formatBytes(archiveStats.size)}) ratio=${(archiveStats.size / Math.max(preArchiveStats?.totalBytes ?? 1, 1)).toFixed(3)}`,
         );
