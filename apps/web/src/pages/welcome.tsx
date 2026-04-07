@@ -220,33 +220,11 @@ export function WelcomePage() {
     setLoginError(null);
     try {
       let { data } = await postApiInternalDesktopCloudConnect();
-      // If a stale polling session exists, disconnect and retry once. But if
-      // the desktop runtime is already polling, keep the current waiting state
-      // instead of resetting the browser auth flow.
-      if (data?.error === "Connection attempt already in progress") {
-        const statusResponse = await getApiInternalDesktopCloudStatus();
-        const status = statusResponse.data;
-
-        setCloudStatus({
-          connected: Boolean(status?.connected),
-          polling: Boolean(status?.polling),
-        });
-
-        if (status?.connected) {
-          setCloudConnecting(false);
-          markSetupComplete();
-          navigate("/workspace", { replace: true });
-          return;
-        }
-
-        if (status?.polling) {
-          return;
-        }
-
-        setCloudConnecting(false);
-        setLoginError(null);
-        return;
-      }
+      // The controller now auto-aborts any stale poll and starts a fresh
+      // device flow on re-click, so we no longer special-case
+      // "Connection attempt already in progress" — the generic data?.error
+      // recovery branch below handles any residual edge case by calling
+      // disconnect + reconnect.
       if (data?.error === "Already connected. Disconnect first.") {
         setLoginError(null);
         markSetupComplete();
