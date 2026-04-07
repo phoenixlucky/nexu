@@ -163,7 +163,7 @@ const en = {
   "layout.sidebar.balancePopup.recharged": "Plan credits (cumulative)",
   "layout.sidebar.balancePopup.rechargedTooltip":
     "Total credits added from your subscription plan",
-  "layout.sidebar.balancePopup.earned": "Reward credits (cumulative)",
+  "layout.sidebar.balancePopup.earned": "Reward credits",
   "layout.sidebar.balancePopup.earnedTooltip":
     "Earned from signup rewards, completed tasks, and activities. Consumption order: plan credits → credit packs → reward credits.",
   "layout.sidebar.balancePopup.consumed": "Consumed",
