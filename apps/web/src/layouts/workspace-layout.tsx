@@ -9,6 +9,7 @@ import { useDesktopCloudStatus } from "@/hooks/use-desktop-cloud-status";
 import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { type Locale, useLocale } from "@/hooks/use-locale";
 import { authClient } from "@/lib/auth-client";
+import { openExternalUrl } from "@/lib/desktop-links";
 import { isWindowsDesktopPlatform } from "@/lib/desktop-platform";
 import { normalizeChannel, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
@@ -196,12 +197,12 @@ function LanguageToggle({ collapsed }: { collapsed: boolean }) {
 const SETUP_COMPLETE_KEY = "nexu_setup_complete";
 const GITHUB_URL = "https://github.com/nexu-io/nexu";
 function resolveCloudUsageUrl(cloudUrl?: string | null): string {
-  if (!cloudUrl) return "https://nexu.net/workspace/usage";
+  if (!cloudUrl) return "https://nexu.io/workspace/usage";
   try {
     const origin = new URL(cloudUrl).origin;
     return `${origin}/workspace/usage`;
   } catch {
-    return "https://nexu.net/workspace/usage";
+    return "https://nexu.io/workspace/usage";
   }
 }
 
@@ -1072,7 +1073,9 @@ function WorkspaceLayoutInner() {
                           track("workspace_sidebar_click", {
                             target: "credits_popup_detail",
                           });
-                          navigate("/workspace/rewards");
+                          void openExternalUrl(
+                            resolveCloudUsageUrl(desktopCloudStatus?.cloudUrl),
+                          );
                         }}
                       >
                         {t("layout.sidebar.balancePopup.viewDetail")}
