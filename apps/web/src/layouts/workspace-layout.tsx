@@ -963,6 +963,7 @@ function WorkspaceLayoutInner() {
                   data-sidebar-growth-card="rewards"
                   className="group mx-3 mb-2 flex items-center gap-3 rounded-[12px] border border-[#F5DFC0]/50 bg-gradient-to-br from-[#FFF8F0] via-[#FFFAF5] to-[#FFF5EB] px-3.5 py-3 shadow-[0_1px_3px_rgba(245,200,120,0.08)] transition-all duration-200 hover:border-[#F0D0A0]/60 hover:shadow-[0_2px_8px_rgba(245,200,120,0.15)]"
                   onClick={() => {
+                    track("workspace_growth_rewards_click");
                     track("workspace_rewards_click");
                     track("workspace_sidebar_click", { target: "rewards" });
                   }}
@@ -1049,6 +1050,7 @@ function WorkspaceLayoutInner() {
                         className="mt-2.5 flex w-full items-center justify-between border-t border-border/60 pt-2.5 text-[11px] font-medium text-text-secondary transition-colors hover:text-text-primary"
                         onClick={() => {
                           setShowBalancePopup(false);
+                          track("workspace_click_usage_detail");
                           track("workspace_sidebar_click", {
                             target: "credits_popup_detail",
                           });
