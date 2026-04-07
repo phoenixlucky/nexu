@@ -2,7 +2,6 @@ import { formatRewardAmount } from "@/components/rewards/home-rewards-teaser";
 import { RewardTaskIcon } from "@/components/rewards/reward-task-icon";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCloudConnect } from "@/hooks/use-cloud-connect";
-import { useDesktopCloudStatus } from "@/hooks/use-desktop-cloud-status";
 import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { openExternalUrl } from "@/lib/desktop-links";
 import {
@@ -24,14 +23,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
-function resolveCloudShareUrl(cloudUrl?: string | null): string {
-  if (!cloudUrl) return "https://nexu.net";
-  try {
-    return new URL(cloudUrl).origin;
-  } catch {
-    return "https://nexu.net";
-  }
-}
+const MOBILE_SHARE_QR_URL = "https://github.com/nexu-io/nexu";
 
 const REWARD_GROUPS: Array<{
   key: RewardTaskStatus["group"];
@@ -237,8 +229,6 @@ export function RewardsPage() {
   const [confirmGithubSessionId, setConfirmGithubSessionId] = useState<
     string | null
   >(null);
-
-  const { data: desktopCloudStatus } = useDesktopCloudStatus();
 
   const { cloudConnecting, handleCloudConnect } = useCloudConnect({
     cloudConnected: status.viewer.cloudConnected,
@@ -577,9 +567,7 @@ export function RewardsPage() {
                           <div className="flex items-center gap-4 rounded-lg px-3 py-3">
                             <div className="shrink-0 rounded-xl border border-border bg-white p-1.5">
                               <QRCodeSVG
-                                value={resolveCloudShareUrl(
-                                  desktopCloudStatus?.cloudUrl,
-                                )}
+                                value={MOBILE_SHARE_QR_URL}
                                 size={56}
                               />
                             </div>
