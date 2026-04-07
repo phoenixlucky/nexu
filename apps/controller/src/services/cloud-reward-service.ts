@@ -6,6 +6,7 @@ import {
   rewardTaskIdSchema,
 } from "@nexu/shared";
 import { z } from "zod";
+import { logger } from "../lib/logger.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
 
 type CloudRewardServiceOptions = {
@@ -104,15 +105,33 @@ export function createCloudRewardService(
           return { ok: false, reason: "auth_failed" };
         }
         if (!res.ok) {
+          logger.warn(
+            { status: res.status, url: `${cloudUrl}/api/v1/rewards/status` },
+            "cloud_rewards_status_http_error",
+          );
           return { ok: false, reason: "network_error" };
         }
         const data: unknown = await res.json();
         const parsed = rewardStatusResponseSchema.safeParse(data);
         if (!parsed.success) {
+          logger.warn(
+            {
+              issues: parsed.error.issues.slice(0, 5),
+              url: `${cloudUrl}/api/v1/rewards/status`,
+            },
+            "cloud_rewards_status_parse_error",
+          );
           return { ok: false, reason: "parse_error" };
         }
         return { ok: true, data: parsed.data };
-      } catch {
+      } catch (error: unknown) {
+        logger.warn(
+          {
+            error: error instanceof Error ? error.message : String(error),
+            url: `${cloudUrl}/api/v1/rewards/status`,
+          },
+          "cloud_rewards_status_network_error",
+        );
         return { ok: false, reason: "network_error" };
       }
     },

@@ -1498,6 +1498,11 @@ export class NexuConfigStore {
           cloudBalance: null,
         };
       }
+
+      logger.warn(
+        { reason: cloudResult.reason },
+        "desktop_rewards_status_cloud_fallback",
+      );
     }
 
     return {
