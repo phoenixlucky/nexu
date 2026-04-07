@@ -1486,6 +1486,27 @@ export class NexuConfigStore {
     };
   }
 
+  /**
+   * Returns a CloudRewardService bound to the currently active cloud profile,
+   * or null when the desktop is not connected to a cloud account. Used by
+   * services (e.g. GithubStarVerificationService) that need to talk to the
+   * cloud reward API without duplicating the profile resolution pattern.
+   */
+  async createCloudRewardService() {
+    const config = await this.getConfig();
+    const cloud = readDesktopCloud(config);
+    if (!cloud.connected || !cloud.apiKey) {
+      return null;
+    }
+    const { activeProfile } =
+      await this.readConfiguredDesktopCloudProfile(config);
+    const cloudUrl = activeProfile.cloudUrl.replace(/\/+$/, "");
+    return createCloudRewardService({
+      cloudUrl,
+      apiKey: cloud.apiKey,
+    });
+  }
+
   async getDesktopRewardsStatus(): Promise<DesktopRewardsStatus> {
     const config = await this.getConfig();
     const cloud = readDesktopCloud(config);

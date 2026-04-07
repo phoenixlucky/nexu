@@ -147,7 +147,9 @@ export async function createContainer(): Promise<ControllerContainer> {
     configStore,
     openclawSyncService,
   );
-  const githubStarVerificationService = new GithubStarVerificationService();
+  const githubStarVerificationService = new GithubStarVerificationService(
+    configStore,
+  );
 
   // Wire cloud state change callback to sync refreshed cloud inventory without
   // auto-switching the default model during startup or first-channel connect.

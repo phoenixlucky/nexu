@@ -63,6 +63,30 @@ const cloudErrorResponseSchema = z.object({
 export type RewardStatusResponse = z.infer<typeof rewardStatusResponseSchema>;
 export type RewardClaimResponse = z.infer<typeof rewardClaimResponseSchema>;
 
+const githubStarPrepareResponseSchema = z.object({
+  sessionToken: z.string().min(1),
+  baselineStars: z.number().int().nonnegative(),
+  expiresAt: z.string(),
+});
+
+const githubStarVerifyResponseSchema = z.discriminatedUnion("ok", [
+  z.object({
+    ok: z.literal(true),
+    currentStars: z.number().int().nonnegative(),
+  }),
+  z.object({
+    ok: z.literal(false),
+    reason: z.enum(["invalid", "expired", "not_increased"]),
+  }),
+]);
+
+export type GithubStarPrepareData = z.infer<
+  typeof githubStarPrepareResponseSchema
+>;
+export type GithubStarVerifyData = z.infer<
+  typeof githubStarVerifyResponseSchema
+>;
+
 export type CloudRewardErrorReason =
   | "auth_failed"
   | "network_error"
@@ -79,6 +103,10 @@ export type CloudRewardService = {
     proof?: DesktopRewardClaimProof,
   ): Promise<CloudRewardResult<RewardClaimResponse>>;
   setRewardBalance(balance: number): Promise<CloudRewardResult<{ ok: true }>>;
+  prepareGithubStarSession(): Promise<CloudRewardResult<GithubStarPrepareData>>;
+  verifyGithubStarSession(
+    sessionToken: string,
+  ): Promise<CloudRewardResult<GithubStarVerifyData>>;
 };
 
 export function createCloudRewardService(
@@ -185,6 +213,100 @@ export function createCloudRewardService(
         }
         return { ok: true, data: parsed.data };
       } catch {
+        return { ok: false, reason: "network_error" };
+      }
+    },
+
+    async prepareGithubStarSession() {
+      try {
+        const res = await fetchWithAuth("/api/v1/rewards/github-star/prepare", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        if (res.status === 401 || res.status === 403) {
+          return {
+            ok: false,
+            reason: "auth_failed",
+            message: await readCloudErrorMessage(res),
+          };
+        }
+        if (!res.ok) {
+          logger.warn(
+            {
+              status: res.status,
+              url: `${cloudUrl}/api/v1/rewards/github-star/prepare`,
+            },
+            "cloud_github_star_prepare_http_error",
+          );
+          return {
+            ok: false,
+            reason: "network_error",
+            message: await readCloudErrorMessage(res),
+          };
+        }
+        const data: unknown = await res.json();
+        const parsed = githubStarPrepareResponseSchema.safeParse(data);
+        if (!parsed.success) {
+          logger.warn(
+            { issues: parsed.error.issues.slice(0, 5) },
+            "cloud_github_star_prepare_parse_error",
+          );
+          return { ok: false, reason: "parse_error" };
+        }
+        return { ok: true, data: parsed.data };
+      } catch (error: unknown) {
+        logger.warn(
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "cloud_github_star_prepare_network_error",
+        );
+        return { ok: false, reason: "network_error" };
+      }
+    },
+
+    async verifyGithubStarSession(sessionToken) {
+      try {
+        const res = await fetchWithAuth("/api/v1/rewards/github-star/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionToken }),
+        });
+        if (res.status === 401 || res.status === 403) {
+          return {
+            ok: false,
+            reason: "auth_failed",
+            message: await readCloudErrorMessage(res),
+          };
+        }
+        if (!res.ok) {
+          logger.warn(
+            {
+              status: res.status,
+              url: `${cloudUrl}/api/v1/rewards/github-star/verify`,
+            },
+            "cloud_github_star_verify_http_error",
+          );
+          return { ok: false, reason: "network_error" };
+        }
+        const data: unknown = await res.json();
+        const parsed = githubStarVerifyResponseSchema.safeParse(data);
+        if (!parsed.success) {
+          logger.warn(
+            { issues: parsed.error.issues.slice(0, 5) },
+            "cloud_github_star_verify_parse_error",
+          );
+          return { ok: false, reason: "parse_error" };
+        }
+        return { ok: true, data: parsed.data };
+      } catch (error: unknown) {
+        logger.warn(
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "cloud_github_star_verify_network_error",
+        );
         return { ok: false, reason: "network_error" };
       }
     },
