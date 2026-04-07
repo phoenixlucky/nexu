@@ -1814,6 +1814,59 @@ function buildRuntimeExtractionStamp(
   });
 }
 
+function readRuntimeExtractionStamp(stampPath: string): string | null {
+  try {
+    return readFileSync(stampPath, "utf8").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function shouldReplaceExtractedRuntime(opts: {
+  entryPath: string;
+  stampPath: string;
+  expectedStamp: string;
+}): boolean {
+  const { entryPath, stampPath, expectedStamp } = opts;
+  const hasExistingRuntime = existsSync(entryPath) || existsSync(stampPath);
+
+  if (!hasExistingRuntime) {
+    return false;
+  }
+
+  return readRuntimeExtractionStamp(stampPath) !== expectedStamp;
+}
+
+async function cleanupForPackagedRuntimeReplacement(
+  log: (message: string) => void,
+) {
+  const launchd = new LaunchdManager({ log });
+  const labels = {
+    controller: SERVICE_LABELS.controller(false),
+    openclaw: SERVICE_LABELS.openclaw(false),
+  };
+  const plistDir = getDefaultPlistDir(false);
+
+  log(
+    "packaged runtime identity changed; tearing down launchd services before runtime replacement",
+  );
+  await teardownLaunchdServices({
+    launchd,
+    labels,
+    plistDir,
+  });
+
+  const { clean, remainingPids } = await ensureNexuProcessesDead({
+    timeoutMs: 5_000,
+    intervalMs: 200,
+  });
+  if (!clean) {
+    log(
+      `packaged runtime replacement proceeding with surviving pids=${remainingPids.join(",")}`,
+    );
+  }
+}
+
 /**
  * Ensure a standalone Electron-as-Node runner exists outside the .app bundle.
  *
@@ -2036,12 +2089,67 @@ export async function resolveLaunchdPaths(
     const runtimeDir = path.join(resourcesPath, "runtime");
     const nexuHome = path.join(os.homedir(), ".nexu");
     const version = appVersion ?? "unknown";
+    const log = console.log;
 
     // Extract runner + controller sidecar outside .app so launchd services
     // don't lock the bundle. If extraction fails (disk full, permissions,
     // etc.), fall back to in-bundle paths — the app will work but Finder
     // will report "app is in use" during reinstall.
     const appContentsPath = path.dirname(resourcesPath); // .app/Contents
+    const extractionStamp = buildRuntimeExtractionStamp(
+      appContentsPath,
+      version,
+    );
+    const runnerBinaryName = readBundleExecutableName(appContentsPath);
+    const runnerBinaryPath = path.join(
+      nexuHome,
+      "runtime",
+      "nexu-runner.app",
+      "Contents",
+      "MacOS",
+      runnerBinaryName,
+    );
+    const runnerStampPath = path.join(
+      nexuHome,
+      "runtime",
+      ".nexu-runner-version",
+    );
+    const controllerEntryPathExternal = path.join(
+      nexuHome,
+      "runtime",
+      "controller-sidecar",
+      "dist",
+      "index.js",
+    );
+    const controllerStampPath = path.join(
+      nexuHome,
+      "runtime",
+      "controller-sidecar",
+      ".version-stamp",
+    );
+    const shouldReplaceRuntime =
+      shouldReplaceExtractedRuntime({
+        entryPath: runnerBinaryPath,
+        stampPath: runnerStampPath,
+        expectedStamp: extractionStamp,
+      }) ||
+      shouldReplaceExtractedRuntime({
+        entryPath: controllerEntryPathExternal,
+        stampPath: controllerStampPath,
+        expectedStamp: extractionStamp,
+      });
+
+    if (shouldReplaceRuntime) {
+      try {
+        await cleanupForPackagedRuntimeReplacement(log);
+      } catch (err) {
+        console.warn(
+          "Packaged runtime cleanup before replacement failed, continuing with extraction attempt.",
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
+
     let nodePath = process.execPath;
     let controllerEntryPath = path.join(
       runtimeDir,

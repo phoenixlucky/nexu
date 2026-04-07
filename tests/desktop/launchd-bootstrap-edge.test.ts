@@ -803,6 +803,80 @@ describe("external runner — path stability and edge cases", () => {
     expect(cpCalls.length).toBeGreaterThan(0);
   });
 
+  it("tears down prod launchd services before replacing stale extracted runtime", async () => {
+    const fsMock = await import("node:fs");
+    const existsSync = fsMock.existsSync as unknown as ReturnType<typeof vi.fn>;
+    const readFileSync = fsMock.readFileSync as unknown as ReturnType<
+      typeof vi.fn
+    >;
+
+    mockLaunchdManager.bootoutAndWaitForExit.mockResolvedValue(undefined);
+
+    existsSync.mockImplementation((target: string) => {
+      const normalizedTarget = normalizePath(target);
+      if (normalizedTarget.endsWith(".nexu-runner-version")) return true;
+      if (normalizedTarget.endsWith("controller-sidecar/.version-stamp")) {
+        return true;
+      }
+      if (normalizedTarget.includes("nexu-runner.app/Contents/MacOS/Nexu")) {
+        return true;
+      }
+      if (normalizedTarget.endsWith("controller-sidecar/dist/index.js")) {
+        return true;
+      }
+      if (
+        normalizedTarget.endsWith(
+          "/Users/testuser/.nexu/runtime/nexu-runner.app.staging/Contents/MacOS/Nexu",
+        )
+      ) {
+        return true;
+      }
+      if (
+        normalizedTarget.endsWith(
+          "/Users/testuser/.nexu/runtime/controller-sidecar.staging/dist/index.js",
+        )
+      ) {
+        return true;
+      }
+      if (normalizedTarget.endsWith("Info.plist")) return true;
+      return false;
+    });
+    readFileSync.mockImplementation((target: string) => {
+      const normalizedTarget = normalizePath(target);
+      if (normalizedTarget.endsWith(".nexu-runner-version")) {
+        return JSON.stringify({
+          appVersion: "1.0.0",
+          bundleVersion: "old-build",
+        });
+      }
+      if (normalizedTarget.endsWith("controller-sidecar/.version-stamp")) {
+        return JSON.stringify({
+          appVersion: "1.0.0",
+          bundleVersion: "old-build",
+        });
+      }
+      if (normalizedTarget.endsWith("Info.plist")) {
+        return "<dict><key>CFBundleVersion</key><string>new-build</string><key>CFBundleExecutable</key><string>Nexu</string></dict>";
+      }
+      return "";
+    });
+
+    const { resolveLaunchdPaths } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    await resolveLaunchdPaths(true, "/App.app/Contents/Resources", "1.0.0");
+
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalledWith(
+      "io.nexu.openclaw",
+      5000,
+    );
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalledWith(
+      "io.nexu.controller",
+      5000,
+    );
+  });
+
   it("dev mode paths do NOT use external runner", async () => {
     const { resolveLaunchdPaths } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"
