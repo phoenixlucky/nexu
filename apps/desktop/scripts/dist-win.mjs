@@ -39,19 +39,6 @@ const pnpmCommand = resolvePnpmCommand({
   env: process.env,
   platform: process.platform,
 });
-const preferExistingBuildArtifacts =
-  process.env.NEXU_DESKTOP_USE_EXISTING_BUILDS === "1" ||
-  process.env.NEXU_DESKTOP_USE_EXISTING_BUILDS?.toLowerCase() === "true";
-const preferExistingRuntimeInstall =
-  process.env.NEXU_DESKTOP_USE_EXISTING_RUNTIME_INSTALL === "1" ||
-  process.env.NEXU_DESKTOP_USE_EXISTING_RUNTIME_INSTALL?.toLowerCase() ===
-    "true";
-const preferExistingSidecars =
-  process.env.NEXU_DESKTOP_USE_EXISTING_SIDECARS === "1" ||
-  process.env.NEXU_DESKTOP_USE_EXISTING_SIDECARS?.toLowerCase() === "true";
-const preferExistingWinUnpacked =
-  process.env.NEXU_DESKTOP_USE_EXISTING_WIN_UNPACKED === "1" ||
-  process.env.NEXU_DESKTOP_USE_EXISTING_WIN_UNPACKED?.toLowerCase() === "true";
 const diagnosticsEnabled =
   process.env.NEXU_DESKTOP_DIST_DIAGNOSTICS === "1" ||
   process.env.NEXU_DESKTOP_DIST_DIAGNOSTICS?.toLowerCase() === "true";
@@ -246,9 +233,9 @@ function createWindowsBuilderPhaseObserver(options) {
   const observeOnce = async () => {
     const winUnpackedPath = resolve(options.releaseRoot, "win-unpacked");
     if (!state.winUnpackedReady && (await pathExists(winUnpackedPath))) {
-      const winUnpackedStats = await collectDirectoryStats(winUnpackedPath).catch(
-        () => null,
-      );
+      const winUnpackedStats = await collectDirectoryStats(
+        winUnpackedPath,
+      ).catch(() => null);
       if (winUnpackedStats && winUnpackedStats.fileCount > 0) {
         state.winUnpackedReady = {
           path: winUnpackedPath,
@@ -554,18 +541,6 @@ async function ensureExistingSidecars(runtimeDistRoot, options = {}) {
       "web sidecar",
     ),
   ]);
-}
-
-async function canReuseExistingArtifacts(ensureFn, label) {
-  try {
-    await ensureFn();
-    return true;
-  } catch (error) {
-    console.log(
-      `[dist:win] ${label} unavailable, rebuilding: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return false;
-  }
 }
 
 async function dereferencePnpmSymlinks() {
@@ -952,37 +927,16 @@ async function main() {
   const runtimeDistRoot = buildContext.resolveRuntimeDistRoot();
   const electronBuilderEnv = buildCapabilities.createElectronBuilderEnv();
   const windowsPwdShimDir = await ensureWindowsPwdShim();
-  const allowUnarchivedOpenclawSidecar = localMode;
-  const shouldReuseExistingBuildArtifacts =
-    preferExistingBuildArtifacts ||
-    (localMode &&
-      (await canReuseExistingArtifacts(
-        ensureExistingBuildArtifacts,
-        "workspace build artifacts",
-      )));
-  const shouldReuseExistingRuntimeInstall =
-    preferExistingRuntimeInstall ||
-    (localMode &&
-      (await canReuseExistingArtifacts(
-        ensureExistingRuntimeInstall,
-        "openclaw runtime install",
-      )));
-  const shouldReuseExistingSidecars =
-    preferExistingSidecars ||
-    (localMode &&
-      (await canReuseExistingArtifacts(
-        () =>
-          ensureExistingSidecars(runtimeDistRoot, {
-            allowUnarchivedOpenclaw: allowUnarchivedOpenclawSidecar,
-          }),
-        "prepared runtime sidecars",
-      )));
-  const shouldReuseExistingWinUnpacked =
-    preferExistingWinUnpacked || nsisFromExistingDir;
+  const useUnarchivedOpenclawSidecar = buildTargetPlatform === "win";
+  const allowUnarchivedOpenclawSidecar = useUnarchivedOpenclawSidecar;
+  const shouldReuseExistingBuildArtifacts = false;
+  const shouldReuseExistingRuntimeInstall = false;
+  const shouldReuseExistingSidecars = false;
+  const shouldReuseExistingWinUnpacked = nsisFromExistingDir;
 
   if (localMode) {
     console.log(
-      `[dist:win] local mode enabled dirOnly=${dirOnly} reuseBuilds=${shouldReuseExistingBuildArtifacts} reuseRuntimeInstall=${shouldReuseExistingRuntimeInstall} reuseSidecars=${shouldReuseExistingSidecars}`,
+      `[dist:win] local mode enabled dirOnly=${dirOnly} reuseBuilds=false reuseRuntimeInstall=false reuseSidecars=false`,
     );
   }
 
@@ -1174,7 +1128,7 @@ async function main() {
           label: "prepare runtime sidecars",
           env: {
             ...buildCapabilities.sidecarReleaseEnv,
-            ...(localMode
+            ...(useUnarchivedOpenclawSidecar
               ? {
                   NEXU_DESKTOP_ARCHIVE_OPENCLAW_SIDECAR: "false",
                 }

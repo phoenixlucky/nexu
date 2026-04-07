@@ -624,5 +624,67 @@ describe("desktop runtime manifests", () => {
       });
       expect(controllerManifest?.env?.OPENCLAW_BIN).toContain("openclaw.cmd");
     });
+
+    it("prefers packaged Windows OpenClaw sidecar when no archive is present", () => {
+      Object.defineProperty(process, "platform", { value: "win32" });
+
+      const electronRoot =
+        "C:\\Users\\testuser\\Downloads\\win-unpacked\\resources";
+      const userDataPath =
+        "C:\\Users\\testuser\\AppData\\Roaming\\nexu-desktop";
+      fsState.paths.add(
+        path.resolve(
+          electronRoot,
+          "runtime",
+          "openclaw",
+          "bin",
+          "openclaw.cmd",
+        ),
+      );
+      fsState.paths.add(
+        path.resolve(
+          electronRoot,
+          "runtime",
+          "openclaw",
+          "node_modules",
+          "openclaw",
+          "openclaw.mjs",
+        ),
+      );
+
+      const manifests = createRuntimeUnitManifests(
+        electronRoot,
+        userDataPath,
+        true,
+        createRuntimeConfig(),
+      );
+
+      const controllerManifest = manifests.find(
+        (manifest) => manifest.id === "controller",
+      );
+
+      expect(controllerManifest?.env?.OPENCLAW_BIN).toBe(
+        path.resolve(
+          electronRoot,
+          "runtime",
+          "openclaw",
+          "bin",
+          "openclaw.cmd",
+        ),
+      );
+    });
+
+    it("fails for Windows packaged manifests when exe-relative OpenClaw runtime is missing", () => {
+      Object.defineProperty(process, "platform", { value: "win32" });
+
+      expect(() =>
+        createRuntimeUnitManifests(
+          "C:\\Users\\testuser\\Downloads\\win-unpacked\\resources",
+          "C:\\Users\\testuser\\AppData\\Roaming\\nexu-desktop",
+          true,
+          createRuntimeConfig(),
+        ),
+      ).toThrow(/Windows packaged OpenClaw runtime/);
+    });
   });
 });

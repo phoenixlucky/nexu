@@ -19,6 +19,7 @@ import type { DesktopRuntimeConfig } from "../../shared/runtime-config";
 import { getWorkspaceRoot } from "../../shared/workspace-paths";
 import { resolveRuntimeManifestsRoots } from "../platforms/shared/runtime-roots";
 import { createAsyncArchiveSidecarMaterializer } from "../platforms/shared/sidecar-materializer";
+import { resolveWindowsPackagedOpenclawSidecarRoot } from "../platforms/win/openclaw-runtime-locator";
 import { writeDesktopMainLog } from "./runtime-logger";
 import type { RuntimeUnitManifest } from "./types";
 
@@ -332,7 +333,13 @@ export function createRuntimeUnitManifests(
   const extractedOpenclawRoot =
     resolvePackagedOpenclawExtractedSidecarRoot(runtimeRoot);
   const effectiveOpenclawSidecarRoot = isPackaged
-    ? extractedOpenclawRoot
+    ? process.platform === "win32"
+      ? resolveWindowsPackagedOpenclawSidecarRoot({
+          packagedSidecarRoot: packagedOpenclawRoot,
+          extractedSidecarRoot: extractedOpenclawRoot,
+          packagedArchivePath: packagedOpenclawArchive ?? null,
+        })
+      : extractedOpenclawRoot
     : openclawSidecarRoot;
   const effectiveOpenclawBinPath = path.resolve(
     effectiveOpenclawSidecarRoot,

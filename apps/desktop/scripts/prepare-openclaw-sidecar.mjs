@@ -1223,7 +1223,7 @@ exit 127
     });
   } else if (shouldCopyRuntimeDependencies()) {
     console.log(
-      "[openclaw-sidecar] skipping archive packaging for fast CI mode",
+      "[openclaw-sidecar] skipping archive packaging; shipping unpacked sidecar",
     );
   }
 }
