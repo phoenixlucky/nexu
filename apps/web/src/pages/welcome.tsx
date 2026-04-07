@@ -26,6 +26,7 @@ import { LanguageSwitcher } from "../components/language-switcher";
 import { ProviderLogo } from "../components/provider-logo";
 import { useLocale } from "../hooks/use-locale";
 import { usePageTitle } from "../hooks/use-page-title";
+import { authClient } from "../lib/auth-client";
 import { openExternalUrl } from "../lib/desktop-links";
 import { track } from "../lib/tracking";
 
@@ -73,11 +74,8 @@ export function WelcomePage() {
   usePageTitle(t("welcome.pageTitle"));
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-
-  // If already set up, skip welcome
-  if (isSetupComplete()) {
-    return <Navigate to="/workspace" replace />;
-  }
+  const { data: session, isPending: authPending } = authClient.useSession();
+  const setupComplete = isSetupComplete();
 
   const [mode, setMode] = useState<Mode>("choose");
 
@@ -92,6 +90,14 @@ export function WelcomePage() {
     useDesktopCloudStatus();
   const cloudConnected = cloudStatus?.connected ?? false;
   const cloudPolling = cloudStatus?.polling ?? false;
+
+  if (setupComplete && authPending) {
+    return <div className="min-h-screen bg-[#0b0b0d]" />;
+  }
+
+  if (setupComplete && session?.user) {
+    return <Navigate to="/workspace" replace />;
+  }
 
   useEffect(() => {
     if (!cloudConnected) {
