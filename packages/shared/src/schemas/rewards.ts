@@ -46,10 +46,12 @@ const X_SHARE_URL = `https://x.com/intent/tweet?text=${encodeURIComponent(
 )}`;
 const REDDIT_SHARE_URL = `https://www.reddit.com/submit?url=${encodeURIComponent(
   REDDIT_SHARE_TARGET_URL,
-)}`;
-const LINKEDIN_SHARE_URL = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
-  "https://github.com/nexu-io/nexu",
-)}`;
+)}&title=${encodeURIComponent(
+  "The simplest desktop client for OpenClaw 🦞",
+)}&type=LINK`;
+const LINKEDIN_SHARE_URL = `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(
+  UNIVERSAL_SHARE_COPY,
+)}&shareUrl=${encodeURIComponent(GITHUB_URL)}`;
 const FACEBOOK_SHARE_URL = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
   REDDIT_SHARE_TARGET_URL,
 )}`;
