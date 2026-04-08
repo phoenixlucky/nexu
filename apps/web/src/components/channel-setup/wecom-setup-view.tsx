@@ -1,5 +1,11 @@
 import { identify, track } from "@/lib/tracking";
-import { BriefcaseBusiness, KeyRound, Loader2 } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  ExternalLink,
+  FileText,
+  KeyRound,
+  Loader2,
+} from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -68,6 +74,7 @@ export function WecomSetupView({
 
   const wecomDeveloperCenterUrl =
     "https://work.weixin.qq.com/wework_admin/frame#/aiHelper/list?from=manage_tools";
+  const wecomDocsUrl = "https://docs.nexu.io/guide/channels/wecom";
 
   return (
     <div className="p-5 rounded-xl border bg-surface-1 border-border">
@@ -173,6 +180,17 @@ export function WecomSetupView({
             {t("wecomSetup.connect")}
           </button>
         </div>
+
+        <a
+          href={wecomDocsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-[12px] text-accent hover:underline"
+        >
+          <FileText size={13} />
+          {t("modal.viewDocs", { name: t("home.channel.wecom") })}
+          <ExternalLink size={12} />
+        </a>
       </div>
     </div>
   );
