@@ -1,4 +1,5 @@
 import {
+  claimDesktopRewardRequestSchema,
   rewardTaskRequiresGithubStarSession,
   rewardTaskRequiresUrlProof,
   validateRewardProofUrl,
@@ -66,5 +67,18 @@ describe("reward proof helpers", () => {
   it("only requires a GitHub monitoring session for the star task", () => {
     expect(rewardTaskRequiresGithubStarSession("github_star")).toBe(true);
     expect(rewardTaskRequiresGithubStarSession("x_share")).toBe(false);
+  });
+
+  it("accepts encrypted GitHub session tokens longer than 128 chars", () => {
+    const longSessionToken = "x".repeat(136);
+
+    expect(() =>
+      claimDesktopRewardRequestSchema.parse({
+        taskId: "github_star",
+        proof: {
+          githubSessionId: longSessionToken,
+        },
+      }),
+    ).not.toThrow();
   });
 });

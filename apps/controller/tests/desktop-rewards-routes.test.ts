@@ -216,6 +216,44 @@ describe("registerDesktopRewardsRoutes", () => {
     });
   });
 
+  it("allows GitHub star claims when verify reports not_increased", async () => {
+    const claimDesktopReward = vi.fn().mockResolvedValue({ ok: true });
+    const verifySession = vi
+      .fn()
+      .mockResolvedValue({ ok: false, reason: "not_increased" });
+    const app = new OpenAPIHono<ControllerBindings>();
+    registerDesktopRewardsRoutes(app, {
+      configStore: {
+        getDesktopRewardsStatus: vi.fn(),
+        claimDesktopReward,
+      },
+      quotaFallbackService: {
+        triggerFallback: vi.fn(),
+      },
+      githubStarVerificationService: {
+        prepareSession: vi.fn(),
+        verifySession,
+      },
+    } as never);
+
+    const response = await app.request("/api/internal/desktop/rewards/claim", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        taskId: "github_star",
+        proof: {
+          githubSessionId: "github-session-2",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(verifySession).toHaveBeenCalledWith("github-session-2");
+    expect(claimDesktopReward).toHaveBeenCalledWith("github_star", {
+      githubSessionId: "github-session-2",
+    });
+  });
+
   it("prepares GitHub star verification sessions", async () => {
     const prepareSession = vi.fn().mockResolvedValue({
       sessionId: "session-1",

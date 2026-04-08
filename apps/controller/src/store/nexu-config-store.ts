@@ -1588,6 +1588,7 @@ export class NexuConfigStore {
       return {
         ok: false,
         alreadyClaimed: false,
+        message: "Desktop cloud is not connected",
         status: await this.getDesktopRewardsStatus(),
       };
     }
@@ -1605,6 +1606,7 @@ export class NexuConfigStore {
       return {
         ok: false,
         alreadyClaimed: false,
+        message: result.message ?? `Failed to claim reward: ${result.reason}`,
         status: await this.getDesktopRewardsStatus(),
       };
     }
@@ -1621,6 +1623,9 @@ export class NexuConfigStore {
     return {
       ok: claimData.ok,
       alreadyClaimed: claimData.alreadyClaimed,
+      message: claimData.ok
+        ? undefined
+        : "Reward claim failed",
       status: convertCloudStatusToDesktop(claimData.status, {
         cloudConnected: true,
         activeModelId: activeModelId2,

@@ -3340,7 +3340,7 @@
                       "githubSessionId": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 128
+                        "maxLength": 1024
                       }
                     },
                     "additionalProperties": false
@@ -3366,6 +3366,9 @@
                     },
                     "alreadyClaimed": {
                       "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
                     },
                     "status": {
                       "type": "object",

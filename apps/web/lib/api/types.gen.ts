@@ -1189,6 +1189,7 @@ export type PostApiInternalDesktopRewardsClaimResponses = {
     200: {
         ok: boolean;
         alreadyClaimed: boolean;
+        message?: string;
         status: {
             viewer: {
                 cloudConnected: boolean;

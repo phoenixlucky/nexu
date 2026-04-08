@@ -189,7 +189,7 @@ export const desktopRewardsStatusSchema = z.object({
 export const desktopRewardClaimProofSchema = z
   .object({
     url: z.string().trim().url().max(2048).optional(),
-    githubSessionId: z.string().trim().min(1).max(128).optional(),
+    githubSessionId: z.string().trim().min(1).max(1024).optional(),
   })
   .strict();
 
@@ -201,6 +201,7 @@ export const claimDesktopRewardRequestSchema = z.object({
 export const claimDesktopRewardResponseSchema = z.object({
   ok: z.boolean(),
   alreadyClaimed: z.boolean(),
+  message: z.string().optional(),
   status: desktopRewardsStatusSchema,
 });
 

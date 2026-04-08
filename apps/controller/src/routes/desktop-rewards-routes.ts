@@ -141,13 +141,11 @@ export function registerDesktopRewardsRoutes(
           await container.githubStarVerificationService.verifySession(
             sessionId,
           );
-        if (!verifyResult.ok) {
+        if (!verifyResult.ok && verifyResult.reason !== "not_increased") {
           const reason =
-            verifyResult.reason === "not_increased"
-              ? "You haven't starred the repository yet"
-              : verifyResult.reason === "expired"
-                ? "Session expired, please start over"
-                : "Invalid session";
+            verifyResult.reason === "expired"
+              ? "Session expired, please start over"
+              : "Invalid session";
           return c.json({ message: reason }, 400);
         }
       }

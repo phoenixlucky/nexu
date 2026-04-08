@@ -203,15 +203,37 @@ export function createCloudRewardService(
           };
         }
         if (!res.ok) {
-          return { ok: false, reason: "network_error" };
+          logger.warn(
+            { status: res.status, url: `${cloudUrl}/api/v1/rewards/claim` },
+            "cloud_rewards_claim_http_error",
+          );
+          return {
+            ok: false,
+            reason: "network_error",
+            message: await readCloudErrorMessage(res),
+          };
         }
         const data: unknown = await res.json();
         const parsed = rewardClaimResponseSchema.safeParse(data);
         if (!parsed.success) {
+          logger.warn(
+            {
+              issues: parsed.error.issues.slice(0, 5),
+              url: `${cloudUrl}/api/v1/rewards/claim`,
+            },
+            "cloud_rewards_claim_parse_error",
+          );
           return { ok: false, reason: "parse_error" };
         }
         return { ok: true, data: parsed.data };
-      } catch {
+      } catch (error: unknown) {
+        logger.warn(
+          {
+            error: error instanceof Error ? error.message : String(error),
+            url: `${cloudUrl}/api/v1/rewards/claim`,
+          },
+          "cloud_rewards_claim_network_error",
+        );
         return { ok: false, reason: "network_error" };
       }
     },

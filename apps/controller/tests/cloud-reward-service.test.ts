@@ -404,14 +404,20 @@ describe("createCloudRewardService", () => {
       expect(result.reason).toBe("auth_failed");
     });
 
-    it("returns ok:false reason:network_error on other non-2xx status", async () => {
+    it("returns cloud message on other non-2xx status", async () => {
       vi.stubGlobal(
         "fetch",
         vi.fn(
           async () =>
-            new Response(JSON.stringify({ error: "Server Error" }), {
-              status: 500,
-            }),
+            new Response(
+              JSON.stringify({
+                message:
+                  "idempotencyKey is already bound to a different credit grant",
+              }),
+              {
+                status: 400,
+              },
+            ),
         ),
       );
 
@@ -424,6 +430,9 @@ describe("createCloudRewardService", () => {
       expect(result.ok).toBe(false);
       if (result.ok) throw new Error("unreachable");
       expect(result.reason).toBe("network_error");
+      expect(result.message).toBe(
+        "idempotencyKey is already bound to a different credit grant",
+      );
     });
 
     it("sends POST with JSON body containing taskId", async () => {

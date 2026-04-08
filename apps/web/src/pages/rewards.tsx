@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCloudConnect } from "@/hooks/use-cloud-connect";
 import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { openExternalUrl } from "@/lib/desktop-links";
+import { getRewardErrorMessage } from "@/lib/reward-error-utils";
 import {
   type RewardConfirmPhase,
   completeRewardWithVirtualCheck,
@@ -236,6 +237,13 @@ export function RewardsPage() {
     onConnected: refresh,
   });
 
+  const showRewardError = (
+    error: unknown,
+    fallbackMessage: string,
+  ) => {
+    toast.error(getRewardErrorMessage(error) ?? fallbackMessage);
+  };
+
   const confirmTask = useMemo(
     () => status.tasks.find((task) => task.id === confirmTaskId) ?? null,
     [confirmTaskId, status.tasks],
@@ -270,8 +278,8 @@ export function RewardsPage() {
         } else {
           toast.error(t("rewards.claimFailed"));
         }
-      } catch {
-        toast.error(t("rewards.claimFailed"));
+      } catch (error) {
+        showRewardError(error, t("rewards.claimFailed"));
       }
       return;
     }
@@ -281,8 +289,8 @@ export function RewardsPage() {
       try {
         const session = await prepareGithubStarSession();
         sessionId = session.sessionId;
-      } catch {
-        toast.error(t("rewards.githubSessionFailed"));
+      } catch (error) {
+        showRewardError(error, t("rewards.githubSessionFailed"));
         return;
       }
       setConfirmPhase("idle");
@@ -715,7 +723,7 @@ export function RewardsPage() {
                 },
               });
               if (!result.ok) {
-                toast.error(t("rewards.claimFailed"));
+                toast.error(result.message ?? t("rewards.claimFailed"));
                 setConfirmPhase("idle");
                 return;
               }
@@ -728,8 +736,8 @@ export function RewardsPage() {
               setConfirmTaskId(null);
               setConfirmProofUrl("");
               setConfirmGithubSessionId(null);
-            } catch {
-              toast.error(t("rewards.claimFailed"));
+            } catch (error) {
+              showRewardError(error, t("rewards.claimFailed"));
               setConfirmPhase("idle");
             }
           }}
