@@ -538,6 +538,15 @@ export class NexuConfigStore {
     });
   }
 
+  private isCurrentPollingSignal(signal: AbortSignal): boolean {
+    // The polling loop may still be processing a response when a newer
+    // connectDesktopCloud() call has already aborted it and installed a fresh
+    // pollingState. Identifying the active poll by AbortSignal identity lets
+    // any final-state write from a stale loop become a no-op instead of
+    // clobbering the new flow's pollingState or persisted credentials.
+    return this.pollingState?.abortController.signal === signal;
+  }
+
   private async pollDesktopCloudAuthorization(
     cloudApiUrl: string,
     deviceId: string,
@@ -584,6 +593,9 @@ export class NexuConfigStore {
               : ((await this.fetchDesktopCloudModels(linkUrl, data.apiKey)) ??
                 []);
 
+          if (signal.aborted || !this.isCurrentPollingSignal(signal)) {
+            return;
+          }
           this.pollingState = null;
           await this.setDesktopCloudState({
             connected: true,
@@ -605,6 +617,9 @@ export class NexuConfigStore {
         }
 
         if (data.status === "expired") {
+          if (signal.aborted || !this.isCurrentPollingSignal(signal)) {
+            return;
+          }
           this.pollingState = null;
           await this.setDesktopCloudState({
             connected: false,
@@ -626,6 +641,9 @@ export class NexuConfigStore {
       }
     }
 
+    if (signal.aborted || !this.isCurrentPollingSignal(signal)) {
+      return;
+    }
     this.pollingState = null;
     await this.setDesktopCloudState({
       connected: false,
