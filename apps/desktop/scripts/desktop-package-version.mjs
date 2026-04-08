@@ -26,7 +26,11 @@ async function main() {
 
     const pkg = await readPackageJson();
     pkg.version = version;
-    await writeFile(packageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`, "utf8");
+    await writeFile(
+      packageJsonPath,
+      `${JSON.stringify(pkg, null, 2)}\n`,
+      "utf8",
+    );
     process.stdout.write(`${version}\n`);
     return;
   }
