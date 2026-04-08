@@ -94,7 +94,7 @@ type DesktopRewardClaimResponse = z.infer<
   typeof claimDesktopRewardResponseSchema
 >;
 
-const CLOUD_REWARD_CREDITS_SUMMARY_BEST_EFFORT_MS = 150;
+const CLOUD_REWARD_CREDITS_SUMMARY_BEST_EFFORT_MS = 1500;
 
 const defaultCloudProfile: CloudProfileEntry = {
   name: "Default",

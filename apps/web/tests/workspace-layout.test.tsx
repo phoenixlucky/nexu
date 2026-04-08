@@ -201,7 +201,7 @@ describe("WorkspaceLayout", () => {
   });
 
   it("uses the credits summary balance as the gift balance source", () => {
-    expect(getWorkspaceGiftBalance({ cloudBalance: null })).toBe(0);
+    expect(getWorkspaceGiftBalance({ cloudBalance: null })).toBeNull();
     expect(getWorkspaceGiftBalance({ cloudBalance: { giftBalance: 42 } })).toBe(
       42,
     );

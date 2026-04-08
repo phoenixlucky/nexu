@@ -219,8 +219,8 @@ type RewardsBalanceSource = {
 
 export function getWorkspaceGiftBalance(
   rewardsStatus: RewardsBalanceSource,
-): number {
-  return rewardsStatus.cloudBalance?.giftBalance ?? 0;
+): number | null {
+  return rewardsStatus.cloudBalance?.giftBalance ?? null;
 }
 
 const GitHubIcon = () => (
@@ -595,19 +595,23 @@ function WorkspaceLayoutInner() {
     cloudConnected &&
     !rewardsStatus.cloudBalance &&
     (rewardsStatusLoading || !rewardsStatusResolved);
+  const rewardsBalanceUnavailable =
+    cloudConnected &&
+    !rewardsBalancePending &&
+    rewardsStatus.cloudBalance === null;
   const canOpenBalancePopup =
     cloudConnected || rewardsStatus.cloudBalance !== null;
   const rewardBalanceValue = rewardsStatus.cloudBalance
     ? `${rewardsStatus.cloudBalance.totalBalance} ${t("layout.sidebar.balanceUnit")}`
     : cloudConnected
-      ? rewardsBalancePending
-        ? t("layout.sidebar.balancePlaceholder")
-        : `0 ${t("layout.sidebar.balanceUnit")}`
+      ? t("layout.sidebar.balancePlaceholder")
       : t("layout.sidebar.balancePlaceholder");
   const rewardBalancePopupValue = rewardsStatus.cloudBalance
     ? String(rewardsStatus.cloudBalance.totalBalance)
-    : rewardBalanceValue;
-  const rewardGiftBalanceValue = getWorkspaceGiftBalance(rewardsStatus);
+    : t("layout.sidebar.balancePlaceholder");
+  const rewardGiftBalanceValue = rewardsBalanceUnavailable
+    ? t("layout.sidebar.balancePlaceholder")
+    : String(getWorkspaceGiftBalance(rewardsStatus) ?? 0);
   const shouldShowRewardsBanner =
     cloudConnected &&
     rewardsStatus.progress.totalCount > 0 &&
