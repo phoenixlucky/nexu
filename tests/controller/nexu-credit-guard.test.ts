@@ -40,13 +40,13 @@ describe("nexu-credit-guard plugin", () => {
       { channelId: "channel-a" },
     );
 
-    const sameChannelResult = await handlers.get("message_sending")?.(
-      { content: "⚠️ upstream error" },
-      { channelId: "channel-a" },
-    );
     const otherChannelResult = await handlers.get("message_sending")?.(
       { content: "⚠️ something happened" },
       { channelId: "channel-b" },
+    );
+    const sameChannelResult = await handlers.get("message_sending")?.(
+      { content: "⚠️ upstream error" },
+      { channelId: "channel-a" },
     );
 
     expect(sameChannelResult).toEqual({
