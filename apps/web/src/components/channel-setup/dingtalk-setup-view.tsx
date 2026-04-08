@@ -164,6 +164,17 @@ export function DingtalkSetupView({
           </div>
         </div>
 
+        <a
+          href={DINGTALK_DOCS_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-[12px] text-accent hover:underline"
+        >
+          <FileText size={13} />
+          {t("modal.viewDocs", { name: t("home.channel.dingtalk") })}
+          <ExternalLink size={12} />
+        </a>
+
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -179,17 +190,6 @@ export function DingtalkSetupView({
             {t("dingtalkSetup.connect")}
           </button>
         </div>
-
-        <a
-          href={DINGTALK_DOCS_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 text-[12px] text-accent hover:underline"
-        >
-          <FileText size={13} />
-          {t("modal.viewDocs", { name: t("home.channel.dingtalk") })}
-          <ExternalLink size={12} />
-        </a>
       </div>
     </div>
   );

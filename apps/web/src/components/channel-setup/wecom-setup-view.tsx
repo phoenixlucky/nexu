@@ -165,6 +165,17 @@ export function WecomSetupView({
           </div>
         </div>
 
+        <a
+          href={wecomDocsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-[12px] text-accent hover:underline"
+        >
+          <FileText size={13} />
+          {t("modal.viewDocs", { name: t("home.channel.wecom") })}
+          <ExternalLink size={12} />
+        </a>
+
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -180,17 +191,6 @@ export function WecomSetupView({
             {t("wecomSetup.connect")}
           </button>
         </div>
-
-        <a
-          href={wecomDocsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 text-[12px] text-accent hover:underline"
-        >
-          <FileText size={13} />
-          {t("modal.viewDocs", { name: t("home.channel.wecom") })}
-          <ExternalLink size={12} />
-        </a>
       </div>
     </div>
   );
