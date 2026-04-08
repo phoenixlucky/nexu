@@ -101,11 +101,16 @@ export function useDesktopRewardsStatus() {
   const rewardsQuery = useQuery({
     queryKey: DESKTOP_REWARDS_QUERY_KEY,
     queryFn: fetchDesktopRewardsStatus,
-    // 15s polling while the window is visible (down from 60s, which felt
-    // stale). When backgrounded we stop polling and rely on the focus
-    // refetch — react-query refetches immediately on window focus by
-    // default since staleTime is 0.
-    refetchInterval: 15_000,
+    // 30s when the window is actually visible AND OS-focused, 60s otherwise.
+    // The 60s floor is a defensive fallback in case focus detection is wrong
+    // — the balance still refreshes every minute no matter what.
+    refetchInterval: () =>
+      typeof document !== "undefined" &&
+      document.visibilityState === "visible" &&
+      document.hasFocus()
+        ? 30_000
+        : 60_000,
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     retry: false,
   });
