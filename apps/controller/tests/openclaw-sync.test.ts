@@ -4,12 +4,14 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ControllerEnv } from "../src/app/env.js";
 import type { compileOpenClawConfig } from "../src/lib/openclaw-config-compiler.js";
+import { CreditGuardStateWriter } from "../src/runtime/credit-guard-state-writer.js";
 import { OpenClawAuthProfilesStore } from "../src/runtime/openclaw-auth-profiles-store.js";
 import { OpenClawAuthProfilesWriter } from "../src/runtime/openclaw-auth-profiles-writer.js";
 import { OpenClawConfigWriter } from "../src/runtime/openclaw-config-writer.js";
 import { OpenClawRuntimeModelWriter } from "../src/runtime/openclaw-runtime-model-writer.js";
 import { OpenClawRuntimePluginWriter } from "../src/runtime/openclaw-runtime-plugin-writer.js";
 import { OpenClawWatchTrigger } from "../src/runtime/openclaw-watch-trigger.js";
+import { createRuntimeState } from "../src/runtime/state.js";
 import { WorkspaceTemplateWriter } from "../src/runtime/workspace-template-writer.js";
 import { OpenClawGatewayService } from "../src/services/openclaw-gateway-service.js";
 import { OpenClawSyncService } from "../src/services/openclaw-sync-service.js";
@@ -44,17 +46,20 @@ describe("OpenClawSyncService", () => {
       openclawStateDir: path.join(rootDir, ".openclaw"),
       openclawConfigPath: path.join(rootDir, ".openclaw", "openclaw.json"),
       openclawSkillsDir: path.join(rootDir, ".openclaw", "skills"),
+      userSkillsDir: path.join(rootDir, ".agents", "skills"),
+      openclawBuiltinExtensionsDir: null,
       openclawExtensionsDir: path.join(rootDir, ".openclaw", "extensions"),
+      bundledRuntimePluginsDir: path.join(rootDir, ".dist-runtime", "plugins"),
       runtimePluginTemplatesDir: path.join(rootDir, "runtime-plugins"),
-      openclawCuratedSkillsDir: path.join(
-        rootDir,
-        ".openclaw",
-        "bundled-skills",
-      ),
       openclawRuntimeModelStatePath: path.join(
         rootDir,
         ".openclaw",
         "nexu-runtime-model.json",
+      ),
+      creditGuardStatePath: path.join(
+        rootDir,
+        ".openclaw",
+        "nexu-credit-guard-state.json",
       ),
       skillhubCacheDir: path.join(rootDir, ".nexu", "skillhub-cache"),
       skillDbPath: path.join(rootDir, ".nexu", "skill-ledger.json"),
@@ -66,7 +71,11 @@ describe("OpenClawSyncService", () => {
         ".openclaw",
         "workspace-templates",
       ),
+      openclawOwnershipMode: "external",
+      openclawBaseUrl: "http://127.0.0.1:18789",
       openclawBin: "openclaw",
+      openclawLogDir: path.join(rootDir, ".nexu", "logs", "openclaw"),
+      openclawLaunchdLabel: null,
       litellmBaseUrl: null,
       litellmApiKey: null,
       openclawGatewayPort: 18789,
@@ -78,6 +87,7 @@ describe("OpenClawSyncService", () => {
       defaultModelId: "anthropic/claude-sonnet-4",
       posthogApiKey: undefined,
       posthogHost: undefined,
+      amplitudeApiKey: undefined,
     };
   });
 
@@ -98,12 +108,17 @@ describe("OpenClawSyncService", () => {
       authProfilesStore,
       new OpenClawRuntimePluginWriter(env),
       new OpenClawRuntimeModelWriter(env),
+      new CreditGuardStateWriter(env),
       new WorkspaceTemplateWriter(env),
       new OpenClawWatchTrigger(env),
-      new OpenClawGatewayService({
-        isConnected: () => false,
-        pushConfig: async () => false,
-      } as never),
+      new OpenClawGatewayService(
+        {
+          request: async () => ({}),
+          isConnected: () => false,
+          stop: () => {},
+        } as never,
+        createRuntimeState(),
+      ),
     );
 
     await configStore.createBot({ name: "Assistant", slug: "assistant" });
@@ -129,11 +144,11 @@ describe("OpenClawSyncService", () => {
       "xoxb-test",
     );
 
-    const templateFile = await readFile(
-      path.join(env.openclawWorkspaceTemplatesDir, `${template.id}.md`),
-      "utf8",
-    );
-    expect(templateFile).toBe("hello");
+    const runtimeTemplates = await configStore.getRuntimeTemplatesSnapshot();
+    expect(runtimeTemplates.templates[template.name]).toEqual({
+      content: "hello",
+      writeMode: "seed",
+    });
 
     const snapshot = JSON.parse(
       await readFile(env.compiledOpenclawSnapshotPath, "utf8"),
@@ -159,12 +174,17 @@ describe("OpenClawSyncService", () => {
       authProfilesStore,
       new OpenClawRuntimePluginWriter(env),
       new OpenClawRuntimeModelWriter(env),
+      new CreditGuardStateWriter(env),
       new WorkspaceTemplateWriter(env),
       new OpenClawWatchTrigger(env),
-      new OpenClawGatewayService({
-        isConnected: () => false,
-        pushConfig: async () => false,
-      } as never),
+      new OpenClawGatewayService(
+        {
+          request: async () => ({}),
+          isConnected: () => false,
+          stop: () => {},
+        } as never,
+        createRuntimeState(),
+      ),
       skillDb,
     );
 

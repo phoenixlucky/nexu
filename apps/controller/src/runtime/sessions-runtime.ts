@@ -1224,9 +1224,16 @@ export class SessionsRuntime {
       return true;
     }
 
-    return (
-      normalized === sessionKey || UUID_LIKE_TITLE_PATTERN.test(normalized)
-    );
+    if (normalized === sessionKey || UUID_LIKE_TITLE_PATTERN.test(normalized)) {
+      return true;
+    }
+
+    if (normalized.endsWith(" · qqbot")) {
+      const qqbotLabel = normalized.slice(0, -" · qqbot".length).trim();
+      return this.isOpaqueQqbotValue(qqbotLabel, "user");
+    }
+
+    return false;
   }
 
   private extractExactChatTargetMetadata(
