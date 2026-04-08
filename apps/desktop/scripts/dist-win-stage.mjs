@@ -15,7 +15,6 @@ import {
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveRepoLocalOpenClawInstallLayout } from "@nexu/openclaw-runtime";
 import { resolvePnpmCommand } from "./platforms/filesystem-compat.mjs";
 import { resolveBuildTargetPlatform } from "./platforms/platform-resolver.mjs";
 import { createPlatformCommandSpec } from "./platforms/process-compat.mjs";
@@ -486,17 +485,16 @@ async function ensureExistingBuildArtifacts() {
 }
 
 async function ensureExistingRuntimeInstall() {
-  const runtimeInstallLayout = resolveRepoLocalOpenClawInstallLayout(repoRoot);
+  const runtimePackageRoot = resolve(repoRoot, "openclaw-runtime");
+  const runtimeNodeModulesPath = resolve(runtimePackageRoot, "node_modules");
+  const runtimePostinstallCachePath = resolve(
+    runtimePackageRoot,
+    ".postinstall-cache.json",
+  );
 
   await Promise.all([
-    ensureExistingPath(
-      runtimeInstallLayout.runtimeNodeModulesPath,
-      "openclaw-runtime install",
-    ),
-    ensureExistingPath(
-      runtimeInstallLayout.runtimePostinstallCachePath,
-      "openclaw-runtime cache",
-    ),
+    ensureExistingPath(runtimeNodeModulesPath, "openclaw-runtime install"),
+    ensureExistingPath(runtimePostinstallCachePath, "openclaw-runtime cache"),
   ]);
 }
 
@@ -643,24 +641,6 @@ function getGitValue(args) {
   } catch {
     return "";
   }
-}
-
-function resolveLocal7ZipCommand() {
-  const candidates = ["7z.exe", "7z"];
-
-  for (const candidate of candidates) {
-    try {
-      execFileSync(candidate, ["i"], {
-        encoding: "utf8",
-        stdio: ["ignore", "ignore", "ignore"],
-      });
-      return candidate;
-    } catch {}
-  }
-
-  throw new Error(
-    "[dist:win] Windows packaging requires a local 7-Zip CLI on PATH (tried: 7z.exe, 7z).",
-  );
 }
 
 function run(command, args, options = {}) {
@@ -994,11 +974,6 @@ async function main() {
       `[dist:win] Windows packaging must run with target platform "win": host=${process.platform}, target=${buildTargetPlatform}.`,
     );
   }
-  const local7ZipCommand = await timedStep(
-    "preflight local 7z",
-    async () => resolveLocal7ZipCommand(),
-    timings,
-  );
   const buildContext = createDesktopBuildContext({
     electronRoot,
     repoRoot,
@@ -1026,8 +1001,6 @@ async function main() {
       `[dist:win] local mode enabled dirOnly=${dirOnly} reuseBuilds=false reuseRuntimeInstall=false reuseSidecars=false`,
     );
   }
-  console.log(`[dist:win] using local 7-Zip command: ${local7ZipCommand}`);
-
   if (nsisFromExistingDir) {
     const reuseCheck = await validateWinUnpackedReuse(releaseRoot);
     if (!reuseCheck.valid) {
