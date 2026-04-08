@@ -34,7 +34,20 @@ describe("reward share templates", () => {
     expect(redditUrl.origin).toBe("https://www.reddit.com");
     expect(redditUrl.pathname).toBe("/submit");
     expect(redditUrl.searchParams.get("url")).toBe(REDDIT_LINK);
-    expect(redditUrl.searchParams.has("title")).toBe(false);
+    expect(redditUrl.searchParams.get("title")).toBe(
+      "The simplest desktop client for OpenClaw 🦞",
+    );
+    expect(redditUrl.searchParams.get("type")).toBe("LINK");
+  });
+
+  it("prefills LinkedIn share copy and target url", () => {
+    const linkedinUrl = getTaskUrl("lingying");
+
+    expect(linkedinUrl.origin).toBe("https://www.linkedin.com");
+    expect(linkedinUrl.pathname).toBe("/feed/");
+    expect(linkedinUrl.searchParams.get("shareActive")).toBe("true");
+    expect(linkedinUrl.searchParams.get("text")).toBe(SHARE_COPY);
+    expect(linkedinUrl.searchParams.get("shareUrl")).toBe(GITHUB_URL);
   });
 
   it("shares the same dev.to article on Facebook", () => {
