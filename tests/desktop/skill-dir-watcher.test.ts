@@ -161,6 +161,7 @@ describe("SkillDirWatcher", () => {
           skillsDir,
           skillDb: db,
           debounceMs: 50,
+          pollIntervalMs: 50,
         });
         watcher.start();
 
@@ -182,6 +183,7 @@ describe("SkillDirWatcher", () => {
           skillsDir,
           skillDb: db,
           debounceMs: 50,
+          pollIntervalMs: 50,
         });
         watcher.syncNow();
         expect(db.isInstalled("doomed-skill", "managed")).toBe(true);
