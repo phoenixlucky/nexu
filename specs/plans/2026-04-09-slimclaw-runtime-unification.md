@@ -75,7 +75,7 @@ That is the main payoff of this work. It makes larger improvements practical, es
 - **Auto build by default**: repo install prepares the runtime automatically; explicit opt-out remains supported.
 - **Path-only contract**: slimclaw exposes artifact paths, not an extra behavior wrapper.
 - **Thin artifact**: artifact modeling stays minimal; prefer direct dist output plus archive packaging.
-- **Packaging-only mutations**: prune, prebundle, and patch exist only to optimize packaging and preserve required Nexu fixes; they must not redefine OpenClaw core behavior.
+- **Two patch classes**: distinguish packaging/optimization patches from Nexu-required compatibility patches. Both belong to slimclaw; the latter must not be dropped in the name of simplification.
 - **Quick fail**: patch, prebundle, and build failures must fail immediately; no silent fallback to an unpatched artifact.
 
 ## Contracts We Can Freeze Now
@@ -107,7 +107,7 @@ The contracts worth preserving are path contracts, not legacy directory names:
 - runtime root: a stable artifact root that consumers can resolve
 - runtime entry: `node_modules/openclaw/openclaw.mjs`
 - runtime bin: `bin/openclaw`, `bin/openclaw.cmd`, `bin/openclaw-gateway`
-- manifest path: a minimal manifest path may be exposed if needed for lookup and invalidation
+- descriptor path: a minimal descriptor/manifest must exist for lookup and invalidation
 - packaged runtime validation may continue to key off the presence of `node_modules/openclaw/openclaw.mjs`
 
 At minimum, slimclaw should provide a stable path contract for:
@@ -115,7 +115,13 @@ At minimum, slimclaw should provide a stable path contract for:
 - runtime root
 - entry path
 - bin path
-- optional manifest path
+- descriptor path
+
+The descriptor/manifest is part of the packaged artifact contract, not an optional convenience. At minimum it should freeze:
+
+- that a descriptor file exists
+- which invalidation inputs it records
+- whether exposed paths are absolute resolved paths or relative to the artifact root
 
 ### Contracts to remove
 
@@ -149,13 +155,18 @@ The following capabilities are already justified by current repo behavior and ca
 6. **Quick-fail patching**
    - missing anchors, missing files, or incompatible bundles must fail the build immediately
 
-7. **Thin artifact output**
+7. **Patch taxonomy with explicit ownership**
+   - slimclaw owns both packaging/optimization patches and Nexu-required compatibility patches
+   - compatibility patches remain required runtime behavior for Nexu and must not be treated as disposable packaging cleanup
+
+8. **Thin artifact output**
    - slimclaw outputs the runtime artifact plus only the minimal manifest/path data needed by consumers
 
-8. **Archive/materialize support for packaged runtime**
-   - packaged desktop flows must continue to support archived artifacts and extracted artifacts
+9. **Archive/descriptor ownership**
+   - slimclaw owns the canonical runtime artifact and its archive/descriptor contract
+   - packaged desktop flows must continue to support archived artifacts and extracted artifacts against that contract
 
-9. **Spawn-by-path and stdout-event compatibility**
+10. **Spawn-by-path and stdout-event compatibility**
    - controller continues to launch runtime by resolved path
    - existing stdout-driven `NEXU_EVENT` consumption remains compatible
 
@@ -186,9 +197,11 @@ controller should no longer guess repo-local fallback paths or scan legacy runti
 desktop should only:
 
 - consume slimclaw artifacts
-- package, archive, materialize, and launch those artifacts
+- package, materialize, and launch those artifacts
 
 desktop should no longer patch OpenClaw a second time or own its own runtime-producer logic.
+
+slimclaw owns the canonical artifact plus its archive/descriptor contract. Desktop consumes that contract and must not redefine it.
 
 Small transitional adapters are acceptable during rollout, but they must not become new runtime producers.
 
