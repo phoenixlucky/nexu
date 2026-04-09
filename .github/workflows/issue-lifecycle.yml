@@ -106,6 +106,90 @@ jobs:
               ].join('\n'),
             });
 
+  # ── Triage commands: /triage accepted | declined | duplicated ──
+  on-triage-command:
+    if: github.event.action == 'created' && github.event_name == 'issue_comment'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const TEAM_MEMBERS = [
+              'isfareen', 'bielurfun', 'zifrom', 'PerishCode',
+              'caiqiling958-cmd', 'nettee', 'shangxinyu1',
+              'qiongyu1999', 'lefarcen', 'zoeforfun', 'pftom', 'mrcfps',
+            ];
+
+            const comment = context.payload.comment;
+            const issue = context.payload.issue;
+            const body = (comment.body || '').trim();
+            const user = comment.user.login;
+
+            if (!TEAM_MEMBERS.includes(user)) return;
+
+            const labels = issue.labels.map(l => l.name);
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const num = issue.number;
+
+            const removeLabel = async (name) => {
+              if (labels.includes(name)) {
+                await github.rest.issues.removeLabel({ owner, repo, issue_number: num, name }).catch(() => {});
+              }
+            };
+
+            // --- /triage accepted ---
+            if (/^\/triage\s+accepted?\s*$/i.test(body)) {
+              await removeLabel('needs-triage');
+              await removeLabel('possible-duplicate');
+              await github.rest.issues.addLabels({ owner, repo, issue_number: num, labels: ['triage:accepted'] });
+
+              await github.rest.issues.createComment({ owner, repo, issue_number: num,
+                body: [
+                  `✅ This issue has been **accepted** by @${user}.`,
+                  ``,
+                  `It will be scheduled for development. If you'd like to contribute a fix, comment "I'd like to work on this" and we'll assign it to you.`,
+                ].join('\n'),
+              });
+              return;
+            }
+
+            // --- /triage declined ---
+            if (/^\/triage\s+declined?\s*$/i.test(body)) {
+              await removeLabel('needs-triage');
+              await github.rest.issues.addLabels({ owner, repo, issue_number: num, labels: ['triage:declined'] });
+
+              await github.rest.issues.createComment({ owner, repo, issue_number: num,
+                body: [
+                  `Thank you for taking the time to report this. After review, we've decided not to proceed with this issue at this time.`,
+                  ``,
+                  `If you believe this should be reconsidered, feel free to share more context and we can revisit.`,
+                ].join('\n'),
+              });
+              await github.rest.issues.update({ owner, repo, issue_number: num, state: 'closed', state_reason: 'not_planned' });
+              return;
+            }
+
+            // --- /triage duplicated #N ---
+            const dupeMatch = body.match(/^\/triage\s+duplicated?\s*#?(\d+)?\s*$/i);
+            if (dupeMatch) {
+              const dupeOf = dupeMatch[1];
+              await removeLabel('needs-triage');
+              await removeLabel('possible-duplicate');
+              await github.rest.issues.addLabels({ owner, repo, issue_number: num, labels: ['triage:duplicated'] });
+
+              const dupeRef = dupeOf ? `#${dupeOf}` : 'an existing issue';
+              await github.rest.issues.createComment({ owner, repo, issue_number: num,
+                body: [
+                  `This issue has been identified as a **duplicate** of ${dupeRef}.`,
+                  ``,
+                  dupeOf ? `Please follow ${dupeRef} for updates. Closing this issue.` : `Please search existing issues for updates. Closing this issue.`,
+                ].join('\n'),
+              });
+              await github.rest.issues.update({ owner, repo, issue_number: num, state: 'closed', state_reason: 'not_planned' });
+              return;
+            }
+
   # ── Auto-assign when contributor claims an issue ──
   on-claim:
     if: github.event.action == 'created' && github.event_name == 'issue_comment'
