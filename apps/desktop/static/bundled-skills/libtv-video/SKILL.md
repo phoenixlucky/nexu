@@ -1,6 +1,6 @@
 ---
 name: LibTV - Image&Video（Seedance 2.0）
-description: Unified LibTV skill for generating BOTH AI images AND videos, powered by Seedance 2.0. Handles text-to-image, image-to-image, text-to-video, and image-to-video workflows via Nexu-managed Seedance keys or user-owned direct LibTV keys. Trigger when users ask to generate, create, edit, or modify AI images or videos; mention seedance, libtv, liblib, image, picture, illustration, video, animation; upload reference media; or ask about generation progress.
+description: Seedance 2.0 video & image generation via LibTV Gateway - AI text-to-video, image-to-video, video continuation, style transfer, and text-to-image using Seedance 2.0 model. Also supports Kling 3.0, Wan 2.6, Midjourney, Seedream 5.0. Trigger phrases: "seedance", "generate video", "make a video", "generate image", "make an image", "draw", "libtv", "liblib".
 homepage: https://www.liblib.tv/
 metadata:
   {

@@ -690,18 +690,7 @@ def cmd_upload(args):
     print(f"   url: {oss_url}")
     print(json.dumps({"url": oss_url}, ensure_ascii=False))
 
-MODEL_HINT = ", please use Seedance 2.0"
 VIDEO_RATIO_HINT_TEMPLATE = ", video ratio {ratio}"
-
-def _append_model_hint(message):
-    """Append Seedance 2.0 model hint if no model is explicitly mentioned."""
-    if not message:
-        return message
-    model_keywords = ["seedance", "kling", "wan ", "midjourney", "seedream", "nanobanana"]
-    lower = message.lower()
-    if any(kw in lower for kw in model_keywords):
-        return message
-    return message + MODEL_HINT
 
 def _append_video_ratio_hint(message):
     if not message:
@@ -711,10 +700,13 @@ def _append_video_ratio_hint(message):
     return message + VIDEO_RATIO_HINT_TEMPLATE.format(ratio=_get_video_ratio())
 
 def _build_session_message(message, auth_mode):
-    next_message = _append_video_ratio_hint(message)
-    if auth_mode == AUTH_MODE_NEXU_GATEWAY:
-        return _append_model_hint(next_message)
-    return next_message
+    # Model selection is left to whatever the user specified (or to the
+    # LibTV backend's default). The skill used to pin Seedance 2.0 by
+    # appending a hint to every prompt, which conflicted with the newer
+    # "supports multiple models" framing in SKILL.md. The video ratio
+    # hint is still appended because that's a format requirement the
+    # user almost always wants defaulted.
+    return _append_video_ratio_hint(message)
 
 def _create_session_result(body, auth_mode):
     if auth_mode == AUTH_MODE_LIBTV_DIRECT:
