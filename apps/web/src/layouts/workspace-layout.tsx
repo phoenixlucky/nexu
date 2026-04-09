@@ -482,9 +482,14 @@ function WorkspaceLayoutInner() {
   useEffect(() => {
     if (!showBalancePopup) return;
     const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      const portalEl = document.querySelector(
+        "[data-sidebar-rewards-balance-popup]",
+      );
       if (
         balanceRef.current &&
-        !balanceRef.current.contains(e.target as Node)
+        !balanceRef.current.contains(target) &&
+        (!portalEl || !portalEl.contains(target))
       ) {
         setShowBalancePopup(false);
       }
@@ -1038,7 +1043,6 @@ function WorkspaceLayoutInner() {
                             data-sidebar-rewards-balance-detail="true"
                             className="mt-2.5 flex w-full items-center justify-between border-t border-border/60 pt-2.5 text-[11px] font-medium text-text-secondary transition-colors hover:text-text-primary"
                             onClick={() => {
-                              setShowBalancePopup(false);
                               track("workspace_click_usage_detail");
                               track("workspace_sidebar_click", {
                                 target: "credits_popup_detail",
@@ -1048,6 +1052,7 @@ function WorkspaceLayoutInner() {
                                   desktopCloudStatus?.cloudUrl,
                                 ),
                               );
+                              setShowBalancePopup(false);
                             }}
                           >
                             {t("layout.sidebar.balancePopup.viewDetail")}
