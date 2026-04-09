@@ -1,0 +1,206 @@
+name: PR Review SLA (48h)
+
+on:
+  pull_request_target:
+    types: [opened, ready_for_review]
+  schedule:
+    # Run every 6 hours to check for stale PRs
+    - cron: "0 */6 * * *"
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  welcome-and-label:
+    name: Welcome first-time contributors
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if first-time contributor
+        id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const author = context.payload.pull_request.user.login;
+
+            const { data: prs } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: "all",
+              sort: "created",
+              direction: "asc",
+              per_page: 5,
+            });
+
+            const authorPrs = prs.filter(
+              (pr) => pr.user.login === author && pr.number !== context.payload.pull_request.number
+            );
+            core.setOutput("is_first_pr", authorPrs.length === 0 ? "true" : "false");
+
+      - name: Label and welcome first-time contributor
+        if: steps.check.outputs.is_first_pr == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = context.payload.pull_request.number;
+            const author = context.payload.pull_request.user.login;
+
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: prNumber,
+              labels: ["first-contribution"],
+            });
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: prNumber,
+              body: [
+                `Welcome to Nexu, @${author}! 👋`,
+                "",
+                "Thanks for your first contribution. Here's what happens next:",
+                "",
+                "1. Our CI will run automated checks (typecheck, lint, build)",
+                "2. A maintainer will review your PR **within 48 hours**",
+                "3. If changes are requested, push new commits to this branch",
+                "",
+                "While you wait, feel free to check out our [First PR Tutorial](https://docs.nexu.io/guide/first-pr-tutorial) if you haven't already.",
+                "",
+                "Questions? Comment here or open a [Discussion](https://github.com/nexu-io/nexu/discussions).",
+              ].join("\n"),
+            });
+
+      - name: Add review-needed label
+        if: |
+          !github.event.pull_request.draft
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = context.payload.pull_request.number;
+
+            const teamMembers = [
+              "qiongyu1999",
+              "joeylee12629-star",
+              "ashleyashli",
+              "mrcfps",
+              "nettee",
+              "lefarcen",
+              "zoeforfun",
+              "pftom",
+              "PerishCode",
+              "caiqiling958-cmd",
+              "shangxinyu1",
+              "alchemistklk",
+              "Siri-Ray",
+            ];
+
+            const author = context.payload.pull_request.user.login;
+            if (!teamMembers.includes(author)) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: prNumber,
+                labels: ["community-pr", "review-needed"],
+              });
+            }
+
+  check-stale-reviews:
+    name: Flag PRs pending review > 48h
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find and ping stale community PRs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            const { data: prs } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: "open",
+              sort: "created",
+              direction: "asc",
+              per_page: 50,
+            });
+
+            const teamMembers = [
+              "qiongyu1999",
+              "joeylee12629-star",
+              "ashleyashli",
+              "mrcfps",
+              "nettee",
+              "lefarcen",
+              "zoeforfun",
+              "pftom",
+              "PerishCode",
+              "caiqiling958-cmd",
+              "shangxinyu1",
+              "alchemistklk",
+              "Siri-Ray",
+            ];
+
+            const reviewers = ["mrcfps", "lefarcen", "PerishCode", "nettee"];
+            const now = Date.now();
+            const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
+
+            for (const pr of prs) {
+              if (pr.draft) continue;
+              if (teamMembers.includes(pr.user.login)) continue;
+
+              const createdAt = new Date(pr.created_at).getTime();
+              const age = now - createdAt;
+
+              if (age < FORTY_EIGHT_HOURS) continue;
+
+              const { data: reviews } = await github.rest.pulls.listReviews({
+                owner,
+                repo,
+                pull_number: pr.number,
+              });
+
+              const hasTeamReview = reviews.some((r) =>
+                teamMembers.includes(r.user.login)
+              );
+
+              if (hasTeamReview) continue;
+
+              const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+                owner,
+                repo,
+                issue_number: pr.number,
+              });
+
+              const hasOverdueLabel = labels.some(
+                (l) => l.name === "review-overdue"
+              );
+
+              if (hasOverdueLabel) continue;
+
+              const hoursWaiting = Math.round(age / (60 * 60 * 1000));
+
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: pr.number,
+                labels: ["review-overdue"],
+              });
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr.number,
+                body: [
+                  `⏰ This community PR has been waiting for review for **${hoursWaiting} hours** (our SLA is 48h).`,
+                  "",
+                  `cc ${reviewers.map((r) => "@" + r).join(" ")} — please review or assign a reviewer.`,
+                ].join("\n"),
+              });
+
+              // Remove review-overdue once reviewed (handled by the label, manual cleanup)
+            }

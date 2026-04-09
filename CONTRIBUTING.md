@@ -9,12 +9,19 @@ Thank you for helping improve nexu. The sections below cover **code**, **documen
 - **Code of conduct:** follow [`CODE_OF_CONDUCT.md`](https://github.com/nexu-io/nexu/blob/main/CODE_OF_CONDUCT.md) in all Issues, Discussions, and PRs.
 - **Security:** do **not** open public issues for vulnerabilities. See [`SECURITY.md`](https://github.com/nexu-io/nexu/blob/main/SECURITY.md) for how to report them; implementation notes live in [`specs/SECURITY.md`](https://github.com/nexu-io/nexu/blob/main/specs/SECURITY.md).
 
+## First-time contributor?
+
+Start with our **[Step-by-Step First PR Tutorial](https://docs.nexu.io/guide/first-pr-tutorial)** — it walks you through the entire process from finding an issue to getting your PR merged. No prior open-source experience needed.
+
+Look for issues labeled [`good-first-issue`](https://github.com/nexu-io/nexu/labels/good-first-issue), [`help-wanted`](https://github.com/nexu-io/nexu/labels/help-wanted), or [`mentor-available`](https://github.com/nexu-io/nexu/labels/mentor-available).
+
 ## Ways to contribute
 
 - **Bug reports** — reproducible steps, version/OS, logs (redact secrets).
 - **Feature ideas** — open a Discussion or Issue so maintainers can align before large PRs.
 - **Code** — fixes and features that match the project scope.
 - **Docs** — fixes, translations, screenshots, and clarity improvements (English + Chinese when both exist).
+- **AI-assisted PRs** — we welcome contributions generated with AI coding agents. See [Agent-assisted PRs](#agent-assisted-prs) below.
 
 ## Before you write code
 
@@ -126,6 +133,26 @@ Use the imperative mood (`add`, `fix`, not `added` / `fixed`). Split unrelated c
 6. **Secrets** — never commit tokens, API keys, or personal credentials. Use env vars and local-only config.
 
 Maintainers may squash or adjust commit messages on merge; keeping your branch rebased on `main` reduces friction.
+
+## Review SLA
+
+We commit to reviewing community PRs **within 48 hours**. If your PR hasn't received a review after 48h, our automation will ping the reviewer team. You can also comment on your PR to nudge us.
+
+## Agent-assisted PRs
+
+We welcome PRs generated or assisted by AI coding agents (GitHub Copilot, Cursor, Claude Code, Devin, etc.). To help maintainers review effectively:
+
+1. **Check the box** in the PR template under "AI / Agent Assistance"
+2. **Note which parts were AI-generated** in the PR description
+3. **Review the generated code yourself** before submitting — you're responsible for correctness
+4. **Verify all CI checks pass** locally: `pnpm typecheck && pnpm lint && pnpm test`
+
+Our CI automatically detects common agent signals (branch naming patterns, commit messages, PR body) and labels PRs with `agent-assisted`. Reviewers apply extra scrutiny for:
+
+- Hallucinated imports or non-existent APIs
+- Over-engineered or unnecessary abstractions
+- Missing error handling or edge cases
+- Credentials or secrets in generated code
 
 ## CI expectations
 

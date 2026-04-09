@@ -1,3 +1,8 @@
+<!-- 
+  Welcome to Nexu! 🎉
+  First-time contributor? See our step-by-step tutorial: https://docs.nexu.io/guide/first-pr-tutorial
+-->
+
 ## What
 
 <!-- One-liner: what does this PR do? -->
@@ -20,6 +25,7 @@
 - [ ] OpenClaw runtime
 - [ ] Skills
 - [ ] Shared schemas / packages
+- [ ] Documentation
 - [ ] Build / CI / Tooling
 
 ## Checklist
@@ -30,6 +36,12 @@
 - [ ] `pnpm generate-types` run (if API routes/schemas changed)
 - [ ] No credentials or tokens in code or logs
 - [ ] No `any` types introduced (use `unknown` with narrowing)
+
+## AI / Agent Assistance
+
+<!-- If you used AI coding tools (Copilot, Cursor, Claude Code, etc.), briefly note which parts were AI-assisted. Delete this section if not applicable. -->
+
+- [ ] This PR was generated or significantly assisted by an AI coding agent
 
 ## Screenshots / recordings
 

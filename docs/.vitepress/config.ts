@@ -139,6 +139,7 @@ const enSidebar = [
   {
     text: "Community",
     items: [
+      { text: "Your First PR", link: "/guide/first-pr-tutorial" },
       { text: "Contributing", link: "/guide/contributing" },
       { text: "Contact Us", link: "/guide/contact" },
       { text: "Star Us on GitHub", link: "/guide/star" },
@@ -242,6 +243,7 @@ const zhSidebar = [
   {
     text: "社区",
     items: [
+      { text: "提交你的第一个 PR", link: "/zh/guide/first-pr-tutorial" },
       { text: "参与贡献", link: "/zh/guide/contributing" },
       { text: "联系我们", link: "/zh/guide/contact" },
       { text: "给我们 Star", link: "/zh/guide/star" },
