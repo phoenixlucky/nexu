@@ -419,6 +419,7 @@ export function createRuntimeUnitManifests(
       NODE_ENV: isPackaged ? "production" : "development",
       PORT: String(runtimeConfig.ports.controller),
       HOST: "127.0.0.1",
+      ...(process.env.CI ? { CI: process.env.CI } : {}),
       WEB_URL: runtimeConfig.urls.web,
       NEXU_HOME: runtimeConfig.paths.nexuHome,
       NEXU_CONTROLLER_OPENCLAW_MODE: "internal",

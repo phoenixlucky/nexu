@@ -344,6 +344,7 @@ export function compileOpenClawConfig(
   installedSkillSlugs?: readonly string[],
   workspaceSkillsByAgent?: ReadonlyMap<string, readonly string[]>,
 ): OpenClawConfig {
+  const disableMdnsDiscovery = process.env.CI === "true";
   const activeBots = config.bots.filter((bot) => bot.status === "active");
   const firstBotModel = activeBots[0]?.modelId ?? null;
   const defaultModelId = resolveModelId(
@@ -360,6 +361,15 @@ export function compileOpenClawConfig(
       port: env.openclawGatewayPort,
       mode: "local",
       bind: config.runtime.gateway.bind,
+      ...(disableMdnsDiscovery
+        ? {
+            discovery: {
+              mdns: {
+                mode: "off",
+              },
+            },
+          }
+        : {}),
       auth: {
         mode: config.runtime.gateway.authMode,
         ...(env.openclawGatewayToken
