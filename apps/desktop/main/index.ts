@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as Sentry from "@sentry/electron/main";
@@ -6,10 +7,12 @@ import {
   BrowserWindow,
   Menu,
   type MenuItemConstructorOptions,
+  Tray,
   app,
   crashReporter,
   dialog,
   globalShortcut,
+  nativeImage,
   nativeTheme,
   powerMonitor,
   powerSaveBlocker,
@@ -64,6 +67,12 @@ import {
   installLaunchdQuitHandler,
   teardownLaunchdServices,
 } from "./services";
+import {
+  type DesktopShellPreferences,
+  applyDesktopShellPreferencesOnStartup,
+  getDesktopShellPreferences,
+  setDesktopShellPreferencesRuntimeHandler,
+} from "./services/desktop-shell-preferences";
 import { isLaunchdBootstrapEnabled } from "./services/launchd-bootstrap";
 import { ProxyManager } from "./services/proxy-manager";
 import {
@@ -271,6 +280,7 @@ if (sentryDsn) {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let residentTray: Tray | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 
 /** True if this is the x86_64 build running under Rosetta 2 on Apple Silicon. */
@@ -897,18 +907,139 @@ function focusMainWindow(): void {
   mainWindow.focus();
 }
 
+function shouldUseResidentEntry(preferences: DesktopShellPreferences): boolean {
+  return !preferences.showInDock;
+}
+
+function resolveTrayIconPath(): string | null {
+  const candidate = resolve(
+    app.isPackaged ? process.resourcesPath : getDesktopAppRoot(),
+    "build",
+    process.platform === "win32" ? "icon.ico" : "icon.png",
+  );
+
+  return existsSync(candidate) ? candidate : null;
+}
+
+function hideMainWindowToBackground(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.hide();
+}
+
+function showMainWindowFromResidentEntry(): void {
+  const preferences = getDesktopShellPreferences();
+
+  if (process.platform === "darwin" && preferences.showInDock) {
+    void app.dock?.show();
+  }
+
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createMainWindow();
+    return;
+  }
+
+  if (!mainWindow.isVisible()) {
+    mainWindow.show();
+  }
+
+  focusMainWindow();
+}
+
+function destroyResidentTray(): void {
+  residentTray?.destroy();
+  residentTray = null;
+}
+
+function ensureResidentTray(): void {
+  if (residentTray) {
+    return;
+  }
+
+  const trayIconPath = resolveTrayIconPath();
+  if (!trayIconPath) {
+    return;
+  }
+
+  const trayIcon = nativeImage.createFromPath(trayIconPath);
+  if (trayIcon.isEmpty()) {
+    return;
+  }
+
+  if (process.platform === "darwin") {
+    trayIcon.setTemplateImage(true);
+  }
+
+  residentTray = new Tray(trayIcon);
+  residentTray.setToolTip("nexu");
+  residentTray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: "Open nexu",
+        click: () => {
+          showMainWindowFromResidentEntry();
+        },
+      },
+      {
+        label: "Quit",
+        click: () => {
+          (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+          app.quit();
+        },
+      },
+    ]),
+  );
+  residentTray.on("click", () => {
+    showMainWindowFromResidentEntry();
+  });
+}
+
+function applyResidentEntryPreferences(
+  preferences: DesktopShellPreferences,
+): void {
+  if (process.platform === "darwin") {
+    app.setActivationPolicy(preferences.showInDock ? "regular" : "accessory");
+  }
+
+  if (process.platform === "win32" && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setSkipTaskbar(!preferences.showInDock);
+  }
+
+  if (shouldUseResidentEntry(preferences)) {
+    ensureResidentTray();
+  } else {
+    destroyResidentTray();
+  }
+}
+
+function shouldHideOnWindowClose(): boolean {
+  if (!app.isPackaged) {
+    return false;
+  }
+
+  if (process.platform === "darwin") {
+    return true;
+  }
+
+  return shouldUseResidentEntry(getDesktopShellPreferences());
+}
+
 app.on("second-instance", () => {
   if (!mainWindow || mainWindow.isDestroyed()) {
     createMainWindow();
     return;
   }
 
+  showMainWindowFromResidentEntry();
   focusMainWindow();
 });
 
 function createMainWindow(): BrowserWindow {
   logLaunchTimeline("main window creation requested");
   const isMacOS = process.platform === "darwin";
+  const shellPreferences = getDesktopShellPreferences();
   const window = new BrowserWindow({
     width: 1280,
     height: 720,
@@ -934,6 +1065,10 @@ function createMainWindow(): BrowserWindow {
       webviewTag: true,
     },
   });
+
+  if (process.platform === "win32") {
+    window.setSkipTaskbar(!shellPreferences.showInDock);
+  }
 
   // Disable sandbox for webviews so preload scripts have access to Node.js APIs
   // (needed for contextBridge/ipcRenderer in ESM-built preloads)
@@ -1054,6 +1189,17 @@ function createMainWindow(): BrowserWindow {
   window.on("closed", () => {
     if (mainWindow === window) {
       mainWindow = null;
+    }
+  });
+
+  window.on("close", (event) => {
+    if ((app as unknown as Record<string, unknown>).__nexuForceQuit) {
+      return;
+    }
+
+    if (!launchdResult && shouldHideOnWindowClose()) {
+      event.preventDefault();
+      hideMainWindowToBackground();
     }
   });
 
@@ -1233,6 +1379,10 @@ app.whenReady().then(async () => {
     status: "ok",
     detail: app.getVersion(),
   });
+  setDesktopShellPreferencesRuntimeHandler((preferences) => {
+    applyResidentEntryPreferences(preferences);
+  });
+  applyDesktopShellPreferencesOnStartup();
   registerIpcHandlers(
     orchestrator,
     runtimeConfig,
@@ -1374,6 +1524,9 @@ app.whenReady().then(async () => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
+    if (shouldUseResidentEntry(getDesktopShellPreferences())) {
+      return;
+    }
     app.quit();
   }
 });

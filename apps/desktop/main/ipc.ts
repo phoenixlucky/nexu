@@ -18,6 +18,10 @@ import type { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import { exportDiagnostics } from "./diagnostics-export";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import {
+  getDesktopShellPreferences,
+  updateDesktopShellPreferences,
+} from "./services/desktop-shell-preferences";
+import {
   type QuitHandlerOptions,
   runTeardownAndExit,
 } from "./services/quit-handler";
@@ -423,6 +427,16 @@ export function registerIpcHandlers(
               method: "DELETE",
             },
           );
+        }
+
+        case "desktop:get-shell-preferences": {
+          return getDesktopShellPreferences();
+        }
+
+        case "desktop:update-shell-preferences": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["desktop:update-shell-preferences"];
+          return updateDesktopShellPreferences(typedPayload);
         }
 
         case "desktop:get-rewards-status": {

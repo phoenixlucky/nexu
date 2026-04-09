@@ -27,6 +27,8 @@ export const hostInvokeChannels = [
   "desktop:get-minimax-oauth-status",
   "desktop:start-minimax-oauth",
   "desktop:cancel-minimax-oauth",
+  "desktop:get-shell-preferences",
+  "desktop:update-shell-preferences",
   "desktop:get-rewards-status",
   "desktop:set-reward-balance",
   "desktop:rewards-updated",
@@ -135,6 +137,11 @@ export type HostInvokePayloadMap = {
     region: "global" | "cn";
   };
   "desktop:cancel-minimax-oauth": undefined;
+  "desktop:get-shell-preferences": undefined;
+  "desktop:update-shell-preferences": {
+    launchAtLogin?: boolean;
+    showInDock?: boolean;
+  };
   "desktop:get-rewards-status": undefined;
   "desktop:set-reward-balance": {
     balance: number;
@@ -408,6 +415,18 @@ export type HostInvokeResultMap = {
     region?: "global" | "cn" | null;
     error?: string | null;
     cancelled: boolean;
+  };
+  "desktop:get-shell-preferences": {
+    launchAtLogin: boolean;
+    showInDock: boolean;
+    supportsLaunchAtLogin: boolean;
+    supportsShowInDock: boolean;
+  };
+  "desktop:update-shell-preferences": {
+    launchAtLogin: boolean;
+    showInDock: boolean;
+    supportsLaunchAtLogin: boolean;
+    supportsShowInDock: boolean;
   };
   "desktop:get-rewards-status": {
     cloudBalance?: {
