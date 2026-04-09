@@ -328,7 +328,6 @@ export async function startDesktopDevProcess(options: {
     logFilePath,
     env: {
       ...desktopLaunch.env,
-      NODE_OPTIONS: createNodeOptions(),
       ...createDesktopInjectedEnv(),
       NEXU_DEV_DESKTOP_RUN_ID: runId,
       NEXU_DEV_SESSION_ID: sessionId,

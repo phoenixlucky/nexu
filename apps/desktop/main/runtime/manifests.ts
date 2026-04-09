@@ -332,6 +332,7 @@ export function createRuntimeUnitManifests(
   isPackaged: boolean,
   runtimeConfig: DesktopRuntimeConfig,
 ): RuntimeUnitManifest[] {
+  const useExternalRuntime = runtimeConfig.runtimeMode === "external";
   const {
     runtimeSidecarBaseRoot,
     runtimeRoot,
@@ -404,83 +405,102 @@ export function createRuntimeUnitManifests(
     id: "controller",
     label: "Controller",
     kind: "service",
-    launchStrategy: "managed",
-    command: resolveElectronNodeRunner(),
-    args: [controllerEntryPath],
-    cwd: controllerRoot,
+    launchStrategy: useExternalRuntime ? "external" : "managed",
+    ...(useExternalRuntime
+      ? {}
+      : {
+          command: resolveElectronNodeRunner(),
+          args: [controllerEntryPath],
+          cwd: controllerRoot,
+        }),
     port: runtimeConfig.ports.controller,
     startupTimeoutMs: 15_000,
     autoStart: false,
     logFilePath: path.resolve(logsDir, "controller.log"),
     dependents: ["web"],
-    env: {
-      ...proxyEnv,
-      ELECTRON_RUN_AS_NODE: "1",
-      NODE_ENV: isPackaged ? "production" : "development",
-      PORT: String(runtimeConfig.ports.controller),
-      HOST: "127.0.0.1",
-      ...(process.env.CI ? { CI: process.env.CI } : {}),
-      WEB_URL: runtimeConfig.urls.web,
-      NEXU_HOME: runtimeConfig.paths.nexuHome,
-      NEXU_CONTROLLER_OPENCLAW_MODE: "internal",
-      RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
-      RUNTIME_GATEWAY_PROBE_ENABLED: "true",
-      OPENCLAW_GATEWAY_PORT: String(openclawPort),
-      OPENCLAW_GATEWAY_TOKEN: runtimeConfig.tokens.gateway,
-      OPENCLAW_BASE_URL: runtimeConfig.urls.openclawBase,
-      OPENCLAW_MDNS_HOSTNAME: openclawMdnsHostname,
-      ...(process.env.CI ? { OPENCLAW_DISABLE_BONJOUR: "1" } : {}),
-      OPENCLAW_STATE_DIR: openclawStateDir,
-      OPENCLAW_CONFIG_PATH: path.resolve(openclawStateDir, "openclaw.json"),
-      OPENCLAW_LOG_DIR: path.resolve(
-        runtimeConfig.paths.nexuHome,
-        "logs",
-        "openclaw",
-      ),
-      OPENCLAW_SKILLS_DIR: openclawSkillsDir,
-      SKILLHUB_STATIC_SKILLS_DIR: skillhubStaticSkillsDir,
-      PLATFORM_TEMPLATES_DIR: platformTemplatesDir,
-      OPENCLAW_BIN: effectiveOpenclawBinPath,
-      ...(isPackaged
-        ? { OPENCLAW_ELECTRON_EXECUTABLE: resolveElectronNodeRunner() }
-        : {}),
-      OPENCLAW_EXTENSIONS_DIR: path.resolve(
-        effectiveOpenclawSidecarRoot,
-        "node_modules",
-        "openclaw",
-        "extensions",
-      ),
-      NODE_PATH: skillNodePath,
-      TMPDIR: openclawTempDir,
-      ...(runtimeConfig.posthogApiKey
-        ? { POSTHOG_API_KEY: runtimeConfig.posthogApiKey }
-        : {}),
-      ...(runtimeConfig.posthogHost
-        ? { POSTHOG_HOST: runtimeConfig.posthogHost }
-        : {}),
-    },
+    ...(useExternalRuntime
+      ? {}
+      : {
+          env: {
+            ...proxyEnv,
+            ELECTRON_RUN_AS_NODE: "1",
+            NODE_ENV: isPackaged ? "production" : "development",
+            PORT: String(runtimeConfig.ports.controller),
+            HOST: "127.0.0.1",
+            ...(process.env.CI ? { CI: process.env.CI } : {}),
+            WEB_URL: runtimeConfig.urls.web,
+            NEXU_HOME: runtimeConfig.paths.nexuHome,
+            NEXU_CONTROLLER_OPENCLAW_MODE: "internal",
+            RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
+            RUNTIME_GATEWAY_PROBE_ENABLED: "true",
+            OPENCLAW_GATEWAY_PORT: String(openclawPort),
+            OPENCLAW_GATEWAY_TOKEN: runtimeConfig.tokens.gateway,
+            OPENCLAW_BASE_URL: runtimeConfig.urls.openclawBase,
+            OPENCLAW_MDNS_HOSTNAME: openclawMdnsHostname,
+            ...(process.env.CI ? { OPENCLAW_DISABLE_BONJOUR: "1" } : {}),
+            OPENCLAW_STATE_DIR: openclawStateDir,
+            OPENCLAW_CONFIG_PATH: path.resolve(
+              openclawStateDir,
+              "openclaw.json",
+            ),
+            OPENCLAW_LOG_DIR: path.resolve(
+              runtimeConfig.paths.nexuHome,
+              "logs",
+              "openclaw",
+            ),
+            OPENCLAW_SKILLS_DIR: openclawSkillsDir,
+            SKILLHUB_STATIC_SKILLS_DIR: skillhubStaticSkillsDir,
+            PLATFORM_TEMPLATES_DIR: platformTemplatesDir,
+            OPENCLAW_BIN: effectiveOpenclawBinPath,
+            ...(isPackaged
+              ? { OPENCLAW_ELECTRON_EXECUTABLE: resolveElectronNodeRunner() }
+              : {}),
+            OPENCLAW_EXTENSIONS_DIR: path.resolve(
+              effectiveOpenclawSidecarRoot,
+              "node_modules",
+              "openclaw",
+              "extensions",
+            ),
+            NODE_PATH: skillNodePath,
+            TMPDIR: openclawTempDir,
+            ...(runtimeConfig.posthogApiKey
+              ? { POSTHOG_API_KEY: runtimeConfig.posthogApiKey }
+              : {}),
+            ...(runtimeConfig.posthogHost
+              ? { POSTHOG_HOST: runtimeConfig.posthogHost }
+              : {}),
+          },
+        }),
   };
 
   const webManifest: RuntimeUnitManifest = {
     id: "web",
     label: "Web",
     kind: "surface",
-    launchStrategy: "managed",
-    command: resolveElectronNodeRunner(),
-    args: [webEntryPath],
-    cwd: webRoot,
+    launchStrategy: useExternalRuntime ? "external" : "managed",
+    ...(useExternalRuntime
+      ? {}
+      : {
+          command: resolveElectronNodeRunner(),
+          args: [webEntryPath],
+          cwd: webRoot,
+        }),
     port: runtimeConfig.ports.web,
     startupTimeoutMs: 15_000,
     autoStart: false,
     logFilePath: path.resolve(logsDir, "web.log"),
-    env: {
-      ...proxyEnv,
-      ELECTRON_RUN_AS_NODE: "1",
-      NODE_ENV: isPackaged ? "production" : "development",
-      WEB_HOST: "127.0.0.1",
-      WEB_PORT: String(runtimeConfig.ports.web),
-      WEB_API_ORIGIN: runtimeConfig.urls.controllerBase,
-    },
+    ...(useExternalRuntime
+      ? {}
+      : {
+          env: {
+            ...proxyEnv,
+            ELECTRON_RUN_AS_NODE: "1",
+            NODE_ENV: isPackaged ? "production" : "development",
+            WEB_HOST: "127.0.0.1",
+            WEB_PORT: String(runtimeConfig.ports.web),
+            WEB_API_ORIGIN: runtimeConfig.urls.controllerBase,
+          },
+        }),
   };
 
   const openclawManifest: RuntimeUnitManifest = {

@@ -78,7 +78,9 @@ function absoluteRuntimePath(base: string, ...segments: string[]): string {
   return path.resolve(base, ...segments);
 }
 
-function createRuntimeConfig(): DesktopRuntimeConfig {
+function createRuntimeConfig(
+  overrides: Partial<DesktopRuntimeConfig> = {},
+): DesktopRuntimeConfig {
   return {
     buildInfo: {
       version: "1.0.0",
@@ -123,6 +125,7 @@ function createRuntimeConfig(): DesktopRuntimeConfig {
     runtimeMode: "internal",
     posthogApiKey: null,
     posthogHost: null,
+    ...overrides,
   };
 }
 
@@ -659,6 +662,36 @@ describe("desktop runtime manifests", () => {
         OPENCLAW_ELECTRON_EXECUTABLE: controllerManifest?.command,
       });
       expect(controllerManifest?.env?.OPENCLAW_BIN).toContain("openclaw.cmd");
+    });
+
+    it("uses external launch strategy for controller and web in external runtime mode", () => {
+      const manifests = createRuntimeUnitManifests(
+        "/repo/apps/desktop",
+        "/tmp/user-data",
+        false,
+        createRuntimeConfig({ runtimeMode: "external" }),
+      );
+
+      const controllerManifest = manifests.find(
+        (manifest) => manifest.id === "controller",
+      );
+      const webManifest = manifests.find((manifest) => manifest.id === "web");
+
+      expect(controllerManifest).toMatchObject({
+        id: "controller",
+        launchStrategy: "external",
+        port: 50800,
+      });
+      expect(controllerManifest?.command).toBeUndefined();
+      expect(controllerManifest?.env).toBeUndefined();
+
+      expect(webManifest).toMatchObject({
+        id: "web",
+        launchStrategy: "external",
+        port: 50810,
+      });
+      expect(webManifest?.command).toBeUndefined();
+      expect(webManifest?.env).toBeUndefined();
     });
 
     it("prefers packaged Windows OpenClaw sidecar when no archive is present", () => {
