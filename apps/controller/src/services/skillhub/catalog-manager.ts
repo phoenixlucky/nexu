@@ -191,17 +191,24 @@ export class CatalogManager {
       //     GNU tar and bsdtar everywhere, so normalizing is harmless and
       //     applied unconditionally.
       const toPosixPath = (p: string): string => p.replace(/\\/g, "/");
-      const tarArgs: string[] = [];
-      if (process.platform === "win32") {
-        tarArgs.push("--force-local");
-      }
-      tarArgs.push(
+      const baseTarArgs = [
         "-xzf",
         toPosixPath(archivePath),
         "-C",
         toPosixPath(extractDir),
-      );
-      await execFileAsync("tar", tarArgs);
+      ];
+      if (process.platform === "win32") {
+        // Try with --force-local first (GNU tar needs it for `C:` paths).
+        // Fall back without it for bsdtar (System32\tar.exe) which rejects
+        // the flag.
+        try {
+          await execFileAsync("tar", ["--force-local", ...baseTarArgs]);
+        } catch {
+          await execFileAsync("tar", baseTarArgs);
+        }
+      } else {
+        await execFileAsync("tar", baseTarArgs);
+      }
 
       const skills = this.buildMinimalCatalog(extractDir);
       writeFileSync(this.tempCatalogPath, JSON.stringify(skills), "utf8");
