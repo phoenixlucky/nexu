@@ -65,6 +65,10 @@ import {
   installLaunchdQuitHandler,
   teardownLaunchdServices,
 } from "./services";
+import {
+  startDesktopDevInspectServer,
+  stopDesktopDevInspectServer,
+} from "./services/dev-inspect-server";
 import { isLaunchdBootstrapEnabled } from "./services/launchd-bootstrap";
 import { ProxyManager } from "./services/proxy-manager";
 import {
@@ -169,6 +173,15 @@ const embeddedWorkspaceTransparentCss = `
     background-color: transparent !important;
   }
 `;
+const desktopDevInspectHost =
+  process.env.NEXU_DESKTOP_DEV_INSPECT_HOST ?? "127.0.0.1";
+const desktopDevInspectPort = Number.parseInt(
+  process.env.NEXU_DESKTOP_DEV_INSPECT_PORT ?? "5181",
+  10,
+);
+const desktopDevInspectToken =
+  process.env.NEXU_DESKTOP_DEV_INSPECT_TOKEN ?? null;
+const desktopDevServerUrl = process.env.NEXU_DESKTOP_DEV_SERVER_URL ?? null;
 
 function readNativeCrashTestTitle(event: Sentry.Event): string | null {
   const taggedTitle =
@@ -1047,6 +1060,10 @@ app.on("second-instance", () => {
   focusMainWindow();
 });
 
+app.on("before-quit", () => {
+  void stopDesktopDevInspectServer();
+});
+
 function createMainWindow(): BrowserWindow {
   logLaunchTimeline("main window creation requested");
   const isMacOS = process.platform === "darwin";
@@ -1239,14 +1256,28 @@ function createMainWindow(): BrowserWindow {
     focusMainWindow();
   }
 
-  void window.loadFile(resolve(__dirname, "../../dist/index.html"));
+  const desktopRendererEntryPath = resolve(__dirname, "../../dist/index.html");
+  const desktopRendererTarget =
+    !app.isPackaged && desktopDevServerUrl
+      ? desktopDevServerUrl
+      : desktopRendererEntryPath;
+
+  if (!app.isPackaged && desktopDevServerUrl) {
+    void window.loadURL(desktopDevServerUrl);
+  } else {
+    void window.loadFile(desktopRendererEntryPath);
+  }
   diagnosticsReporter?.recordStartupProbe({
     source: "main",
     stage: "main:window-load-dispatched",
     status: "ok",
-    detail: resolve(__dirname, "../../dist/index.html"),
+    detail: desktopRendererTarget,
   });
-  logLaunchTimeline("main window loadFile dispatched");
+  logLaunchTimeline(
+    !app.isPackaged && desktopDevServerUrl
+      ? "main window loadURL dispatched"
+      : "main window loadFile dispatched",
+  );
   mainWindow = window;
   return window;
 }
@@ -1403,6 +1434,18 @@ app.whenReady().then(async () => {
     status: "ok",
     detail: app.getVersion(),
   });
+  if (
+    !app.isPackaged &&
+    desktopDevInspectToken &&
+    Number.isInteger(desktopDevInspectPort) &&
+    desktopDevInspectPort > 0
+  ) {
+    await startDesktopDevInspectServer({
+      host: desktopDevInspectHost,
+      port: desktopDevInspectPort,
+      token: desktopDevInspectToken,
+    });
+  }
   registerIpcHandlers(
     orchestrator,
     runtimeConfig,

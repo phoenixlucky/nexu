@@ -43,6 +43,7 @@ import {
   notifySetupAnimationComplete,
   onDesktopCommand,
   onRuntimeEvent,
+  reportDesktopDevPageError,
   reportStartupProbe,
   showRuntimeLogFile,
   startUnit,
@@ -118,6 +119,16 @@ window.addEventListener("error", (event) => {
       ? (event.error.stack ?? event.error.message)
       : event.message;
   sendRendererStartupProbe("renderer:window-error", "error", detail);
+
+  if (!window.nexuHost.bootstrap.isPackaged) {
+    reportDesktopDevPageError({
+      level: "error",
+      message: detail,
+      url: window.location.href,
+      sourceId: event.filename || null,
+      line: event.lineno || null,
+    });
+  }
 });
 
 window.addEventListener("unhandledrejection", (event) => {
@@ -125,6 +136,16 @@ window.addEventListener("unhandledrejection", (event) => {
   const detail =
     reason instanceof Error ? (reason.stack ?? reason.message) : String(reason);
   sendRendererStartupProbe("renderer:unhandled-rejection", "error", detail);
+
+  if (!window.nexuHost.bootstrap.isPackaged) {
+    reportDesktopDevPageError({
+      level: "error",
+      message: `Unhandled promise rejection: ${detail}`,
+      url: window.location.href,
+      sourceId: null,
+      line: null,
+    });
+  }
 });
 
 function initializeRendererSentry(dsn: string): void {
