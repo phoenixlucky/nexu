@@ -1,0 +1,268 @@
+# Slimclaw Runtime Unification Plan
+
+Date: 2026-04-09
+
+## Context
+
+Nexu's OpenClaw runtime pipeline is currently split across multiple producers:
+
+- `openclaw-runtime/` owns install, cache, and pruning
+- `openclaw-runtime-patches/` owns part of the patch set
+- `packages/dev-utils/src/openclaw-runtime-stage.ts` patches/stages runtime for dev
+- `apps/desktop/scripts/prepare-openclaw-sidecar.mjs` patches/stages runtime for desktop packaging
+- `scripts/dev/*`, `apps/controller/*`, `apps/desktop/*`, and tests directly reference legacy runtime paths and layouts
+
+This means the repo does not have a single owner for:
+
+- the runtime build entry
+- the patch source of truth
+- the final artifact contract
+
+More importantly, this fragmented shape makes large runtime optimizations hard to execute as a closed loop. Any serious runtime change currently spills across legacy runtime packaging, dev staging, desktop sidecar prep, and test contracts.
+
+## Problem Statement
+
+The current problem is not naming. It is that the runtime artifact pipeline is fragmented.
+
+Today:
+
+- runtime producers are duplicated
+- patch mechanisms are duplicated
+- consumers depend on internal legacy paths
+- dev and desktop still own runtime-producer logic
+- pruning, patching, and sidecar layout already define product capability boundaries, but remain encoded as scattered scripts
+
+That fragmentation has a practical cost: it blocks the highest-value runtime work.
+
+The primary reason to split out `packages/slimclaw` is not aesthetic architecture cleanup. It is to create a single closed-loop runtime owner so Nexu can make larger, more aggressive OpenClaw runtime optimizations safely.
+
+The first visible payoffs are expected to be:
+
+- prebundle-driven reductions in install and build time
+- cleaner cold-start strategy with lower startup latency
+- cleaner health/readiness strategy with less startup uncertainty and recovery overhead
+
+The architectural cleanup matters, but mainly because it enables those optimizations to happen in one place instead of being spread across historical runtime scaffolding.
+
+## Goals
+
+1. Make `packages/slimclaw` the single runtime owner.
+2. Make `packages/slimclaw/build.mjs` the single runtime build entry.
+3. Converge all runtime consumers on a slimclaw-owned path contract.
+4. Ensure dev, controller, desktop, and tests consume runtime artifacts but do not produce them.
+5. Remove `openclaw-runtime` and `openclaw-runtime-patches` completely.
+
+## Expected Payoff
+
+The long-term architectural benefit is real, but the main payoff is more concrete: once slimclaw becomes the single runtime owner, Nexu can optimize OpenClaw runtime behavior as a self-contained system.
+
+That enables work that is much harder in the current layout, especially:
+
+- prebundle optimization to cut install and build time
+- better cold-start behavior to reduce startup latency
+- better runtime health/readiness handling to reduce startup delays and monitoring complexity
+
+In other words, `packages/slimclaw` is the natural long-term shape because it turns an already-existing runtime subsystem into a real optimization boundary.
+
+## Non-Goals
+
+- changing core OpenClaw behavior
+- redesigning controller or desktop product semantics
+- freezing every archive, cache, or patch implementation detail in this plan
+
+## Fixed Principles
+
+- **No magic**: slimclaw declares the `openclaw` dependency directly and builds from that.
+- **Auto build by default**: repo install prepares the runtime automatically; explicit opt-out remains supported.
+- **Path-only contract**: slimclaw exposes artifact paths, not an extra behavior wrapper.
+- **Thin artifact**: artifact modeling stays minimal; prefer direct dist output plus archive packaging.
+- **Packaging-only mutations**: prune, prebundle, and patch exist only to optimize packaging and preserve required Nexu fixes; they must not redefine OpenClaw core behavior.
+- **Quick fail**: patch, prebundle, and build failures must fail immediately; no silent fallback to an unpatched artifact.
+
+## Contracts We Can Freeze Now
+
+### External interface boundary
+
+All of the following are in scope for convergence onto slimclaw:
+
+- root/build entrypoints
+- dev entrypoints
+- controller entrypoints
+- desktop build/runtime entrypoints
+- test entrypoints
+
+Tests are part of the external interface migration, not a cleanup-afterward task.
+
+Reason: tests already encode today's runtime contract. Leaving them behind would keep two contracts alive: one for production and one for tests.
+
+Representative existing couplings include:
+
+- `scripts/dev/src/shared/dev-runtime-config.ts`
+- `apps/controller/src/runtime/openclaw-process.ts`
+- `apps/desktop/scripts/prepare-openclaw-sidecar.mjs`
+
+### Contracts to keep
+
+The contracts worth preserving are path contracts, not legacy directory names:
+
+- runtime root: a stable artifact root that consumers can resolve
+- runtime entry: `node_modules/openclaw/openclaw.mjs`
+- runtime bin: `bin/openclaw`, `bin/openclaw.cmd`, `bin/openclaw-gateway`
+- manifest path: a minimal manifest path may be exposed if needed for lookup and invalidation
+- packaged runtime validation may continue to key off the presence of `node_modules/openclaw/openclaw.mjs`
+
+At minimum, slimclaw should provide a stable path contract for:
+
+- runtime root
+- entry path
+- bin path
+- optional manifest path
+
+### Contracts to remove
+
+- top-level `openclaw-runtime/`
+- top-level `openclaw-runtime-patches/`
+- root `openclaw-runtime:*` scripts
+- direct consumer references to `openclaw-runtime/node_modules/...`
+- dev/desktop-owned patch, stage, or runtime-producer logic
+
+## Required Slimclaw Capabilities
+
+The following capabilities are already justified by current repo behavior and can be frozen in this plan.
+
+1. **Explicit dependency ownership**
+   - slimclaw declares and builds `openclaw` directly.
+
+2. **Default auto-build with explicit opt-out**
+   - runtime preparation remains automatic on install.
+
+3. **Fingerprint, cache, and reuse**
+   - unchanged inputs should reuse prior outputs
+   - changed inputs must invalidate and rebuild
+
+4. **Pruning as an owned build responsibility**
+   - prune policy is part of the build pipeline and part of artifact invalidation
+
+5. **Transactional artifact build**
+   - build into a candidate output, validate it, then switch over
+   - do not patch fragile files in-place on the final consumer path
+
+6. **Quick-fail patching**
+   - missing anchors, missing files, or incompatible bundles must fail the build immediately
+
+7. **Thin artifact output**
+   - slimclaw outputs the runtime artifact plus only the minimal manifest/path data needed by consumers
+
+8. **Archive/materialize support for packaged runtime**
+   - packaged desktop flows must continue to support archived artifacts and extracted artifacts
+
+9. **Spawn-by-path and stdout-event compatibility**
+   - controller continues to launch runtime by resolved path
+   - existing stdout-driven `NEXU_EVENT` consumption remains compatible
+
+## Consumer Boundary After Refactor
+
+### dev
+
+dev should only:
+
+- ensure slimclaw is built
+- resolve the slimclaw runtime entry path
+- launch the runtime
+
+dev should no longer patch, stage, or produce runtime artifacts.
+
+### controller
+
+controller should only:
+
+- resolve slimclaw entry/bin/root paths
+- launch and supervise the runtime
+- consume runtime events
+
+controller should no longer guess repo-local fallback paths or scan legacy runtime roots.
+
+### desktop
+
+desktop should only:
+
+- consume slimclaw artifacts
+- package, archive, materialize, and launch those artifacts
+
+desktop should no longer patch OpenClaw a second time or own its own runtime-producer logic.
+
+Small transitional adapters are acceptable during rollout, but they must not become new runtime producers.
+
+## Implementation Sequence
+
+### 1. External interface decoupling
+
+Keep the compatibility layer as thin as possible and move every runtime entrypoint to slimclaw.
+
+Done when:
+
+- all root, dev, controller, desktop, and test entrypoints resolve runtime through slimclaw-owned path contracts
+- any compatibility layer is limited to path redirection, manifest lookup, entry resolution, or small transitional adaptation
+- no compatibility layer patches, stages, or produces runtime artifacts
+
+Exit condition: no maintained caller still needs to know the legacy runtime package name or layout.
+
+### 2. Internal implementation alignment
+
+Move all producer responsibilities into slimclaw.
+
+Done when:
+
+- patch source of truth is singular
+- prune/build/fingerprint/layout ownership is singular
+- dev and desktop no longer own runtime-producer logic
+
+This may overlap locally with step 1 where necessary.
+
+Exit condition: slimclaw is the only place where runtime artifacts are built, patched, pruned, or staged.
+
+### 3. Full regression pass
+
+Verify:
+
+- build artifact correctness
+- consumer-chain correctness for dev, controller, and desktop
+- capability regressions for:
+  - Feishu patched path
+  - `NEXU_EVENT channel.reply_outcome`
+  - PDF parsing
+  - Playwright-backed browser interaction
+
+Exit condition: the slimclaw-owned pipeline preserves the runtime-critical flows the legacy pipeline was responsible for.
+
+### 4. Legacy removal
+
+After the first three steps are stable, remove:
+
+- `openclaw-runtime/`
+- `openclaw-runtime-patches/`
+- legacy root scripts
+- legacy path references
+- legacy test entrypoints
+
+Exit condition: deleting the legacy runtime directories does not break build, dev, controller, desktop, or test flows.
+
+## Details Intentionally Deferred
+
+The following are real implementation topics but should not be frozen at the plan level yet:
+
+- exact patch representation (`overlay` vs imperative vs declarative)
+- exact archive/extraction format or algorithm (`zip`, `tar`, `7z`, sync vs async)
+- exact cache filenames, stamp schemas, or internal directory layout
+- exact node-runtime selection heuristics
+- exact prune allow/deny lists
+- exact shape of temporary desktop transitional adapters
+
+## Done When
+
+- `packages/slimclaw` is the only runtime owner
+- `packages/slimclaw/build.mjs` is the only runtime build entry
+- all runtime consumers resolve artifacts through slimclaw-owned path contracts
+- dev and desktop no longer contain runtime-producer logic
+- regression coverage passes for build, consumer flows, and key runtime capabilities
+- `openclaw-runtime` and `openclaw-runtime-patches` are deleted
