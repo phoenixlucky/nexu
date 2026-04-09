@@ -440,7 +440,7 @@ export function createRuntimeUnitManifests(
       SKILLHUB_STATIC_SKILLS_DIR: skillhubStaticSkillsDir,
       PLATFORM_TEMPLATES_DIR: platformTemplatesDir,
       OPENCLAW_BIN: effectiveOpenclawBinPath,
-      ...(process.platform === "win32"
+      ...(isPackaged
         ? { OPENCLAW_ELECTRON_EXECUTABLE: resolveElectronNodeRunner() }
         : {}),
       OPENCLAW_EXTENSIONS_DIR: path.resolve(

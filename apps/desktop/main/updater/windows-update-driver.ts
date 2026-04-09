@@ -48,7 +48,7 @@ function resolveWindowsManifestUrl(options: {
   }
 
   if (options.source === "github") {
-    return "https://github.com/nexu-io/nexu/releases/latest";
+    return `${R2_BASE_URL}/${options.channel}/win32/x64/latest-win.json`;
   }
 
   return `${R2_BASE_URL}/${options.channel}/win32/x64/latest-win.json`;
@@ -164,42 +164,49 @@ export class WindowsUpdateDriver implements PlatformUpdateDriver {
 
   async checkForUpdates(): Promise<UpdateDriverCheckResult> {
     this.handlers?.onChecking();
+    try {
+      const response = await fetch(this.currentFeedUrl, {
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) {
+        throw new Error(
+          `Windows update manifest request failed: ${response.status} ${response.statusText}`,
+        );
+      }
 
-    const response = await fetch(this.currentFeedUrl, {
-      headers: { Accept: "application/json" },
-    });
-    if (!response.ok) {
-      throw new Error(
-        `Windows update manifest request failed: ${response.status} ${response.statusText}`,
-      );
-    }
+      const manifest = (await response.json()) as WindowsUpdateManifest;
+      this.latestManifest = manifest;
 
-    const manifest = (await response.json()) as WindowsUpdateManifest;
-    this.latestManifest = manifest;
+      const updateAvailable =
+        compareDesktopVersions(manifest.version, this.context.currentVersion) >
+        0;
 
-    const updateAvailable =
-      compareDesktopVersions(manifest.version, this.context.currentVersion) > 0;
+      if (updateAvailable) {
+        this.handlers?.onAvailable({
+          version: manifest.version,
+          releaseDate: manifest.releaseDate,
+          releaseNotes: manifest.releaseNotes,
+          actionUrl: manifest.installer.url,
+        });
+      } else {
+        this.handlers?.onUnavailable({
+          version: manifest.version,
+          releaseDate: manifest.releaseDate,
+        });
+      }
 
-    if (updateAvailable) {
-      this.handlers?.onAvailable({
-        version: manifest.version,
-        releaseDate: manifest.releaseDate,
-        releaseNotes: manifest.releaseNotes,
+      return {
+        updateAvailable,
+        remoteVersion: manifest.version,
+        remoteReleaseDate: manifest.releaseDate,
         actionUrl: manifest.installer.url,
-      });
-    } else {
-      this.handlers?.onUnavailable({
-        version: manifest.version,
-        releaseDate: manifest.releaseDate,
-      });
+      };
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.handlers?.onError(normalizedError);
+      throw normalizedError;
     }
-
-    return {
-      updateAvailable,
-      remoteVersion: manifest.version,
-      remoteReleaseDate: manifest.releaseDate,
-      actionUrl: manifest.installer.url,
-    };
   }
 
   async downloadUpdate(): Promise<{ ok: boolean }> {

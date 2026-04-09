@@ -18,6 +18,16 @@ describe("windows update driver", () => {
     );
   });
 
+  it("maps github source to a machine-readable Windows manifest", () => {
+    expect(
+      resolveWindowsManifestUrlForTests({
+        source: "github",
+        channel: "stable",
+        feedUrl: null,
+      }),
+    ).toBe("https://desktop-releases.nexu.io/stable/win32/x64/latest-win.json");
+  });
+
   it("compares desktop prerelease versions correctly", () => {
     expect(
       compareDesktopVersionsForTests(
@@ -95,6 +105,52 @@ describe("windows update driver", () => {
         "https://desktop-releases.nexu.io/nightly/win32/x64/nexu-latest-nightly-win-x64.exe",
       );
       expect(onUnavailable).not.toHaveBeenCalled();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("emits onError when manifest fetch fails", async () => {
+    const onError = vi.fn();
+    const driver = new WindowsUpdateDriver({
+      currentVersion: "0.1.10",
+      autoDownload: false,
+      openExternal: vi.fn().mockResolvedValue(undefined),
+      writeLog: vi.fn(),
+    });
+    driver.configure({
+      source: "r2",
+      channel: "stable",
+      feedUrl:
+        "https://desktop-releases.nexu.io/stable/win32/x64/latest-win.json",
+    });
+    driver.bindEvents({
+      onChecking: vi.fn(),
+      onAvailable: vi.fn(),
+      onUnavailable: vi.fn(),
+      onProgress: vi.fn(),
+      onDownloaded: vi.fn(),
+      onError,
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: "Service Unavailable",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetchMock as typeof fetch;
+    try {
+      await expect(driver.checkForUpdates()).rejects.toThrow(
+        "Windows update manifest request failed: 503 Service Unavailable",
+      );
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message:
+            "Windows update manifest request failed: 503 Service Unavailable",
+        }),
+      );
     } finally {
       globalThis.fetch = originalFetch;
     }
