@@ -134,10 +134,11 @@ For slimclaw's own prepared `dist` output, the minimal descriptor should cover:
 - a relative-to-`distRoot` path map for:
   - `entryPath`
   - `binPath`
-  - `gatewayBinPath`
   - `builtinExtensionsDir`
 
 The slimclaw descriptor does **not** own archive or materialization metadata. Those belong to the upper packaging layers.
+
+The plan does **not** freeze a separate `gatewayBinPath` as part of the replacement contract. The active controller-first architecture should preserve gateway execution behavior through the runtime entry / CLI surface without baking an obsolete standalone gateway binary into the new minimal descriptor.
 
 ### Contracts to remove
 
@@ -231,6 +232,12 @@ desktop should no longer patch OpenClaw a second time or own its own runtime-pro
 
 More precisely: slimclaw owns the canonical prepared `dist` artifact plus its descriptor contract. Desktop owns any outer archive/materialization behavior built on top of that artifact.
 
+That upper-layer ownership still has hard packaged-runtime constraints that must remain true after the migration:
+
+- launchd-managed packaged services continue to run only from the packaged runtime locations under `~/.nexu/runtime/...`
+- startup attach continues to depend on the current identity checks in `runtime-ports.json`
+- update/install safety continues to depend on the extracted sidecar layout and lock-check behavior remaining compatible
+
 Small transitional adapters are acceptable during rollout, but they must not become new runtime producers.
 
 ## Implementation Sequence
@@ -275,6 +282,7 @@ Verify:
   - `NEXU_EVENT channel.reply_outcome`
   - PDF parsing
   - Playwright-backed browser interaction
+  - Slack reply smoke probe
 
 Exit condition: the slimclaw-owned pipeline preserves the runtime-critical flows the legacy pipeline was responsible for.
 
