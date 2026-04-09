@@ -269,6 +269,9 @@ function compilePlugins(
         .filter((pluginId): pluginId is string => pluginId !== null),
     ),
   ];
+  // Always-allow channel plugins so channel-binding-compiler's prewarm
+  // accounts hot-reload on first connect instead of triggering SIGUSR1.
+  const prewarmedChannelPluginIds = ["openclaw-weixin"];
   const platformPluginIds = [
     "nexu-runtime-model",
     "nexu-credit-guard",
@@ -281,7 +284,11 @@ function compilePlugins(
   // output order, which OpenClaw treats as a config change and triggers
   // a SIGUSR1 restart + 11s gateway drain per reload.
   const allow = Array.from(
-    new Set([...connectedPluginIds, ...platformPluginIds]),
+    new Set([
+      ...connectedPluginIds,
+      ...prewarmedChannelPluginIds,
+      ...platformPluginIds,
+    ]),
   ).sort();
 
   return {
