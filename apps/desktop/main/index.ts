@@ -11,6 +11,7 @@ import {
   crashReporter,
   dialog,
   globalShortcut,
+  nativeImage,
   nativeTheme,
   powerMonitor,
   powerSaveBlocker,
@@ -26,6 +27,10 @@ import type {
 import { buildChildProcessProxyEnv } from "../shared/proxy-config";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
+import {
+  shouldEnableDesktopUpdateManager,
+  shouldStartDesktopPeriodicUpdateChecks,
+} from "../shared/update-policy";
 import { getDesktopAppRoot, getWorkspaceRoot } from "../shared/workspace-paths";
 import { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import { exportDiagnostics } from "./diagnostics-export";
@@ -293,6 +298,36 @@ if (sentryDsn) {
 let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let systemTray: Tray | null = null;
+
+function isZhLocale(): boolean {
+  return app.getLocale().toLowerCase().startsWith("zh");
+}
+
+function getWindowsTrayStrings(): {
+  show: string;
+  hide: string;
+  quit: string;
+} {
+  if (isZhLocale()) {
+    return {
+      show: "显示 Nexu",
+      hide: "隐藏 Nexu",
+      quit: "退出 Nexu",
+    };
+  }
+
+  return {
+    show: "Show Nexu",
+    hide: "Hide Nexu",
+    quit: "Quit Nexu",
+  };
+}
+
+function resolveWindowsTrayIconPath(): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, "tray-icon.ico")
+    : resolve(getDesktopAppRoot(), "build", "icon.ico");
+}
 
 function isForceQuitInProgress(): boolean {
   return Boolean((app as unknown as Record<string, unknown>).__nexuForceQuit);
@@ -982,6 +1017,8 @@ function updateSystemTrayMenu(): void {
     return;
   }
 
+  const trayStrings = getWindowsTrayStrings();
+
   const isVisible = Boolean(
     mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible(),
   );
@@ -989,7 +1026,7 @@ function updateSystemTrayMenu(): void {
   systemTray.setContextMenu(
     Menu.buildFromTemplate([
       {
-        label: isVisible ? "Hide Nexu" : "Show Nexu",
+        label: isVisible ? trayStrings.hide : trayStrings.show,
         click: () => {
           if (isVisible) {
             hideMainWindowToTray();
@@ -1006,7 +1043,7 @@ function updateSystemTrayMenu(): void {
       },
       { type: "separator" },
       {
-        label: "Quit Nexu",
+        label: trayStrings.quit,
         click: () => {
           app.quit();
         },
@@ -1020,9 +1057,8 @@ async function ensureWindowsTray(): Promise<void> {
     return;
   }
 
-  const trayIcon = await app
-    .getFileIcon(process.execPath, { size: "normal" })
-    .catch(() => undefined);
+  const trayIconPath = resolveWindowsTrayIconPath();
+  const trayIcon = nativeImage.createFromPath(trayIconPath);
 
   if (!trayIcon || trayIcon.isEmpty()) {
     return;
@@ -1545,7 +1581,15 @@ app.whenReady().then(async () => {
       setQuitHandlerOpts(quitOpts);
     }
 
-    if (app.isPackaged && runtimeConfig.updates.autoUpdateEnabled) {
+    const shouldEnableUpdates =
+      app.isPackaged &&
+      runtimeConfig.updates.autoUpdateEnabled &&
+      shouldEnableDesktopUpdateManager({
+        buildSource: runtimeConfig.buildInfo.source,
+        updateFeed: runtimeConfig.urls.updateFeed,
+      });
+
+    if (shouldEnableUpdates) {
       const updateMgr = new UpdateManager(win, orchestrator, {
         channel: runtimeConfig.updates.channel,
         feedUrl: runtimeConfig.urls.updateFeed,
@@ -1564,7 +1608,15 @@ app.whenReady().then(async () => {
           : undefined,
       });
       setUpdateManager(updateMgr);
-      updateMgr.startPeriodicCheck();
+
+      if (
+        shouldStartDesktopPeriodicUpdateChecks({
+          buildSource: runtimeConfig.buildInfo.source,
+          updateFeed: runtimeConfig.urls.updateFeed,
+        })
+      ) {
+        updateMgr.startPeriodicCheck();
+      }
     } else {
       setUpdateManager(null);
     }

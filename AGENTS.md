@@ -240,6 +240,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | Local dev CLI guidance | `scripts/dev/AGENTS.md` |
 | Frontend conventions | `specs/FRONTEND.md` |
 | Desktop runtime guide | `specs/guides/desktop-runtime-guide.md` |
+| Desktop update testing guide | `specs/guides/desktop-update-testing.md` |
 | Security posture | `specs/SECURITY.md` |
 | Reliability | `specs/RELIABILITY.md` |
 | Product model | `specs/PRODUCT_SENSE.md` |

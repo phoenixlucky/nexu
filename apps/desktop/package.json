@@ -114,6 +114,10 @@
         "from": "build-config.json",
         "to": "build-config.json",
         "filter": ["**/*"]
+      },
+      {
+        "from": "build/icon.ico",
+        "to": "tray-icon.ico"
       }
     ],
     "afterSign": "./scripts/notarize.cjs",
