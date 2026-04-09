@@ -106,11 +106,20 @@ jobs:
           NEXU_SKIP_RUNTIME_POSTINSTALL: "1"
         run: pnpm install --frozen-lockfile
 
+      - name: Select test plan
+        id: plan
+        run: node scripts/ci/test-plan.mjs
+
       - name: Test with coverage
+        if: github.event_name != 'pull_request'
         run: pnpm test:coverage
 
+      - name: Run selected PR tests
+        if: github.event_name == 'pull_request'
+        run: ${{ steps.plan.outputs.test_command }}
+
       - name: Upload unit coverage to Codecov
-        if: ${{ !cancelled() && hashFiles('coverage/lcov.info') != '' }}
+        if: ${{ github.event_name != 'pull_request' && !cancelled() && hashFiles('coverage/lcov.info') != '' }}
         uses: codecov/codecov-action@v6
         with:
           use_oidc: true
