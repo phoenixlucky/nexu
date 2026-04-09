@@ -1,0 +1,209 @@
+name: PR Review SLA (48h)
+
+on:
+  pull_request_target:
+    types: [opened, ready_for_review]
+  schedule:
+    - cron: "0 */6 * * *"
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  welcome-and-label:
+    name: Label community PRs and welcome first-timers
+    if: github.event_name == 'pull_request_target' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Classify PR author and apply labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const prNumber = pr.number;
+            const author = pr.user.login;
+
+            // Core team — sync with issue-response-tracker.yml
+            const teamMembers = [
+              "qiongyu1999", "joeylee12629-star", "ashleyashli",
+              "mrcfps", "nettee", "lefarcen", "zoeforfun", "pftom",
+              "PerishCode", "caiqiling958-cmd", "shangxinyu1",
+              "alchemistklk", "Siri-Ray", "anthhub", "xingzihai",
+              "hkslover", "NickHood1984",
+            ];
+
+            if (teamMembers.includes(author)) {
+              core.info(`Author ${author} is a team member, skipping.`);
+              return;
+            }
+
+            // Area mentors — from good-first-issue system
+            const areaMentors = {
+              "area/frontend": ["mashu", "tangqiyuan"],
+              "area/backend": ["chenzhe", "liuyi"],
+              "area/skill-engine": ["xirui", "zhangchi"],
+              "area/channels": ["hanyuanxi", "liuyi"],
+              "area/docs": ["qiongyu1999", "caiqiling958-cmd"],
+              "area/i18n": ["caiqiling958-cmd", "zhangziyi"],
+            };
+
+            // Label as community PR
+            await github.rest.issues.addLabels({
+              owner, repo,
+              issue_number: prNumber,
+              labels: ["community-pr", "review-needed"],
+            });
+
+            // Check if first-time contributor
+            const { data: allPrs } = await github.rest.pulls.list({
+              owner, repo,
+              state: "all",
+              per_page: 100,
+            });
+            const priorPrs = allPrs.filter(
+              (p) => p.user.login === author && p.number !== prNumber
+            );
+
+            if (priorPrs.length === 0) {
+              await github.rest.issues.addLabels({
+                owner, repo,
+                issue_number: prNumber,
+                labels: ["first-contribution"],
+              });
+
+              // Find linked issue to identify the mentor
+              let mentorPing = "";
+              const issueRefs = (pr.body || "").match(
+                /(?:closes|fixes|resolves)\s+#(\d+)/gi
+              );
+              if (issueRefs) {
+                const issueNum = issueRefs[0].match(/#(\d+)/)[1];
+                try {
+                  const { data: issue } = await github.rest.issues.get({
+                    owner, repo,
+                    issue_number: parseInt(issueNum),
+                  });
+                  const areaLabel = issue.labels
+                    .map((l) => l.name)
+                    .find((n) => n.startsWith("area/"));
+                  if (areaLabel && areaMentors[areaLabel]) {
+                    mentorPing = `Your mentor for this area: ${areaMentors[areaLabel].map((m) => "@" + m).join(" / ")}`;
+                  }
+                } catch (e) {
+                  core.warning(`Could not fetch linked issue: ${e.message}`);
+                }
+              }
+
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: prNumber,
+                body: [
+                  `Welcome to Nexu, @${author}! 👋`,
+                  "",
+                  "Thanks for your first contribution! Here's what happens next:",
+                  "",
+                  "1. CI will run automated checks (typecheck, lint, build)",
+                  "2. A mentor will review your PR **within 48 hours**",
+                  "3. If changes are requested, push new commits — re-review within 24h",
+                  "",
+                  mentorPing,
+                  "",
+                  "Need help? Comment here or join [Discord #contributing](https://discord.gg/nexu).",
+                ]
+                  .filter(Boolean)
+                  .join("\n"),
+              });
+            }
+
+  check-stale-reviews:
+    name: Flag community PRs pending review > 48h
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan and ping overdue PRs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            const teamMembers = [
+              "qiongyu1999", "joeylee12629-star", "ashleyashli",
+              "mrcfps", "nettee", "lefarcen", "zoeforfun", "pftom",
+              "PerishCode", "caiqiling958-cmd", "shangxinyu1",
+              "alchemistklk", "Siri-Ray", "anthhub", "xingzihai",
+              "hkslover", "NickHood1984",
+            ];
+
+            // Default reviewers when no area mentor can be determined
+            const fallbackReviewers = ["mrcfps", "lefarcen", "PerishCode"];
+
+            const areaMentors = {
+              "area/frontend": ["mashu", "tangqiyuan"],
+              "area/backend": ["chenzhe", "liuyi"],
+              "area/skill-engine": ["xirui", "zhangchi"],
+              "area/channels": ["hanyuanxi", "liuyi"],
+              "area/docs": ["qiongyu1999", "caiqiling958-cmd"],
+              "area/i18n": ["caiqiling958-cmd", "zhangziyi"],
+            };
+
+            const now = Date.now();
+            const SLA_MS = 48 * 60 * 60 * 1000;
+
+            const { data: prs } = await github.rest.pulls.list({
+              owner, repo,
+              state: "open",
+              sort: "created",
+              direction: "asc",
+              per_page: 50,
+            });
+
+            for (const pr of prs) {
+              if (pr.draft) continue;
+              if (teamMembers.includes(pr.user.login)) continue;
+
+              const age = now - new Date(pr.created_at).getTime();
+              if (age < SLA_MS) continue;
+
+              // Check if already reviewed by team
+              const { data: reviews } = await github.rest.pulls.listReviews({
+                owner, repo,
+                pull_number: pr.number,
+              });
+              if (reviews.some((r) => teamMembers.includes(r.user.login))) continue;
+
+              // Check if already flagged
+              const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+                owner, repo,
+                issue_number: pr.number,
+              });
+              if (labels.some((l) => l.name === "review-overdue")) continue;
+
+              // Find area mentor from PR labels
+              const areaLabel = labels
+                .map((l) => l.name)
+                .find((n) => n.startsWith("area/"));
+              const mentors =
+                (areaLabel && areaMentors[areaLabel]) || fallbackReviewers;
+
+              const hours = Math.round(age / (60 * 60 * 1000));
+
+              await github.rest.issues.addLabels({
+                owner, repo,
+                issue_number: pr.number,
+                labels: ["review-overdue"],
+              });
+
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: pr.number,
+                body: [
+                  `⏰ This community PR has been waiting for review for **${hours}h** (SLA: 48h).`,
+                  "",
+                  `Pinging ${areaLabel ? areaLabel + " mentors" : "fallback reviewers"}: ${mentors.map((m) => "@" + m).join(" ")}`,
+                  "",
+                  "If the primary mentor is unavailable, please hand off to the secondary mentor.",
+                ].join("\n"),
+              });
+            }

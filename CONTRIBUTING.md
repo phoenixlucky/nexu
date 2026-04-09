@@ -9,12 +9,19 @@ Thank you for helping improve nexu. The sections below cover **code**, **documen
 - **Code of conduct:** follow [`CODE_OF_CONDUCT.md`](https://github.com/nexu-io/nexu/blob/main/CODE_OF_CONDUCT.md) in all Issues, Discussions, and PRs.
 - **Security:** do **not** open public issues for vulnerabilities. See [`SECURITY.md`](https://github.com/nexu-io/nexu/blob/main/SECURITY.md) for how to report them; implementation notes live in [`specs/SECURITY.md`](https://github.com/nexu-io/nexu/blob/main/specs/SECURITY.md).
 
+## New here?
+
+Start with the **[Step-by-Step First PR Tutorial](https://docs.nexu.io/guide/first-pr-tutorial)** — it covers everything from picking an issue to getting merged. Each [`good-first-issue`](https://github.com/nexu-io/nexu/labels/good-first-issue) includes an AI Prompt you can paste into Cursor or Claude Code to get started in minutes.
+
+Issues labeled [`mentor-available`](https://github.com/nexu-io/nexu/labels/mentor-available) have a dedicated mentor who will guide you and review your PR within 48 hours.
+
 ## Ways to contribute
 
 - **Bug reports** — reproducible steps, version/OS, logs (redact secrets).
 - **Feature ideas** — open a Discussion or Issue so maintainers can align before large PRs.
 - **Code** — fixes and features that match the project scope.
 - **Docs** — fixes, translations, screenshots, and clarity improvements (English + Chinese when both exist).
+- **AI-assisted PRs** — we welcome contributions made with AI coding agents. See [Agent-assisted PRs](#agent-assisted-prs).
 
 ## Before you write code
 
@@ -126,6 +133,23 @@ Use the imperative mood (`add`, `fix`, not `added` / `fixed`). Split unrelated c
 6. **Secrets** — never commit tokens, API keys, or personal credentials. Use env vars and local-only config.
 
 Maintainers may squash or adjust commit messages on merge; keeping your branch rebased on `main` reduces friction.
+
+## Review SLA
+
+We commit to reviewing community PRs within **48 hours**. Each `area/*` direction has an assigned mentor pair (primary + secondary). If the primary mentor is unavailable, the secondary takes over. If your PR goes past 48h without review, our automation will flag it and ping the responsible mentors.
+
+After review feedback, push new commits and the mentor will re-review within **24 hours**.
+
+## Agent-assisted PRs
+
+We welcome PRs created with AI tools (GitHub Copilot, Cursor, Claude Code, Devin, etc.):
+
+1. **Check the box** in the PR template under "AI / Agent Assistance"
+2. **Note the tool and scope** — which tool, which parts were AI-generated
+3. **Review the code yourself** before submitting — you own the quality
+4. **Verify all CI checks pass** locally: `pnpm typecheck && pnpm lint && pnpm test`
+
+Our CI auto-detects common agent signals (branch names, commit patterns, PR body) and labels with `agent-assisted`. Reviewers apply extra scrutiny for hallucinated imports, over-engineered abstractions, and missing edge cases.
 
 ## CI expectations
 
