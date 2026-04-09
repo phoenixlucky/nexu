@@ -20,6 +20,13 @@ This means the repo does not have a single owner for:
 
 More importantly, this fragmented shape makes large runtime optimizations hard to execute as a closed loop. Any serious runtime change currently spills across legacy runtime packaging, dev staging, desktop sidecar prep, and test contracts.
 
+That matters now because the runtime cost is already directly hurting developer throughput:
+
+- dev cold start is already over 30 seconds
+- multi-target builds are already over 10 minutes
+
+Those numbers make the feedback loop materially worse. Iteration slows down, debugging and trial-and-error become more expensive, and high-leverage runtime optimizations remain blocked behind the current fragmented ownership model.
+
 ## Problem Statement
 
 The current problem is not naming. It is that the runtime artifact pipeline is fragmented.
@@ -41,6 +48,8 @@ The first visible payoffs are expected to be:
 - prebundle-driven reductions in install and build time
 - cleaner cold-start strategy with lower startup latency
 - cleaner health/readiness strategy with less startup uncertainty and recovery overhead
+
+This is why the work is high priority: the expected return is not just architectural neatness, but a faster engineering loop.
 
 The architectural cleanup matters, but mainly because it enables those optimizations to happen in one place instead of being spread across historical runtime scaffolding.
 
