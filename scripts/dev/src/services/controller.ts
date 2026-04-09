@@ -70,7 +70,8 @@ async function waitForControllerPortPid(): Promise<number> {
     getScriptsDevRuntimeConfig().controllerPort,
     "controller dev server",
     {
-      attempts: 30,
+      // Match supervisor headroom — Windows cold-start can take ~15s.
+      attempts: 120,
       delayMs: 500,
     },
   );
