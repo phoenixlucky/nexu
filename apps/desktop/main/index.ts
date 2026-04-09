@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as Sentry from "@sentry/electron/main";
@@ -68,8 +69,15 @@ import {
   getDefaultPlistDir,
   getLogDir,
   installLaunchdQuitHandler,
+  runTeardownAndExit,
   teardownLaunchdServices,
 } from "./services";
+import {
+  type DesktopShellPreferences,
+  applyDesktopShellPreferencesOnStartup,
+  getDesktopShellPreferences,
+  setDesktopShellPreferencesRuntimeHandler,
+} from "./services/desktop-shell-preferences";
 import {
   startDesktopDevInspectServer,
   stopDesktopDevInspectServer,
@@ -296,6 +304,10 @@ if (sentryDsn) {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let residentTray: Tray | null = null;
+let launchdQuitOptsForResidentEntry:
+  | Parameters<typeof installLaunchdQuitHandler>[0]
+  | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let systemTray: Tray | null = null;
 
@@ -1004,12 +1016,30 @@ function focusMainWindow(): void {
   mainWindow.focus();
 }
 
-function hideMainWindowToTray(): void {
+function shouldUseResidentEntry(preferences: DesktopShellPreferences): boolean {
+  return !preferences.showInDock;
+}
+
+function resolveTrayIconPath(): string | null {
+  const candidate = resolve(
+    app.isPackaged ? process.resourcesPath : getDesktopAppRoot(),
+    "build",
+    process.platform === "win32" ? "icon.ico" : "icon.png",
+  );
+
+  return existsSync(candidate) ? candidate : null;
+}
+
+function hideMainWindowToBackground(): void {
   if (!mainWindow || mainWindow.isDestroyed()) {
     return;
   }
 
   mainWindow.hide();
+}
+
+function hideMainWindowToTray(): void {
+  hideMainWindowToBackground();
 }
 
 function updateSystemTrayMenu(): void {
@@ -1029,27 +1059,99 @@ function updateSystemTrayMenu(): void {
         label: isVisible ? trayStrings.hide : trayStrings.show,
         click: () => {
           if (isVisible) {
-            hideMainWindowToTray();
+            hideMainWindowToBackground();
             return;
           }
 
-          if (!mainWindow || mainWindow.isDestroyed()) {
-            createMainWindow();
-            return;
-          }
-
-          focusMainWindow();
+          showMainWindowFromResidentEntry();
         },
       },
       { type: "separator" },
       {
         label: trayStrings.quit,
         click: () => {
+          markForceQuitInProgress();
           app.quit();
         },
       },
     ]),
   );
+}
+
+function showMainWindowFromResidentEntry(): void {
+  const preferences = getDesktopShellPreferences();
+
+  if (process.platform === "darwin" && preferences.showInDock) {
+    void app.dock?.show();
+  }
+
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createMainWindow();
+    return;
+  }
+
+  if (!mainWindow.isVisible()) {
+    mainWindow.show();
+  }
+
+  focusMainWindow();
+}
+
+function destroyResidentTray(): void {
+  residentTray?.destroy();
+  residentTray = null;
+}
+
+function ensureResidentTray(): void {
+  if (residentTray) {
+    return;
+  }
+
+  const trayIconPath = resolveTrayIconPath();
+  if (!trayIconPath) {
+    return;
+  }
+
+  const trayIcon = nativeImage.createFromPath(trayIconPath);
+  if (trayIcon.isEmpty()) {
+    return;
+  }
+
+  if (process.platform === "darwin") {
+    trayIcon.setTemplateImage(true);
+  }
+
+  const tray = new Tray(trayIcon);
+  residentTray = tray;
+  tray.setToolTip("nexu");
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: "Open nexu",
+        click: () => {
+          showMainWindowFromResidentEntry();
+        },
+      },
+      {
+        label: "Quit",
+        click: () => {
+          if (app.isPackaged && launchdQuitOptsForResidentEntry) {
+            void runTeardownAndExit(
+              launchdQuitOptsForResidentEntry,
+              "tray-quit",
+            );
+            return;
+          }
+
+          markForceQuitInProgress();
+          app.quit();
+        },
+      },
+    ]),
+  );
+  tray.on("click", () => {
+    showMainWindowFromResidentEntry();
+  });
 }
 
 async function ensureWindowsTray(): Promise<void> {
@@ -1069,17 +1171,12 @@ async function ensureWindowsTray(): Promise<void> {
   updateSystemTrayMenu();
 
   systemTray.on("click", () => {
-    if (!mainWindow || mainWindow.isDestroyed()) {
-      createMainWindow();
+    if (mainWindow?.isVisible()) {
+      hideMainWindowToBackground();
       return;
     }
 
-    if (mainWindow.isVisible()) {
-      hideMainWindowToTray();
-      return;
-    }
-
-    focusMainWindow();
+    showMainWindowFromResidentEntry();
   });
 
   systemTray.on("right-click", () => {
@@ -1087,12 +1184,46 @@ async function ensureWindowsTray(): Promise<void> {
   });
 }
 
+function applyResidentEntryPreferences(
+  preferences: DesktopShellPreferences,
+): void {
+  if (process.platform === "darwin") {
+    app.setActivationPolicy(preferences.showInDock ? "regular" : "accessory");
+  }
+
+  if (process.platform === "win32" && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setSkipTaskbar(!preferences.showInDock);
+  }
+
+  if (process.platform !== "win32" && shouldUseResidentEntry(preferences)) {
+    ensureResidentTray();
+  } else {
+    destroyResidentTray();
+  }
+}
+
+function shouldHideOnWindowClose(): boolean {
+  if (!app.isPackaged) {
+    return false;
+  }
+
+  if (process.platform === "darwin") {
+    return true;
+  }
+
+  if (process.platform === "win32") {
+    return systemTray !== null;
+  }
+
+  return shouldUseResidentEntry(getDesktopShellPreferences());
+}
 app.on("second-instance", () => {
   if (!mainWindow || mainWindow.isDestroyed()) {
     createMainWindow();
     return;
   }
 
+  showMainWindowFromResidentEntry();
   focusMainWindow();
 });
 
@@ -1103,6 +1234,7 @@ app.on("before-quit", () => {
 function createMainWindow(): BrowserWindow {
   logLaunchTimeline("main window creation requested");
   const isMacOS = process.platform === "darwin";
+  const shellPreferences = getDesktopShellPreferences();
   const window = new BrowserWindow({
     width: 1280,
     height: 720,
@@ -1130,6 +1262,10 @@ function createMainWindow(): BrowserWindow {
       backgroundThrottling: false,
     },
   });
+
+  if (process.platform === "win32") {
+    window.setSkipTaskbar(!shellPreferences.showInDock);
+  }
 
   // Disable sandbox for webviews so preload scripts have access to Node.js APIs
   // (needed for contextBridge/ipcRenderer in ESM-built preloads)
@@ -1278,6 +1414,17 @@ function createMainWindow(): BrowserWindow {
 
   window.on("hide", () => {
     updateSystemTrayMenu();
+  });
+
+  window.on("close", (event) => {
+    if ((app as unknown as Record<string, unknown>).__nexuForceQuit) {
+      return;
+    }
+
+    if (!launchdResult && shouldHideOnWindowClose()) {
+      event.preventDefault();
+      hideMainWindowToBackground();
+    }
   });
 
   // During first install / post-update, show the window IMMEDIATELY with a
@@ -1476,12 +1623,26 @@ app.whenReady().then(async () => {
     Number.isInteger(desktopDevInspectPort) &&
     desktopDevInspectPort > 0
   ) {
-    await startDesktopDevInspectServer({
-      host: desktopDevInspectHost,
-      port: desktopDevInspectPort,
-      token: desktopDevInspectToken,
-    });
+    try {
+      await startDesktopDevInspectServer({
+        host: desktopDevInspectHost,
+        port: desktopDevInspectPort,
+        token: desktopDevInspectToken,
+      });
+    } catch (error) {
+      writeDesktopMainLog({
+        source: "dev-inspect",
+        stream: "stderr",
+        kind: "app",
+        message: `desktop dev inspect server failed to start host=${desktopDevInspectHost} port=${desktopDevInspectPort} error=${error instanceof Error ? error.message : String(error)}`,
+        logFilePath: null,
+      });
+    }
   }
+  setDesktopShellPreferencesRuntimeHandler((preferences) => {
+    applyResidentEntryPreferences(preferences);
+  });
+  applyDesktopShellPreferencesOnStartup();
   registerIpcHandlers(
     orchestrator,
     runtimeConfig,
@@ -1579,6 +1740,7 @@ app.whenReady().then(async () => {
       };
       installLaunchdQuitHandler(quitOpts);
       setQuitHandlerOpts(quitOpts);
+      launchdQuitOptsForResidentEntry = quitOpts;
     }
 
     const shouldEnableUpdates =
@@ -1641,6 +1803,9 @@ app.whenReady().then(async () => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
+    if (shouldUseResidentEntry(getDesktopShellPreferences())) {
+      return;
+    }
     app.quit();
   }
 });
