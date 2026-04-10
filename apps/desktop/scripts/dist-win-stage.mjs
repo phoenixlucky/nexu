@@ -457,33 +457,44 @@ async function validateWinUnpackedReuse(releaseRoot) {
   }
 }
 
-async function validatePackagedQqbotDependencies(releaseRoot) {
+const requiredBundledPluginArtifacts = [
+  {
+    pluginId: "openclaw-qqbot",
+    requiredPath: ["node_modules", "silk-wasm", "package.json"],
+    label: "silk-wasm",
+  },
+  {
+    pluginId: "dingtalk-connector",
+    requiredPath: ["node_modules", "dingtalk-stream", "package.json"],
+    label: "dingtalk-stream",
+  },
+];
+
+async function validatePackagedBundledPluginDependencies(releaseRoot) {
   const winUnpackedRoot = resolve(releaseRoot, "win-unpacked");
-  const qqbotPluginRoot = resolve(
-    winUnpackedRoot,
-    "resources",
-    "runtime",
-    "controller",
-    "plugins",
-    "openclaw-qqbot",
-  );
-  const silkWasmPackagePath = resolve(
-    qqbotPluginRoot,
-    "node_modules",
-    "silk-wasm",
-    "package.json",
-  );
 
-  if (!(await pathExists(qqbotPluginRoot))) {
-    throw new Error(
-      `[dist:win] packaged app is missing openclaw-qqbot: ${qqbotPluginRoot}`,
+  for (const artifact of requiredBundledPluginArtifacts) {
+    const pluginRoot = resolve(
+      winUnpackedRoot,
+      "resources",
+      "runtime",
+      "controller",
+      "plugins",
+      artifact.pluginId,
     );
-  }
+    const dependencyPath = resolve(pluginRoot, ...artifact.requiredPath);
 
-  if (!(await pathExists(silkWasmPackagePath))) {
-    throw new Error(
-      `[dist:win] packaged app is missing openclaw-qqbot dependency silk-wasm: ${silkWasmPackagePath}`,
-    );
+    if (!(await pathExists(pluginRoot))) {
+      throw new Error(
+        `[dist:win] packaged app is missing ${artifact.pluginId}: ${pluginRoot}`,
+      );
+    }
+
+    if (!(await pathExists(dependencyPath))) {
+      throw new Error(
+        `[dist:win] packaged app is missing ${artifact.pluginId} dependency ${artifact.label}: ${dependencyPath}`,
+      );
+    }
   }
 }
 
@@ -1324,8 +1335,8 @@ async function main() {
     timings,
   );
   await timedStep(
-    "validate packaged qqbot dependencies",
-    async () => validatePackagedQqbotDependencies(releaseRoot),
+    "validate packaged bundled plugin dependencies",
+    async () => validatePackagedBundledPluginDependencies(releaseRoot),
     timings,
   );
 
