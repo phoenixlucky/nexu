@@ -388,8 +388,10 @@ def main():
         # Upload thumbnail
         image_key = upload_thumbnail(token, args.thumbnail_url)
 
-        # Send message
-        send_video_message(token, args.chat_id, file_key, image_key)
+        # Send message — exit non-zero on failure so the caller
+        # (_deliver_feishu_video) does not record a false delivered_at.
+        if not send_video_message(token, args.chat_id, file_key, image_key):
+            sys.exit(1)
     finally:
         os.unlink(video_path)
 
