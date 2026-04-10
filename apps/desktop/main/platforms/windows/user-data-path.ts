@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { win32 } from "node:path";
 
 export interface ResolveWindowsPackagedUserDataPathInput {
   appDataPath: string;
@@ -14,11 +14,11 @@ export interface ResolveWindowsPackagedUserDataPathResult {
 export function resolveWindowsPackagedUserDataPath(
   input: ResolveWindowsPackagedUserDataPathInput,
 ): ResolveWindowsPackagedUserDataPathResult {
-  const defaultUserDataPath = resolve(input.appDataPath, "nexu-desktop");
+  const defaultUserDataPath = win32.resolve(input.appDataPath, "nexu-desktop");
   const resolvedUserDataPath = input.overrideUserDataPath
-    ? resolve(input.overrideUserDataPath)
+    ? win32.resolve(input.overrideUserDataPath)
     : input.registryUserDataPath
-      ? resolve(input.registryUserDataPath)
+      ? win32.resolve(input.registryUserDataPath)
       : defaultUserDataPath;
 
   return {
