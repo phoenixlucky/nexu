@@ -22,6 +22,8 @@ import { UnsupportedUpdateDriver } from "./unsupported-update-driver";
 import type { PlatformUpdateDriver } from "./update-driver";
 import { WindowsUpdateDriver } from "./windows-update-driver";
 
+type DownloadMode = "idle" | "background" | "foreground";
+
 export interface UpdateManagerOptions {
   source?: UpdateSource;
   channel?: UpdateChannelName;
@@ -104,6 +106,13 @@ export class UpdateManager {
   private currentFeedUrl: string;
   private readonly platform: NodeJS.Platform;
   private readonly driver: PlatformUpdateDriver;
+  private readonly autoDownload: boolean;
+  private downloadMode: DownloadMode = "idle";
+  private pendingVersion: string | null = null;
+  private pendingReleaseDate: string | undefined = undefined;
+  private pendingReleaseNotes: string | undefined = undefined;
+  private pendingActionUrl: string | undefined = undefined;
+  private downloadComplete = false;
   private checkInProgress: Promise<{ updateAvailable: boolean }> | null = null;
   private lastProgressLogAt = 0;
   private lastProgressLogPercent: number | null = null;
@@ -125,6 +134,7 @@ export class UpdateManager {
     this.initialDelayMs = options?.initialDelayMs ?? 0;
     this.launchdCtx = options?.launchd;
     this.options = options;
+    this.autoDownload = options?.autoDownload ?? false;
     this.platform = options?.platform ?? process.platform;
     this.driver = createUpdateDriver(
       this.platform,
@@ -197,6 +207,27 @@ export class UpdateManager {
           remoteReleaseDate: info.releaseDate,
         });
         this.logCheck("update event: update available", diagnostic);
+
+        if (this.autoDownload) {
+          // Background auto-download: suppress UI, start downloading silently
+          this.downloadMode = "background";
+          this.pendingVersion = info.version;
+          this.pendingReleaseDate = info.releaseDate;
+          this.pendingReleaseNotes = info.releaseNotes;
+          this.pendingActionUrl = info.actionUrl;
+          this.logCheck(
+            "auto-download: starting background download",
+            diagnostic,
+          );
+
+          // On Windows, trigger download manually (Mac electron-updater
+          // auto-downloads when autoDownload is true)
+          if (this.platform === "win32") {
+            void this.driver.downloadUpdate();
+          }
+          return;
+        }
+
         this.send("update:available", {
           version: info.version,
           releaseNotes: info.releaseNotes,
@@ -228,6 +259,12 @@ export class UpdateManager {
             this.getDiagnostic(),
           );
         }
+
+        // Suppress progress events during background download
+        if (this.downloadMode === "background") {
+          return;
+        }
+
         this.send("update:progress", {
           percent: progress.percent,
           bytesPerSecond: progress.bytesPerSecond,
@@ -243,11 +280,25 @@ export class UpdateManager {
             remoteReleaseDate: info.releaseDate,
           }),
         );
+        this.downloadMode = "idle";
+        this.downloadComplete = true;
+        // Always notify renderer when download completes
         this.send("update:downloaded", { version: info.version });
       },
       onError: (error) => {
         const diagnostic = this.getDiagnostic();
         this.logCheck(`update error: ${error.message}`, diagnostic);
+
+        if (this.downloadMode === "background") {
+          // Suppress error UI during background download
+          this.logCheck(
+            "auto-download: background download failed, suppressing UI error",
+            diagnostic,
+          );
+          this.downloadMode = "idle";
+          return;
+        }
+
         this.send("update:error", { message: error.message, diagnostic });
       },
     });
@@ -270,6 +321,45 @@ export class UpdateManager {
   async checkNow(): Promise<{ updateAvailable: boolean }> {
     const startedAt = Date.now();
     this.logCheck("update check start", this.getDiagnostic());
+
+    // If background download already completed, surface it immediately
+    if (this.downloadComplete && this.pendingVersion) {
+      this.logCheck(
+        "update check: background download already complete, surfacing",
+        this.getDiagnostic(),
+      );
+      // Brief "checking" flash so the settings button shows a transition
+      this.send("update:checking", this.getDiagnostic());
+      this.send("update:downloaded", { version: this.pendingVersion });
+      return { updateAvailable: true };
+    }
+
+    // If background download is in progress, show "available" with version
+    // info but keep downloading in the background. User can decide whether
+    // to install — clicking Install will switch to foreground mode with
+    // visible progress.
+    if (this.downloadMode === "background" && this.pendingVersion) {
+      this.logCheck(
+        "update check: background download in progress, surfacing available state",
+        this.getDiagnostic(),
+      );
+
+      // Brief "checking" flash so the settings button shows a transition
+      this.send("update:checking", this.getDiagnostic());
+
+      const diagnostic = this.getDiagnostic({
+        remoteVersion: this.pendingVersion,
+        remoteReleaseDate: this.pendingReleaseDate,
+      });
+      this.send("update:available", {
+        version: this.pendingVersion,
+        releaseNotes: this.pendingReleaseNotes,
+        actionUrl: this.pendingActionUrl,
+        diagnostic,
+      });
+      return { updateAvailable: true };
+    }
+
     if (this.checkInProgress) {
       this.logCheck(
         "update check skipped: already in progress",
@@ -322,6 +412,15 @@ export class UpdateManager {
         this.getDiagnostic(),
       );
       return { ok: false };
+    }
+
+    // Switch to foreground mode and remove rate limit
+    this.downloadMode = "foreground";
+    if (
+      this.platform === "win32" &&
+      this.driver instanceof WindowsUpdateDriver
+    ) {
+      this.driver.setRateLimit(null);
     }
 
     return this.driver.downloadUpdate();
@@ -404,63 +503,61 @@ export class UpdateManager {
 
     logStep("phase 1 cleanup end");
 
-    // --- Phase 2: Process verification ---
-    // Two sweeps of SIGKILL to clear all Nexu sidecar processes. Uses both
-    // authoritative sources (launchd labels, runtime-ports.json) and pgrep.
-    const firstSweepStartedAt = Date.now();
-    let { clean, remainingPids } = await ensureNexuProcessesDead({
-      timeoutMs: 8_000,
-      intervalMs: 200,
-    });
-    this.logCheck(
-      `quit-and-install: first sweep complete in ${Date.now() - firstSweepStartedAt}ms (${clean ? "clean" : `survivors: ${remainingPids.join(", ")}`})`,
-      this.getDiagnostic(),
-    );
-
-    if (!clean) {
-      const secondSweepStartedAt = Date.now();
-      ({ clean, remainingPids } = await ensureNexuProcessesDead({
-        timeoutMs: 5_000,
+    // --- Phase 2 & 3: macOS-only process verification and lock check ---
+    // On Windows, the NSIS installer handles process detection itself.
+    if (this.platform === "darwin") {
+      // Two sweeps of SIGKILL to clear all Nexu sidecar processes. Uses both
+      // authoritative sources (launchd labels, runtime-ports.json) and pgrep.
+      const firstSweepStartedAt = Date.now();
+      let { clean, remainingPids } = await ensureNexuProcessesDead({
+        timeoutMs: 8_000,
         intervalMs: 200,
-      }));
+      });
       this.logCheck(
-        `quit-and-install: second sweep complete in ${Date.now() - secondSweepStartedAt}ms (${clean ? "clean" : `survivors: ${remainingPids.join(", ")}`})`,
+        `quit-and-install: first sweep complete in ${Date.now() - firstSweepStartedAt}ms (${clean ? "clean" : `survivors: ${remainingPids.join(", ")}`})`,
         this.getDiagnostic(),
       );
-    }
 
-    // --- Phase 3: Evidence-based install decision ---
-    // Even with surviving processes, the update may be safe if those
-    // processes don't hold file handles to critical update paths. Use
-    // lsof to check whether the .app bundle or extracted sidecar dirs
-    // are actually locked.
-    const lockCheckStartedAt = Date.now();
-    const { locked, lockedPaths } = await checkCriticalPathsLocked();
-    this.logCheck(
-      `quit-and-install: critical-path lock check complete in ${Date.now() - lockCheckStartedAt}ms (${locked ? `locked: ${lockedPaths.join(", ")}` : "unlocked"})`,
-      this.getDiagnostic(),
-    );
+      if (!clean) {
+        const secondSweepStartedAt = Date.now();
+        ({ clean, remainingPids } = await ensureNexuProcessesDead({
+          timeoutMs: 5_000,
+          intervalMs: 200,
+        }));
+        this.logCheck(
+          `quit-and-install: second sweep complete in ${Date.now() - secondSweepStartedAt}ms (${clean ? "clean" : `survivors: ${remainingPids.join(", ")}`})`,
+          this.getDiagnostic(),
+        );
+      }
 
-    if (locked) {
-      // Critical paths are held open — installing now would fail or
-      // corrupt the app. Skip this attempt; electron-updater will
-      // re-detect the pending update on next launch.
+      // Evidence-based install decision: check if critical paths are locked.
+      const lockCheckStartedAt = Date.now();
+      const { locked, lockedPaths } = await checkCriticalPathsLocked();
       this.logCheck(
-        `quit-and-install: ABORTING — critical paths still locked: ${lockedPaths.join(", ")}`,
+        `quit-and-install: critical-path lock check complete in ${Date.now() - lockCheckStartedAt}ms (${locked ? `locked: ${lockedPaths.join(", ")}` : "unlocked"})`,
         this.getDiagnostic(),
       );
-      return;
+
+      if (locked) {
+        this.logCheck(
+          `quit-and-install: ABORTING — critical paths still locked: ${lockedPaths.join(", ")}`,
+          this.getDiagnostic(),
+        );
+        return;
+      }
+
+      if (!clean) {
+        this.logCheck(
+          "quit-and-install: residual processes exist but no critical path locks, proceeding",
+          this.getDiagnostic(),
+        );
+      }
     }
 
-    if (!clean) {
-      // Processes alive but no critical file handles — safe to proceed.
-      this.logCheck(
-        "quit-and-install: residual processes exist but no critical path locks, proceeding",
-        this.getDiagnostic(),
-      );
-    }
-
-    if (this.driver.capability.applyMode !== "in-app") {
+    if (
+      this.driver.capability.applyMode !== "in-app" &&
+      this.driver.capability.applyMode !== "external-installer"
+    ) {
       this.logCheck(
         "quit-and-install skipped: capability disabled on this platform",
         this.getDiagnostic(),
@@ -470,7 +567,7 @@ export class UpdateManager {
 
     // Set force-quit flag so window close handlers don't intercept the exit
     (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
-    logStep("triggering autoUpdater.quitAndInstall");
+    logStep("triggering update apply");
     await this.driver.applyUpdate();
   }
 
