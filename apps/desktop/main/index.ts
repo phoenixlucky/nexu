@@ -84,11 +84,8 @@ import {
 } from "./services/dev-inspect-server";
 import { isLaunchdBootstrapEnabled } from "./services/launchd-bootstrap";
 import { ProxyManager } from "./services/proxy-manager";
-import {
-  getLegacyNexuHomeStateDir,
-  migrateOpenclawState,
-} from "./services/state-migration";
 import { flushV8CoverageIfEnabled } from "./services/v8-coverage";
+import { readPendingWindowsUserDataMigration } from "./services/windows-user-data-migration";
 import { SleepGuard, type SleepGuardLogEntry } from "./sleep-guard";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
@@ -122,12 +119,13 @@ const baseRuntimeConfig = getDesktopRuntimeConfig(process.env, {
   resourcesPath: app.isPackaged ? electronRoot : undefined,
   useBuildConfig: app.isPackaged,
 });
+const runtimePlatformAdapter =
+  getDesktopRuntimePlatformAdapter(baseRuntimeConfig);
 // In launchd mode, skip port probing — the bootstrap has its own port
 // recovery via runtime-ports.json and handles leftover processes gracefully.
 // Probing here would waste time and the results get overridden by attach anyway.
 const useLaunchdMode = isLaunchdBootstrapEnabled();
-const runtimeLifecycle =
-  getDesktopRuntimePlatformAdapter(baseRuntimeConfig).lifecycle;
+const runtimeLifecycle = runtimePlatformAdapter.lifecycle;
 const { allocations: runtimePortAllocations, runtimeConfig } = useLaunchdMode
   ? {
       allocations: [] as PortAllocation[],
@@ -145,6 +143,38 @@ const { allocations: runtimePortAllocations, runtimeConfig } = useLaunchdMode
         throw error;
       },
     );
+
+const pendingUserDataMigration =
+  app.isPackaged && process.platform === "win32"
+    ? readPendingWindowsUserDataMigration()
+    : null;
+const runtimeRoots = runtimePlatformAdapter.capabilities.resolveRuntimeRoots({
+  app,
+  electronRoot,
+  runtimeConfig,
+});
+if (!useLaunchdMode) {
+  runtimePlatformAdapter.capabilities.stateMigrationPolicy.run({
+    runtimeConfig,
+    runtimeRoots,
+    isPackaged: app.isPackaged,
+    pendingUserDataMigration,
+    log: (message) => {
+      writeDesktopMainLog({
+        source: "state-migration",
+        stream: "system",
+        kind: "lifecycle",
+        message,
+        logFilePath: resolve(
+          app.getPath("userData"),
+          "logs",
+          "desktop-main.log",
+        ),
+      });
+    },
+  });
+}
+
 const needsSetupExtraction = checkOpenclawExtractionNeeded(
   electronRoot,
   app.getPath("userData"),
@@ -310,6 +340,7 @@ let launchdQuitOptsForResidentEntry:
   | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let systemTray: Tray | null = null;
+let pendingMacResidentEntryPreferences: DesktopShellPreferences | null = null;
 
 function isZhLocale(): boolean {
   return app.getLocale().toLowerCase().startsWith("zh");
@@ -870,28 +901,22 @@ async function runLaunchdColdStart(): Promise<void> {
     /^~/,
     process.env.HOME ?? "",
   );
+  const runtimeRoots = runtimePlatformAdapter.capabilities.resolveRuntimeRoots({
+    app,
+    electronRoot,
+    runtimeConfig,
+  });
 
-  // In packaged mode, keep openclaw state under Electron userData (matches v0.1.5).
-  // In dev mode, derive from nexuHome for repo-local isolation.
-  const openclawRuntimeRoot = isDev
-    ? resolve(nexuHome, "runtime", "openclaw")
-    : resolve(app.getPath("userData"), "runtime", "openclaw");
-  const openclawStateDir = resolve(openclawRuntimeRoot, "state");
-  const openclawConfigPath = resolve(openclawStateDir, "openclaw.json");
+  const { openclawRuntimeRoot, openclawStateDir, openclawConfigPath } =
+    runtimeRoots;
 
-  // Migrate any state created under ~/.nexu during v0.1.6 back to userData path
-  if (!isDev) {
-    const legacyStateDir = getLegacyNexuHomeStateDir(
-      runtimeConfig.paths.nexuHome,
-    );
-    if (legacyStateDir !== openclawStateDir) {
-      migrateOpenclawState({
-        targetStateDir: openclawStateDir,
-        sourceStateDir: legacyStateDir,
-        log: (msg) => logColdStart(`state-migration: ${msg}`),
-      });
-    }
-  }
+  runtimePlatformAdapter.capabilities.stateMigrationPolicy.run({
+    runtimeConfig,
+    runtimeRoots,
+    isPackaged: app.isPackaged,
+    pendingUserDataMigration: null,
+    log: (message) => logColdStart(`state-migration: ${message}`),
+  });
 
   // In dev mode, serve web app from apps/web/dist
   // In packaged mode, serve from resources/web
@@ -1029,15 +1054,24 @@ function focusMainWindow(): void {
 }
 
 function shouldUseResidentEntry(preferences: DesktopShellPreferences): boolean {
+  if (process.platform === "darwin") {
+    return true;
+  }
+
   return !preferences.showInDock;
 }
 
 function resolveTrayIconPath(): string | null {
-  const candidate = resolve(
-    app.isPackaged ? process.resourcesPath : getDesktopAppRoot(),
-    "build",
-    process.platform === "win32" ? "icon.ico" : "icon.png",
-  );
+  const candidate =
+    process.platform === "darwin"
+      ? app.isPackaged
+        ? join(process.resourcesPath, "tray-icon-mac.png")
+        : resolve(getDesktopAppRoot(), "build", "tray-icon-mac.png")
+      : resolve(
+          app.isPackaged ? process.resourcesPath : getDesktopAppRoot(),
+          "build",
+          process.platform === "win32" ? "icon.ico" : "icon.png",
+        );
 
   return existsSync(candidate) ? candidate : null;
 }
@@ -1124,12 +1158,13 @@ function ensureResidentTray(): void {
     return;
   }
 
-  const trayIcon = nativeImage.createFromPath(trayIconPath);
+  let trayIcon = nativeImage.createFromPath(trayIconPath);
   if (trayIcon.isEmpty()) {
     return;
   }
 
   if (process.platform === "darwin") {
+    trayIcon = trayIcon.resize({ height: 18 });
     trayIcon.setTemplateImage(true);
   }
 
@@ -1200,7 +1235,20 @@ function applyResidentEntryPreferences(
   preferences: DesktopShellPreferences,
 ): void {
   if (process.platform === "darwin") {
+    const window = mainWindow;
+    if (window && !window.isDestroyed() && window.isFullScreen()) {
+      pendingMacResidentEntryPreferences = preferences;
+      window.setFullScreen(false);
+      return;
+    }
+
+    pendingMacResidentEntryPreferences = null;
     app.setActivationPolicy(preferences.showInDock ? "regular" : "accessory");
+    if (preferences.showInDock) {
+      void app.dock?.show();
+    } else {
+      app.dock?.hide();
+    }
   }
 
   if (process.platform === "win32" && mainWindow && !mainWindow.isDestroyed()) {
@@ -1426,6 +1474,16 @@ function createMainWindow(): BrowserWindow {
 
   window.on("hide", () => {
     updateSystemTrayMenu();
+  });
+
+  window.on("leave-full-screen", () => {
+    if (mainWindow !== window || !pendingMacResidentEntryPreferences) {
+      return;
+    }
+
+    const pendingPreferences = pendingMacResidentEntryPreferences;
+    pendingMacResidentEntryPreferences = null;
+    applyResidentEntryPreferences(pendingPreferences);
   });
 
   window.on("close", (event) => {
@@ -1767,7 +1825,8 @@ app.whenReady().then(async () => {
       const updateMgr = new UpdateManager(win, orchestrator, {
         channel: runtimeConfig.updates.channel,
         feedUrl: runtimeConfig.urls.updateFeed,
-        initialDelayMs: process.platform === "win32" ? 45_000 : 0,
+        autoDownload: true,
+        initialDelayMs: process.platform === "win32" ? 30_000 : 0,
         prepareForUpdateInstall: runtimeLifecycle.prepareForUpdateInstall
           ? async (args: PrepareForUpdateInstallArgs) => {
               await runtimeLifecycle.prepareForUpdateInstall?.(args);
