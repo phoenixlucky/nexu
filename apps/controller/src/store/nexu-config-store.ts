@@ -2013,7 +2013,7 @@ export class NexuConfigStore {
   }
 
   async getDesktopAnalyticsEnabled(): Promise<boolean> {
-    return (await this.getStoredDesktopAnalyticsEnabled()) ?? false;
+    return (await this.getStoredDesktopAnalyticsEnabled()) ?? true;
   }
 
   async setDesktopAnalyticsEnabled(enabled: boolean): Promise<boolean> {

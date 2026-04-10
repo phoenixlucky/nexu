@@ -25,9 +25,10 @@ import "./index.css";
 const posthogApiKey = import.meta.env.VITE_POSTHOG_API_KEY;
 const analyticsEnabledByPreference = (() => {
   try {
-    return localStorage.getItem(ANALYTICS_PREFERENCE_STORAGE_KEY) === "1";
+    const value = localStorage.getItem(ANALYTICS_PREFERENCE_STORAGE_KEY);
+    return value === null ? true : value === "1";
   } catch {
-    return false;
+    return true;
   }
 })();
 
