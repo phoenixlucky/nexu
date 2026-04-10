@@ -1157,6 +1157,14 @@ function destroyResidentTray(): void {
   residentTray = null;
 }
 
+function showResidentTrayMenu(): void {
+  if (!residentTray) {
+    return;
+  }
+
+  residentTray.popUpContextMenu();
+}
+
 function ensureResidentTray(): void {
   if (residentTray) {
     return;
@@ -1206,7 +1214,10 @@ function ensureResidentTray(): void {
     ]),
   );
   tray.on("click", () => {
-    showMainWindowFromResidentEntry();
+    showResidentTrayMenu();
+  });
+  tray.on("right-click", () => {
+    showResidentTrayMenu();
   });
 }
 
