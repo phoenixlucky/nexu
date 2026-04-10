@@ -5,16 +5,19 @@ import { exists } from "./utils.mjs";
 
 const runtimeDir = path.dirname(fileURLToPath(import.meta.url));
 const lockfilePath = path.join(runtimeDir, "package-lock.json");
-const npmCliPath = path.resolve(
-  process.execPath,
-  "..",
-  "..",
-  "lib",
-  "node_modules",
-  "npm",
-  "bin",
-  "npm-cli.js",
-);
+const nodeBinDir = path.dirname(process.execPath);
+const npmCliPath =
+  process.platform === "win32"
+    ? path.resolve(nodeBinDir, "node_modules", "npm", "bin", "npm-cli.js")
+    : path.resolve(
+        nodeBinDir,
+        "..",
+        "lib",
+        "node_modules",
+        "npm",
+        "bin",
+        "npm-cli.js",
+      );
 
 function createCommandSpec(command, args) {
   if (command === "npm") {
