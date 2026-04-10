@@ -19,6 +19,33 @@ LangString Lang_SelectUserDataDir 2052 "选择 Nexu 本地数据目录"
 LangString Lang_ErrorUserDataEmpty 1033 "User data directory cannot be empty."
 LangString Lang_ErrorUserDataEmpty 2052 "本地数据目录不能为空。"
 
+LangString Lang_ErrorUserDataTargetNonEmpty 1033 "The selected data directory already contains files. Choose an empty folder, or choose a parent folder and let Nexu create a ${DEFAULT_USER_DATA_DIR_NAME} folder inside it."
+LangString Lang_ErrorUserDataTargetNonEmpty 2052 "所选数据目录中已包含文件。请选择空目录，或选择一个父目录，让 Nexu 在其中创建 ${DEFAULT_USER_DATA_DIR_NAME} 目录。"
+
+LangString Lang_MigrationTitle 1033 "Existing data migration"
+LangString Lang_MigrationTitle 2052 "现有数据迁移"
+
+LangString Lang_MigrationSubtitle 1033 "Choose how Nexu should handle data from the previous location"
+LangString Lang_MigrationSubtitle 2052 "选择 Nexu 如何处理旧位置中的数据"
+
+LangString Lang_MigrationHelp 1033 "Nexu found existing local data in the previous directory. Choose how to use the new directory on first launch."
+LangString Lang_MigrationHelp 2052 "Nexu 在旧目录中发现了现有本地数据。请选择首次启动时如何使用新的数据目录。"
+
+LangString Lang_MigrationOldDirLabel 1033 "Previous data directory"
+LangString Lang_MigrationOldDirLabel 2052 "旧数据目录"
+
+LangString Lang_MigrationNewDirLabel 1033 "New data directory"
+LangString Lang_MigrationNewDirLabel 2052 "新数据目录"
+
+LangString Lang_MigrationMoveOption 1033 "Move data to the new directory and clear the old folder"
+LangString Lang_MigrationMoveOption 2052 "将数据移动到新目录并清理旧目录"
+
+LangString Lang_MigrationCopyOption 1033 "Copy missing files to the new directory and keep the old folder"
+LangString Lang_MigrationCopyOption 2052 "将缺失文件复制到新目录并保留旧目录"
+
+LangString Lang_MigrationNoopOption 1033 "Do not migrate old data"
+LangString Lang_MigrationNoopOption 2052 "不迁移旧数据"
+
 LangString Lang_ErrorAppRunning 1033 "Nexu is currently running. Please quit the app before continuing the installation."
 LangString Lang_ErrorAppRunning 2052 "Nexu 当前正在运行。请先退出应用后再继续安装。"
 

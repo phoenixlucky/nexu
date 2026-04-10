@@ -89,6 +89,7 @@ import {
   migrateOpenclawState,
 } from "./services/state-migration";
 import { flushV8CoverageIfEnabled } from "./services/v8-coverage";
+import { executePendingWindowsUserDataMigration } from "./services/windows-user-data-migration";
 import { SleepGuard, type SleepGuardLogEntry } from "./sleep-guard";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
@@ -145,6 +146,26 @@ const { allocations: runtimePortAllocations, runtimeConfig } = useLaunchdMode
         throw error;
       },
     );
+
+if (app.isPackaged && process.platform === "win32") {
+  executePendingWindowsUserDataMigration({
+    currentUserDataDir: app.getPath("userData"),
+    log: (message) => {
+      writeDesktopMainLog({
+        source: "windows-user-data-migration",
+        stream: "system",
+        kind: "lifecycle",
+        message,
+        logFilePath: resolve(
+          app.getPath("userData"),
+          "logs",
+          "desktop-main.log",
+        ),
+      });
+    },
+  });
+}
+
 const needsSetupExtraction = checkOpenclawExtractionNeeded(
   electronRoot,
   app.getPath("userData"),

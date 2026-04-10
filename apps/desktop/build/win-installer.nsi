@@ -42,7 +42,13 @@ RequestExecutionLevel user
 !define INSTALL_TOMBSTONE_MARKER ".nexu-installer-tombstone"
 
 Var UserDataDir
+Var OldUserDataDir
+Var OldUserDataDirIsNonEmpty
 Var UserDataInputHandle
+Var MigrationStrategy
+Var MigrationMoveRadioHandle
+Var MigrationCopyRadioHandle
+Var MigrationNoopRadioHandle
 Var UninstallDeleteDataCheckboxHandle
 Var UninstallDeleteLocalDataSelected
 
@@ -66,6 +72,7 @@ ShowUninstDetails show
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 Page custom UserDataPageCreate UserDataPageLeave
+Page custom MigrationPageCreate MigrationPageLeave
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -81,6 +88,55 @@ Function BrowseUserDataDir
   ${If} $1 != error
     ${NSD_SetText} $UserDataInputHandle "$1"
   ${EndIf}
+FunctionEnd
+
+Function NormalizeUserDataDir
+  Push $1
+  Push $2
+  Push $3
+
+  StrCpy $0 "$UserDataDir"
+
+trim_trailing_separators:
+  StrLen $1 $0
+  ${If} $1 <= 3
+    Goto normalized_suffix_check
+  ${EndIf}
+
+  IntOp $2 $1 - 1
+  StrCpy $3 $0 1 $2
+  StrCmp $3 "\\" trim_one_separator
+  StrCmp $3 "/" trim_one_separator
+  Goto normalized_suffix_check
+
+trim_one_separator:
+  StrCpy $0 $0 $2
+  Goto trim_trailing_separators
+
+normalized_suffix_check:
+  StrLen $1 $0
+  ${If} $1 >= 13
+    IntOp $2 $1 - 13
+    StrCpy $3 $0 13 $2
+    StrCmp $3 "\\${DEFAULT_USER_DATA_DIR_NAME}" normalization_done
+    StrCmp $3 "/${DEFAULT_USER_DATA_DIR_NAME}" normalization_done
+  ${EndIf}
+
+  IntOp $2 $1 - 1
+  StrCpy $3 $0 1 $2
+  StrCmp $3 "\\" append_without_separator
+  StrCmp $3 "/" append_without_separator
+  StrCpy $0 "$0\\${DEFAULT_USER_DATA_DIR_NAME}"
+  Goto normalization_done
+
+append_without_separator:
+  StrCpy $0 "$0${DEFAULT_USER_DATA_DIR_NAME}"
+
+normalization_done:
+  StrCpy $UserDataDir "$0"
+  Pop $3
+  Pop $2
+  Pop $1
 FunctionEnd
 
 Function UserDataPageCreate
@@ -114,6 +170,102 @@ Function UserDataPageLeave
     MessageBox MB_OK|MB_ICONEXCLAMATION "$(Lang_ErrorUserDataEmpty)"
     Abort
   ${EndIf}
+
+  Call NormalizeUserDataDir
+  ${NSD_SetText} $UserDataInputHandle "$UserDataDir"
+
+  StrCpy $0 "$UserDataDir"
+  Call UpdateDirectoryNonEmptyState
+  ${If} $UserDataDir != $OldUserDataDir
+  ${AndIf} $OldUserDataDirIsNonEmpty == "1"
+    MessageBox MB_OK|MB_ICONEXCLAMATION "$(Lang_ErrorUserDataTargetNonEmpty)"
+    Abort
+  ${EndIf}
+FunctionEnd
+
+Function UpdateDirectoryNonEmptyState
+  Push $1
+  Push $2
+
+  StrCpy $OldUserDataDirIsNonEmpty "0"
+  IfFileExists "$0\*" 0 done
+  FindFirst $1 $2 "$0\*"
+loop:
+  IfErrors close
+  StrCmp $2 "" next
+  StrCmp $2 "." next
+  StrCmp $2 ".." next
+  StrCpy $OldUserDataDirIsNonEmpty "1"
+  Goto close
+next:
+  FindNext $1 $2
+  Goto loop
+close:
+  FindClose $1
+done:
+  Pop $2
+  Pop $1
+FunctionEnd
+
+Function MigrationPageCreate
+  ${If} $UserDataDir == $OldUserDataDir
+    Abort
+  ${EndIf}
+
+  StrCpy $0 "$OldUserDataDir"
+  Call UpdateDirectoryNonEmptyState
+  ${If} $OldUserDataDirIsNonEmpty != "1"
+    Abort
+  ${EndIf}
+
+  !insertmacro MUI_HEADER_TEXT "$(Lang_MigrationTitle)" "$(Lang_MigrationSubtitle)"
+
+  nsDialogs::Create 1018
+  Pop $0
+  ${If} $0 == error
+    Abort
+  ${EndIf}
+
+  ${NSD_CreateLabel} 0 0 100% 18u "$(Lang_MigrationHelp)"
+  Pop $0
+
+  ${NSD_CreateLabel} 0 24u 100% 10u "$(Lang_MigrationOldDirLabel)"
+  Pop $0
+  ${NSD_CreateLabel} 0 34u 100% 12u "$OldUserDataDir"
+  Pop $0
+
+  ${NSD_CreateLabel} 0 50u 100% 10u "$(Lang_MigrationNewDirLabel)"
+  Pop $0
+  ${NSD_CreateLabel} 0 60u 100% 12u "$UserDataDir"
+  Pop $0
+
+  ${NSD_CreateRadioButton} 0 82u 100% 12u "$(Lang_MigrationMoveOption)"
+  Pop $MigrationMoveRadioHandle
+  ${NSD_Check} $MigrationMoveRadioHandle
+
+  ${NSD_CreateRadioButton} 0 98u 100% 12u "$(Lang_MigrationCopyOption)"
+  Pop $MigrationCopyRadioHandle
+
+  ${NSD_CreateRadioButton} 0 114u 100% 12u "$(Lang_MigrationNoopOption)"
+  Pop $MigrationNoopRadioHandle
+
+  nsDialogs::Show
+FunctionEnd
+
+Function MigrationPageLeave
+  ${NSD_GetState} $MigrationCopyRadioHandle $0
+  ${If} $0 == ${BST_CHECKED}
+    StrCpy $MigrationStrategy "copy"
+    Return
+  ${EndIf}
+
+  ${NSD_GetState} $MigrationNoopRadioHandle $0
+  ${If} $0 == ${BST_CHECKED}
+    StrCpy $MigrationStrategy "noop"
+    Return
+  ${EndIf}
+
+  StrCpy $MigrationStrategy "move"
 FunctionEnd
 
 Function un.UninstallOptionsPageCreate
@@ -391,10 +543,12 @@ Function .onInit
   Delete "${INSTALLER_LOG}"
   Push "installer init"
   Call LogInstallerEvent
-  ReadRegStr $UserDataDir HKCU "${NEXU_CONFIG_REGKEY}" "${NEXU_USER_DATA_VALUE}"
-  ${If} $UserDataDir == ""
-    StrCpy $UserDataDir "$APPDATA\${DEFAULT_USER_DATA_DIR_NAME}"
+  ReadRegStr $OldUserDataDir HKCU "${NEXU_CONFIG_REGKEY}" "${NEXU_USER_DATA_VALUE}"
+  ${If} $OldUserDataDir == ""
+    StrCpy $OldUserDataDir "$APPDATA\${DEFAULT_USER_DATA_DIR_NAME}"
   ${EndIf}
+  StrCpy $UserDataDir "$OldUserDataDir"
+  StrCpy $MigrationStrategy "move"
   nsExec::ExecToStack '"$SYSDIR\tasklist.exe" /FI "IMAGENAME eq Nexu.exe" /NH'
   Pop $0
   Pop $1
@@ -480,6 +634,18 @@ Section "Install"
   ${Else}
     WriteRegStr HKCU "${NEXU_CONFIG_REGKEY}" "${NEXU_USER_DATA_VALUE}" "$UserDataDir"
   ${EndIf}
+  StrCpy $0 "$OldUserDataDir"
+  Call UpdateDirectoryNonEmptyState
+  ${If} $UserDataDir != $OldUserDataDir
+  ${AndIf} $OldUserDataDirIsNonEmpty == "1"
+    WriteRegStr HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationSource" "$OldUserDataDir"
+    WriteRegStr HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationTarget" "$UserDataDir"
+    WriteRegStr HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationStrategy" "$MigrationStrategy"
+  ${Else}
+    DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationSource"
+    DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationTarget"
+    DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationStrategy"
+  ${EndIf}
   DetailPrint "$(Lang_StatusInstallDone)"
   Push "install section done"
   Call LogInstallerEvent
@@ -490,6 +656,9 @@ Section "Uninstall"
   Push "uninstall section start"
   Call un.LogInstallerEvent
   StrCpy $UninstallDeleteLocalDataSelected "0"
+  DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationSource"
+  DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationTarget"
+  DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationStrategy"
   Delete "$DESKTOP\Nexu.lnk"
   Delete "$SMPROGRAMS\Nexu\Nexu.lnk"
   Delete "$SMPROGRAMS\Nexu\Uninstall Nexu.lnk"
