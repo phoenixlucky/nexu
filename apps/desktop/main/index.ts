@@ -1124,6 +1124,15 @@ function updateSystemTrayMenu(): void {
   );
 }
 
+function showSystemTrayMenu(): void {
+  if (!systemTray) {
+    return;
+  }
+
+  updateSystemTrayMenu();
+  systemTray.popUpContextMenu();
+}
+
 function showMainWindowFromResidentEntry(): void {
   const preferences = getDesktopShellPreferences();
 
@@ -1218,16 +1227,11 @@ async function ensureWindowsTray(): Promise<void> {
   updateSystemTrayMenu();
 
   systemTray.on("click", () => {
-    if (mainWindow?.isVisible()) {
-      hideMainWindowToBackground();
-      return;
-    }
-
-    showMainWindowFromResidentEntry();
+    showSystemTrayMenu();
   });
 
   systemTray.on("right-click", () => {
-    updateSystemTrayMenu();
+    showSystemTrayMenu();
   });
 }
 
