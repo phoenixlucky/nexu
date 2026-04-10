@@ -278,11 +278,12 @@ function compilePlugins(
   // config omits it, the next write creates a diff that triggers a
   // gateway restart, and the cycle repeats.
   const prewarmedChannelPluginIds = ["feishu", "openclaw-weixin"];
+  const analyticsEnabled = config.desktop.analyticsEnabled === true;
   const platformPluginIds = [
     "nexu-runtime-model",
     "nexu-credit-guard",
-    "langfuse-tracer",
     "nexu-platform-bootstrap",
+    ...(analyticsEnabled ? ["langfuse-tracer"] : []),
     ...(resolvedMiniMaxOauth ? ["minimax-portal-auth"] : []),
   ];
 
@@ -334,9 +335,13 @@ function compilePlugins(
       "nexu-runtime-model": {
         enabled: true,
       },
-      "langfuse-tracer": {
-        enabled: true,
-      },
+      ...(analyticsEnabled
+        ? {
+            "langfuse-tracer": {
+              enabled: true,
+            },
+          }
+        : {}),
       "nexu-credit-guard": {
         enabled: true,
         config: {

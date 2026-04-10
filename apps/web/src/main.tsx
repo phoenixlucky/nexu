@@ -14,6 +14,7 @@ import { LocaleProvider } from "./hooks/use-locale";
 import "./lib/api";
 import { getAnalyticsAppMetadata } from "./lib/analytics-app-metadata";
 import {
+  ANALYTICS_PREFERENCE_STORAGE_KEY,
   identifyAuthenticatedUser,
   initializeAnalytics,
   resetAnalytics,
@@ -22,7 +23,15 @@ import "./i18n";
 import "./index.css";
 
 const posthogApiKey = import.meta.env.VITE_POSTHOG_API_KEY;
-if (posthogApiKey) {
+const analyticsEnabledByPreference = (() => {
+  try {
+    return localStorage.getItem(ANALYTICS_PREFERENCE_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+})();
+
+if (posthogApiKey && analyticsEnabledByPreference) {
   const { appName, appVersion } = getAnalyticsAppMetadata();
   initializeAnalytics({
     apiKey: posthogApiKey,

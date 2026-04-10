@@ -2005,6 +2005,29 @@ export class NexuConfigStore {
     return locale;
   }
 
+  async getStoredDesktopAnalyticsEnabled(): Promise<boolean | null> {
+    const config = await this.getConfig();
+    return typeof config.desktop.analyticsEnabled === "boolean"
+      ? config.desktop.analyticsEnabled
+      : null;
+  }
+
+  async getDesktopAnalyticsEnabled(): Promise<boolean> {
+    return (await this.getStoredDesktopAnalyticsEnabled()) ?? false;
+  }
+
+  async setDesktopAnalyticsEnabled(enabled: boolean): Promise<boolean> {
+    await this.store.update((config) => ({
+      ...config,
+      desktop: {
+        ...config.desktop,
+        analyticsEnabled: enabled,
+      },
+    }));
+
+    return enabled;
+  }
+
   async refreshDesktopCloudModels() {
     await this.hydrateDesktopCloudModels(true);
     return this.getDesktopCloudStatus();
