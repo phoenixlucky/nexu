@@ -1756,7 +1756,7 @@ app.whenReady().then(async () => {
         channel: runtimeConfig.updates.channel,
         feedUrl: runtimeConfig.urls.updateFeed,
         autoDownload: true,
-        initialDelayMs: process.platform === "win32" ? 45_000 : 0,
+        initialDelayMs: process.platform === "win32" ? 30_000 : 0,
         prepareForUpdateInstall: runtimeLifecycle.prepareForUpdateInstall
           ? async (args: PrepareForUpdateInstallArgs) => {
               await runtimeLifecycle.prepareForUpdateInstall?.(args);
