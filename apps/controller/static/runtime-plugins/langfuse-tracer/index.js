@@ -1,6 +1,22 @@
 const DEFAULT_BASE_URL = "https://cloud.langfuse.com";
 const pendingPrompts = new Map();
 
+function logWarn(api, message) {
+  try {
+    api.logger.warn(message);
+  } catch {
+    // Never let tracing logs affect the main runtime path.
+  }
+}
+
+function logInfo(api, message) {
+  try {
+    api.logger.info(message);
+  } catch {
+    // Never let tracing logs affect the main runtime path.
+  }
+}
+
 function readLangfuseConfig() {
   const publicKey = process.env.LANGFUSE_PUBLIC_KEY?.trim();
   const secretKey = process.env.LANGFUSE_SECRET_KEY?.trim();
@@ -135,16 +151,18 @@ async function postLangfuseBatch(api, config, batch) {
         Authorization: config.authHeader,
         "Content-Type": "application/json",
       },
+      signal: AbortSignal.timeout(5000),
       body: JSON.stringify({ batch }),
     });
     if (!response.ok) {
       const body = await response.text().catch(() => "");
-      api.logger.warn(
+      logWarn(
+        api,
         `[langfuse-tracer] Ingestion failed ${response.status}: ${body.slice(0, 200)}`,
       );
     }
   } catch (error) {
-    api.logger.warn(`[langfuse-tracer] Fetch error: ${String(error)}`);
+    logWarn(api, `[langfuse-tracer] Fetch error: ${String(error)}`);
   }
 }
 
@@ -156,32 +174,39 @@ const plugin = {
   register(api) {
     const config = readLangfuseConfig();
     if (!config) {
-      api.logger.info(
+      logInfo(
+        api,
         "[langfuse-tracer] LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY not set — tracing disabled",
       );
       return;
     }
 
-    api.logger.info(
-      `[langfuse-tracer] Langfuse tracing enabled → ${config.baseUrl}`,
-    );
+    logInfo(api, `[langfuse-tracer] Langfuse tracing enabled → ${config.baseUrl}`);
 
     api.on("before_agent_start", (event = {}, context = {}) => {
-      const key = context.sessionKey ?? context.agentId ?? "default";
-      pendingPrompts.set(key, {
-        prompt: typeof event.prompt === "string" ? event.prompt : "",
-        startedAt: Date.now(),
-      });
+      try {
+        const key = context.sessionKey ?? context.agentId ?? "default";
+        pendingPrompts.set(key, {
+          prompt: typeof event.prompt === "string" ? event.prompt : "",
+          startedAt: Date.now(),
+        });
+      } catch (error) {
+        logWarn(api, `[langfuse-tracer] before_agent_start error: ${String(error)}`);
+      }
     });
 
-    api.on("agent_end", async (event = {}, context = {}) => {
-      const key = context.sessionKey ?? context.agentId ?? "default";
-      const pending = pendingPrompts.get(key);
-      pendingPrompts.delete(key);
+    api.on("agent_end", (event = {}, context = {}) => {
+      try {
+        const key = context.sessionKey ?? context.agentId ?? "default";
+        const pending = pendingPrompts.get(key);
+        pendingPrompts.delete(key);
 
-      const messages = Array.isArray(event.messages) ? event.messages : [];
-      const batch = buildBatch({ ...event, messages }, context, pending);
-      await postLangfuseBatch(api, config, batch);
+        const messages = Array.isArray(event.messages) ? event.messages : [];
+        const batch = buildBatch({ ...event, messages }, context, pending);
+        void postLangfuseBatch(api, config, batch);
+      } catch (error) {
+        logWarn(api, `[langfuse-tracer] agent_end error: ${String(error)}`);
+      }
     });
   },
 };
