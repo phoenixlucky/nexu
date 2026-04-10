@@ -30,6 +30,11 @@ const MANIFEST_ID_FIXES = {
   "wecom-openclaw-plugin": "wecom",
 };
 
+function shouldCopyPluginPath(source) {
+  const basename = path.basename(source);
+  return basename !== ".bin" && basename !== "node_modules";
+}
+
 function getVirtualStoreNodeModules(realPkgPath) {
   let currentPath = realPkgPath;
   while (currentPath !== dirname(currentPath)) {
@@ -39,6 +44,16 @@ function getVirtualStoreNodeModules(realPkgPath) {
     currentPath = dirname(currentPath);
   }
   return null;
+}
+
+function getPackageNodeModules(packageRoot) {
+  const candidate = path.join(packageRoot, "node_modules");
+  try {
+    readdirSync(candidate);
+    return candidate;
+  } catch {
+    return null;
+  }
 }
 
 function listPackages(nodeModulesDir) {
@@ -157,12 +172,14 @@ async function bundlePlugin({ id, npmName }) {
     recursive: true,
     force: true,
     dereference: true,
-    filter: (source) => path.basename(source) !== ".bin",
+    filter: shouldCopyPluginPath,
   });
   await maybeFixPluginManifest(outputDir);
 
-  const rootVirtualNodeModules = getVirtualStoreNodeModules(sourcePackageRoot);
-  if (!rootVirtualNodeModules) {
+  const rootDependencyNodeModules =
+    getPackageNodeModules(sourcePackageRoot) ??
+    getVirtualStoreNodeModules(sourcePackageRoot);
+  if (!rootDependencyNodeModules) {
     throw new Error(`Unable to resolve node_modules for ${npmName}`);
   }
 
@@ -173,7 +190,9 @@ async function bundlePlugin({ id, npmName }) {
     ...Object.keys(packageJson.peerDependencies ?? {}),
   ]);
   const collected = new Map();
-  const queue = [{ nodeModulesDir: rootVirtualNodeModules, skipPkg: npmName }];
+  const queue = [
+    { nodeModulesDir: rootDependencyNodeModules, skipPkg: npmName },
+  ];
 
   while (queue.length > 0) {
     const { nodeModulesDir, skipPkg } = queue.shift();
@@ -217,11 +236,12 @@ async function bundlePlugin({ id, npmName }) {
 
     const destinationPath = path.join(outputNodeModules, packageName);
     await mkdir(path.dirname(destinationPath), { recursive: true });
+    await rm(destinationPath, { recursive: true, force: true });
     await cp(realPackagePath, destinationPath, {
       recursive: true,
       force: true,
       dereference: true,
-      filter: (source) => path.basename(source) !== ".bin",
+      filter: shouldCopyPluginPath,
     });
   }
 }

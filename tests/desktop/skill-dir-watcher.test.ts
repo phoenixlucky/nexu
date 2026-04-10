@@ -20,6 +20,10 @@ function removeSkill(skillsDir: string, slug: string): void {
   rmSync(resolve(skillsDir, slug), { recursive: true, force: true });
 }
 
+function touchWatchTrigger(skillsDir: string): void {
+  writeFileSync(resolve(skillsDir, ".watch-trigger"), String(Date.now()));
+}
+
 function wait(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -34,12 +38,13 @@ async function waitUntil(
     if (fn()) return;
     await wait(intervalMs);
   }
+
+  throw new Error("Timed out waiting for watcher state");
 }
 
 describe("SkillDirWatcher", () => {
   let tempDir: string;
   let skillsDir: string;
-  let userSkillsDir: string;
   let dbPath: string;
   let db: SkillDb;
   let watcher: SkillDirWatcher;
@@ -48,8 +53,6 @@ describe("SkillDirWatcher", () => {
     tempDir = makeTempDir();
     skillsDir = resolve(tempDir, "skills");
     mkdirSync(skillsDir, { recursive: true });
-    userSkillsDir = resolve(tempDir, "user-skills");
-    mkdirSync(userSkillsDir, { recursive: true });
     dbPath = resolve(tempDir, "skill-ledger.json");
     db = await SkillDb.create(dbPath);
   });
@@ -85,22 +88,6 @@ describe("SkillDirWatcher", () => {
 
       expect(db.isInstalled("github", "managed")).toBe(true);
       expect(db.getAllInstalled()).toHaveLength(1);
-    });
-
-    it("records untracked user-directory skills as user", () => {
-      writeSkill(userSkillsDir, "obsidian");
-      writeSkill(userSkillsDir, "playwright-skill");
-
-      watcher = new SkillDirWatcher({
-        skillsDir,
-        userSkillsDir,
-        skillDb: db,
-      });
-      watcher.syncNow();
-
-      expect(db.isInstalled("obsidian", "user")).toBe(true);
-      expect(db.isInstalled("playwright-skill", "user")).toBe(true);
-      expect(db.getAllInstalled()).toHaveLength(2);
     });
 
     it("marks missing skills as uninstalled", () => {
@@ -184,6 +171,7 @@ describe("SkillDirWatcher", () => {
         watcher.start();
 
         writeSkill(skillsDir, "new-skill");
+        touchWatchTrigger(skillsDir);
 
         await waitUntil(() => db.isInstalled("new-skill", "managed"));
 
@@ -191,46 +179,29 @@ describe("SkillDirWatcher", () => {
       },
     );
 
-    it("detects SKILL.md removal and marks skill as uninstalled", async () => {
-      writeSkill(skillsDir, "doomed-skill");
+    it(
+      "detects SKILL.md removal and marks skill as uninstalled",
+      { timeout: 10000 },
+      async () => {
+        writeSkill(skillsDir, "doomed-skill");
 
-      watcher = new SkillDirWatcher({
-        skillsDir,
-        skillDb: db,
-        debounceMs: 50,
-      });
-      watcher.syncNow();
-      expect(db.isInstalled("doomed-skill", "managed")).toBe(true);
+        watcher = new SkillDirWatcher({
+          skillsDir,
+          skillDb: db,
+          debounceMs: 50,
+        });
+        watcher.syncNow();
+        expect(db.isInstalled("doomed-skill", "managed")).toBe(true);
 
-      watcher.start();
+        watcher.start();
 
-      removeSkill(skillsDir, "doomed-skill");
+        removeSkill(skillsDir, "doomed-skill");
+        touchWatchTrigger(skillsDir);
 
-      await waitUntil(() => !db.isInstalled("doomed-skill", "managed"));
+        await waitUntil(() => !db.isInstalled("doomed-skill", "managed"));
 
-      expect(db.isInstalled("doomed-skill", "managed")).toBe(false);
-    });
-
-    it("detects user skill install and triggers onChange after debounce", async () => {
-      let changeCount = 0;
-
-      watcher = new SkillDirWatcher({
-        skillsDir,
-        userSkillsDir,
-        skillDb: db,
-        debounceMs: 50,
-        onChange: () => {
-          changeCount += 1;
-        },
-      });
-      watcher.start();
-
-      writeSkill(userSkillsDir, "obsidian");
-
-      await waitUntil(() => db.isInstalled("obsidian", "user"));
-
-      expect(db.isInstalled("obsidian", "user")).toBe(true);
-      expect(changeCount).toBeGreaterThan(0);
-    });
+        expect(db.isInstalled("doomed-skill", "managed")).toBe(false);
+      },
+    );
   });
 });

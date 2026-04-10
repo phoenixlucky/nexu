@@ -71,6 +71,10 @@ function createBaseConfig(): NexuConfig {
       },
       defaultModelId: "anthropic/claude-sonnet-4",
     },
+    models: {
+      mode: "merge",
+      providers: {},
+    },
     providers: [],
     integrations: [],
     channels: [],
@@ -88,6 +92,8 @@ describe("compileOpenClawConfig", () => {
     expect(compiled.plugins?.entries?.["openclaw-weixin"]).toEqual({
       enabled: true,
     });
+    // Prewarm allowlist: prevents first-connect SIGUSR1 + drain window.
+    expect(compiled.plugins?.allow).toContain("openclaw-weixin");
     expect(compiled.channels?.feishu?.enabled).toBe(true);
     expect(compiled.channels?.feishu?.accounts).toEqual({
       __nexu_internal_feishu_prewarm__: {
@@ -298,6 +304,36 @@ describe("compileOpenClawConfig", () => {
 
   it("compiles ollama providers with the native ollama API", () => {
     const config = createBaseConfig();
+    config.models = {
+      mode: "merge",
+      providers: {
+        ollama: {
+          enabled: true,
+          displayName: "Ollama",
+          baseUrl: "http://127.0.0.1:11434",
+          auth: "api-key",
+          api: "ollama",
+          apiKey: "ollama-local",
+          models: [
+            {
+              id: "qwen2.5-coder:7b",
+              name: "qwen2.5-coder:7b",
+              api: "ollama",
+              reasoning: false,
+              input: ["text"],
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              },
+              contextWindow: 0,
+              maxTokens: 0,
+            },
+          ],
+        },
+      },
+    };
     config.providers = [
       {
         id: "provider_ollama",

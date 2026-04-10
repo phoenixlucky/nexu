@@ -8,6 +8,7 @@ import {
   resolveTsxPaths,
   spawnHiddenProcess,
   terminateProcess,
+  waitFor,
   waitForListeningPortPid,
   waitForProcessStart,
   writeDevLock,
@@ -64,15 +65,42 @@ export async function getControllerPortPid(): Promise<number> {
   );
 }
 
-async function waitForControllerPortPid(): Promise<number> {
+async function waitForControllerPortPid(
+  supervisorPid?: number,
+): Promise<number> {
   return waitForListeningPortPid(
     getScriptsDevRuntimeConfig().controllerPort,
     "controller dev server",
     {
-      attempts: 30,
+      // Match supervisor headroom — Windows cold-start can take ~15s.
+      attempts: 120,
       delayMs: 500,
+      supervisorPid,
+      supervisorName: "controller supervisor",
     },
   );
+}
+
+async function cleanupStaleControllerPort(): Promise<void> {
+  try {
+    const workerPid = await getControllerPortPid();
+    await terminateProcess(workerPid);
+    await waitFor(
+      async () => {
+        try {
+          await getControllerPortPid();
+        } catch {
+          return;
+        }
+        throw new Error("controller dev server listener is still active");
+      },
+      () => new Error("controller dev server listener did not stop in time"),
+      {
+        attempts: 20,
+        delayMs: 250,
+      },
+    ).catch(() => terminateProcess(workerPid));
+  } catch {}
 }
 
 async function ensureOpenclawReadyForController(): Promise<void> {
@@ -127,6 +155,8 @@ export async function startControllerDevProcess(options: {
       ),
   );
 
+  await cleanupStaleControllerPort();
+
   const runId = options.sessionId;
   const sessionId = options.sessionId;
   const logFilePath = getControllerDevLogPath(runId);
@@ -170,7 +200,7 @@ export async function startControllerDevProcess(options: {
     () => new Error("controller dev process did not expose a pid"),
   );
   const supervisorPid = processHandle.pid as number;
-  const workerPid = await waitForControllerPortPid();
+  const workerPid = await waitForControllerPortPid(supervisorPid);
 
   await writeDevLock(controllerDevLockPath, {
     pid: supervisorPid,

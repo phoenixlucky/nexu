@@ -80,6 +80,15 @@ async function ensureExistingPath(path, label) {
   }
 }
 
+async function pathExists(targetPath) {
+  try {
+    await lstat(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function ensureExistingBuildArtifacts() {
   await Promise.all([
     ensureExistingPath(
@@ -116,17 +125,19 @@ async function ensureExistingRuntimeInstall() {
   ]);
 }
 
+// Only honor an explicitly provided electron dist override (used by e2e
+// coverage tooling). When unset, return null so electron-builder falls back
+// to its default electron resolution. Pointing electron-builder directly at
+// the pnpm-stored Electron.app caused codesign to fail with "bundle format is
+// ambiguous" because the framework symlink layout did not survive the copy
+// from the pnpm content-addressable store (regression from #698).
 async function resolveElectronDistPath() {
-  if (process.env.NEXU_DESKTOP_ELECTRON_DIST_PATH) {
-    return process.env.NEXU_DESKTOP_ELECTRON_DIST_PATH;
+  const override = process.env.NEXU_DESKTOP_ELECTRON_DIST_PATH;
+  if (!override) {
+    return null;
   }
-
-  const electronPackageJsonPath = require.resolve("electron/package.json", {
-    paths: [electronRoot, repoRoot],
-  });
-  const electronDistPath = resolve(dirname(electronPackageJsonPath), "dist");
-  await ensureExistingPath(electronDistPath, "electron dist");
-  return electronDistPath;
+  await ensureExistingPath(override, "electron dist override");
+  return override;
 }
 
 async function timedStep(stepName, fn, timings) {
@@ -461,6 +472,52 @@ async function stapleNotarizedAppBundles() {
   }
 }
 
+async function validatePackagedQqbotDependencies(releaseRoot) {
+  const appBundleDirs = await readdir(releaseRoot, { withFileTypes: true });
+  const packagedMacBundles = appBundleDirs.filter(
+    (entry) =>
+      entry.isDirectory() &&
+      (entry.name === "mac" || entry.name.startsWith("mac-")),
+  );
+
+  if (packagedMacBundles.length === 0) {
+    throw new Error(
+      `[dist:mac] expected packaged macOS app bundles under ${releaseRoot}, but none were found.`,
+    );
+  }
+
+  for (const entry of packagedMacBundles) {
+    const appRoot = resolve(releaseRoot, entry.name, "Nexu.app");
+    const qqbotPluginRoot = resolve(
+      appRoot,
+      "Contents",
+      "Resources",
+      "runtime",
+      "controller",
+      "plugins",
+      "openclaw-qqbot",
+    );
+    const silkWasmPackagePath = resolve(
+      qqbotPluginRoot,
+      "node_modules",
+      "silk-wasm",
+      "package.json",
+    );
+
+    if (!(await pathExists(qqbotPluginRoot))) {
+      throw new Error(
+        `[dist:mac] packaged app is missing openclaw-qqbot: ${qqbotPluginRoot}`,
+      );
+    }
+
+    if (!(await pathExists(silkWasmPackagePath))) {
+      throw new Error(
+        `[dist:mac] packaged app is missing openclaw-qqbot dependency silk-wasm: ${silkWasmPackagePath}`,
+      );
+    }
+  }
+}
+
 async function ensureBuildConfig() {
   const configPath = resolve(electronRoot, "build-config.json");
   const isCi =
@@ -584,10 +641,15 @@ async function ensureBuildConfig() {
       merged.NEXU_DESKTOP_BUILD_TIME ??
       existingConfig.NEXU_DESKTOP_BUILD_TIME ??
       defaultMetadata.NEXU_DESKTOP_BUILD_TIME,
-    ...((merged.AMPLITUDE_API_KEY ?? existingConfig.AMPLITUDE_API_KEY)
+    ...((merged.POSTHOG_API_KEY ?? existingConfig.POSTHOG_API_KEY)
       ? {
-          AMPLITUDE_API_KEY:
-            merged.AMPLITUDE_API_KEY ?? existingConfig.AMPLITUDE_API_KEY,
+          POSTHOG_API_KEY:
+            merged.POSTHOG_API_KEY ?? existingConfig.POSTHOG_API_KEY,
+        }
+      : {}),
+    ...((merged.POSTHOG_HOST ?? existingConfig.POSTHOG_HOST)
+      ? {
+          POSTHOG_HOST: merged.POSTHOG_HOST ?? existingConfig.POSTHOG_HOST,
         }
       : {}),
   };
@@ -805,7 +867,9 @@ async function main() {
         "--publish",
         "never",
         `--config.electronVersion=${electronVersion}`,
-        `--config.electronDist=${electronDistPath}`,
+        ...(electronDistPath
+          ? [`--config.electronDist=${electronDistPath}`]
+          : []),
         `--config.buildVersion=${buildVersion}`,
         `--config.directories.output=${releaseRoot}`,
         ...(isFastCiMode
@@ -829,6 +893,11 @@ async function main() {
           : notarizeEnv,
       });
     },
+    timings,
+  );
+  await timedStep(
+    "validate packaged qqbot dependencies",
+    async () => validatePackagedQqbotDependencies(releaseRoot),
     timings,
   );
   await timedStep(

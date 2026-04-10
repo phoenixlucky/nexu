@@ -1,6 +1,7 @@
 import type {
   AppInfo,
   DesktopRuntimeConfig,
+  DesktopUpdateCapability,
   DiagnosticsExportResult,
   DiagnosticsInfo,
   HostDesktopCommand,
@@ -37,6 +38,19 @@ export async function exportDiagnostics(
 
 export function reportStartupProbe(payload: StartupProbePayload): void {
   getHostBridge().reportStartupProbe(payload);
+}
+
+export function reportDesktopDevPageError(input: {
+  level: "error";
+  message: string;
+  url: string | null;
+  sourceId: string | null;
+  line: number | null;
+}): void {
+  getHostBridge().reportRendererDiagnosticsLog({
+    source: "page-error",
+    ...input,
+  });
 }
 
 export async function triggerMainProcessCrash(): Promise<void> {
@@ -101,6 +115,18 @@ export async function queryRuntimeEvents(
 
 export async function getDesktopCloudStatus() {
   return getHostBridge().invoke("desktop:get-cloud-status", undefined);
+}
+
+export async function getDesktopRewardsStatus() {
+  return getHostBridge().invoke("desktop:get-rewards-status", undefined);
+}
+
+export async function setDesktopRewardBalance(balance: number) {
+  return getHostBridge().invoke("desktop:set-reward-balance", { balance });
+}
+
+export async function notifyDesktopRewardsUpdated(): Promise<void> {
+  await getHostBridge().invoke("desktop:rewards-updated", undefined);
 }
 
 export async function createCloudProfile(profile: {
@@ -170,6 +196,10 @@ export function onRuntimeEvent(
 export async function checkForUpdate(): Promise<boolean> {
   const result = await getHostBridge().invoke("update:check", undefined);
   return result.updateAvailable;
+}
+
+export async function getUpdateCapability(): Promise<DesktopUpdateCapability> {
+  return getHostBridge().invoke("update:get-capability", undefined);
 }
 
 export async function downloadUpdate(): Promise<boolean> {

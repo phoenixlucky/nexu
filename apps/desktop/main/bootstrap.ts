@@ -1,8 +1,13 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { app } from "electron";
 import { getDesktopNexuHomeDir } from "../shared/desktop-paths";
 import { resolveRuntimePlatform } from "./platforms/platform-resolver";
+import {
+  getLegacyPackagedNexuHomeDir,
+  migrateNexuHomeFromUserData,
+} from "./services/nexu-home-migration";
 
 function safeWrite(stream: NodeJS.WriteStream, message: string): void {
   if (stream.destroyed || !stream.writable) {
@@ -113,15 +118,19 @@ function configurePackagedPaths(): void {
 
   const appDataPath = app.getPath("appData");
   const overrideUserDataPath = process.env.NEXU_DESKTOP_USER_DATA_ROOT;
+  const registryUserDataPath =
+    process.platform === "win32" ? readWindowsRegistryUserDataRoot() : null;
   const defaultUserDataPath = app.getPath("userData");
   const runtimePlatform = resolveRuntimePlatform();
   const legacyWindowsUserDataPath = join(appDataPath, "@nexu", "desktop");
   const standardWindowsUserDataPath = join(appDataPath, "nexu-desktop");
   const userDataPath = overrideUserDataPath
     ? resolve(overrideUserDataPath)
-    : runtimePlatform === "win"
-      ? standardWindowsUserDataPath
-      : join(appDataPath, "@nexu", "desktop");
+    : registryUserDataPath
+      ? resolve(registryUserDataPath)
+      : runtimePlatform === "win"
+        ? standardWindowsUserDataPath
+        : join(appDataPath, "@nexu", "desktop");
   let effectiveUserDataPath = userDataPath;
 
   if (
@@ -145,11 +154,27 @@ function configurePackagedPaths(): void {
   const sessionDataPath = join(effectiveUserDataPath, "session");
   const logsPath = join(effectiveUserDataPath, "logs");
   const nexuHomePath = getDesktopNexuHomeDir(effectiveUserDataPath);
+  const legacyPackagedNexuHomePath = getLegacyPackagedNexuHomeDir(
+    effectiveUserDataPath,
+  );
 
   mkdirSync(effectiveUserDataPath, { recursive: true });
   mkdirSync(sessionDataPath, { recursive: true });
   mkdirSync(logsPath, { recursive: true });
   mkdirSync(nexuHomePath, { recursive: true });
+
+  if (legacyPackagedNexuHomePath !== nexuHomePath) {
+    migrateNexuHomeFromUserData({
+      targetNexuHome: nexuHomePath,
+      sourceNexuHome: legacyPackagedNexuHomePath,
+      log: (message) => {
+        safeWrite(
+          process.stdout,
+          `[desktop:paths] nexu-home-migration: ${message}\n`,
+        );
+      },
+    });
+  }
 
   process.env.NEXU_HOME = nexuHomePath;
 
@@ -159,8 +184,31 @@ function configurePackagedPaths(): void {
 
   safeWrite(
     process.stdout,
-    `[desktop:paths] appData=${appDataPath} defaultUserData=${defaultUserDataPath} overrideUserData=${overrideUserDataPath ?? "<unset>"} userData=${effectiveUserDataPath} sessionData=${sessionDataPath} logs=${logsPath} nexuHome=${nexuHomePath}\n`,
+    `[desktop:paths] appData=${appDataPath} defaultUserData=${defaultUserDataPath} overrideUserData=${overrideUserDataPath ?? "<unset>"} registryUserData=${registryUserDataPath ?? "<unset>"} userData=${effectiveUserDataPath} sessionData=${sessionDataPath} logs=${logsPath} nexuHome=${nexuHomePath}\n`,
   );
+}
+
+function readWindowsRegistryUserDataRoot(): string | null {
+  try {
+    const output = execFileSync(
+      "reg.exe",
+      ["query", "HKCU\\Software\\Nexu\\Desktop", "/v", "UserDataRoot"],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+        windowsHide: true,
+      },
+    );
+
+    for (const line of output.split(/\r?\n/u)) {
+      const match = line.match(/^\s*UserDataRoot\s+REG_\w+\s+(.+)$/u);
+      if (match?.[1]) {
+        return match[1].trim();
+      }
+    }
+  } catch {}
+
+  return null;
 }
 
 loadDesktopDevEnv();

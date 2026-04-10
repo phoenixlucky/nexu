@@ -5,10 +5,12 @@ const localePreferenceScript = `
   const storageKey = "nexu-docs-locale";
   const zhPrefix = "/zh/";
   const jaPrefix = "/ja/";
+  const koPrefix = "/ko/";
 
   const normalizePath = (path) => {
     if (path === "/zh") return zhPrefix;
     if (path === "/ja") return jaPrefix;
+    if (path === "/ko") return koPrefix;
     return path;
   };
 
@@ -20,13 +22,16 @@ const localePreferenceScript = `
     if (normalizedPath === jaPrefix || normalizedPath.startsWith(jaPrefix)) {
       return "ja";
     }
+    if (normalizedPath === koPrefix || normalizedPath.startsWith(koPrefix)) {
+      return "ko";
+    }
     return "en";
   };
 
   const getPreferredLocale = () => {
     try {
       const stored = window.localStorage.getItem(storageKey);
-      if (stored === "en" || stored === "zh" || stored === "ja") {
+      if (stored === "en" || stored === "zh" || stored === "ja" || stored === "ko") {
         return stored;
       }
     } catch {}
@@ -41,6 +46,9 @@ const localePreferenceScript = `
     if (languages.some((language) => String(language).toLowerCase().startsWith("ja"))) {
       return "ja";
     }
+    if (languages.some((language) => String(language).toLowerCase().startsWith("ko"))) {
+      return "ko";
+    }
     return "en";
   };
 
@@ -52,9 +60,9 @@ const localePreferenceScript = `
 
   const pathname = normalizePath(window.location.pathname);
 
-  if (pathname === "/" || pathname === zhPrefix || pathname === jaPrefix) {
+  if (pathname === "/" || pathname === zhPrefix || pathname === jaPrefix || pathname === koPrefix) {
     const preferredLocale = getPreferredLocale();
-    const targetPath = preferredLocale === "zh" ? zhPrefix : preferredLocale === "ja" ? jaPrefix : "/";
+    const targetPath = preferredLocale === "zh" ? zhPrefix : preferredLocale === "ja" ? jaPrefix : preferredLocale === "ko" ? koPrefix : "/";
 
     if (pathname !== targetPath) {
       window.location.replace(targetPath + window.location.search + window.location.hash);
@@ -113,8 +121,11 @@ const enSidebar = [
         text: "Channel Configuration",
         link: "/guide/channels",
         items: [
+          { text: "WeCom", link: "/guide/channels/wecom" },
           { text: "WeChat", link: "/guide/channels/wechat" },
           { text: "Feishu", link: "/guide/channels/feishu" },
+          { text: "QQ", link: "/guide/channels/qq" },
+          { text: "DingTalk", link: "/guide/channels/dingtalk" },
           { text: "Slack", link: "/guide/channels/slack" },
           { text: "Discord", link: "/guide/channels/discord" },
           { text: "Telegram", link: "/guide/channels/telegram" },
@@ -124,6 +135,13 @@ const enSidebar = [
       { text: "Model Configuration", link: "/guide/models" },
       { text: "Skill Installation", link: "/guide/skills" },
       { text: "Seedance 2.0 Video Generation", link: "/guide/seedance" },
+    ],
+  },
+  {
+    text: "Credits",
+    items: [
+      { text: "Model Credit Consumption", link: "/guide/model-pricing" },
+      { text: "Earn Credits by Sharing", link: "/guide/rewards" },
     ],
   },
   {
@@ -139,7 +157,6 @@ const enSidebar = [
       { text: "Contributing", link: "/guide/contributing" },
       { text: "Contact Us", link: "/guide/contact" },
       { text: "Star Us on GitHub", link: "/guide/star" },
-      { text: "Earn Points by Sharing", link: "/guide/rewards" },
       { text: "Changelog", link: "https://github.com/nexu-io/nexu/releases" },
     ],
   },
@@ -161,7 +178,10 @@ const jaSidebar = [
         text: "チャンネル設定",
         link: "/ja/guide/channels",
         items: [
+          { text: "WeCom", link: "/ja/guide/channels/wecom" },
           { text: "Feishu", link: "/ja/guide/channels/feishu" },
+          { text: "QQ", link: "/ja/guide/channels/qq" },
+          { text: "DingTalk", link: "/ja/guide/channels/dingtalk" },
           { text: "Slack", link: "/ja/guide/channels/slack" },
           { text: "Discord", link: "/ja/guide/channels/discord" },
           { text: "Telegram", link: "/ja/guide/channels/telegram" },
@@ -171,6 +191,13 @@ const jaSidebar = [
       { text: "モデル設定", link: "/ja/guide/models" },
       { text: "スキルインストール", link: "/ja/guide/skills" },
       { text: "Seedance 2.0 動画生成", link: "/ja/guide/seedance" },
+    ],
+  },
+  {
+    text: "ポイント",
+    items: [
+      { text: "モデルのポイント消費", link: "/ja/guide/model-pricing" },
+      { text: "シェアしてポイント獲得", link: "/ja/guide/rewards" },
     ],
   },
   {
@@ -186,8 +213,64 @@ const jaSidebar = [
       { text: "コントリビュート", link: "/ja/guide/contributing" },
       { text: "お問い合わせ", link: "/ja/guide/contact" },
       { text: "GitHub で Star", link: "/ja/guide/star" },
-      { text: "シェアでポイント獲得", link: "/ja/guide/rewards" },
       { text: "更新ログ", link: "https://github.com/nexu-io/nexu/releases" },
+    ],
+  },
+];
+
+const koSidebar = [
+  {
+    text: "시작하기",
+    items: [
+      { text: "소개", link: "/ko/" },
+      { text: "1분 빠른 시작", link: "/ko/guide/quickstart" },
+      { text: "핵심 개념", link: "/ko/guide/concepts" },
+    ],
+  },
+  {
+    text: "설정",
+    items: [
+      {
+        text: "채널 설정",
+        link: "/ko/guide/channels",
+        items: [
+          { text: "WeCom", link: "/ko/guide/channels/wecom" },
+          { text: "WeChat", link: "/ko/guide/channels/wechat" },
+          { text: "Feishu", link: "/ko/guide/channels/feishu" },
+          { text: "QQ", link: "/ko/guide/channels/qq" },
+          { text: "DingTalk", link: "/ko/guide/channels/dingtalk" },
+          { text: "Slack", link: "/ko/guide/channels/slack" },
+          { text: "Discord", link: "/ko/guide/channels/discord" },
+          { text: "Telegram", link: "/ko/guide/channels/telegram" },
+          { text: "WhatsApp", link: "/ko/guide/channels/whatsapp" },
+        ],
+      },
+      { text: "모델 설정", link: "/ko/guide/models" },
+      { text: "스킬 설치", link: "/ko/guide/skills" },
+      { text: "Seedance 2.0 동영상 생성", link: "/ko/guide/seedance" },
+    ],
+  },
+  {
+    text: "크레딧",
+    items: [
+      { text: "모델 크레딧 소비", link: "/ko/guide/model-pricing" },
+      { text: "공유로 크레딧 받기", link: "/ko/guide/rewards" },
+    ],
+  },
+  {
+    text: "도움말",
+    items: [
+      { text: "업데이트 가이드", link: "/ko/guide/update" },
+      { text: "문제 해결", link: "/ko/guide/troubleshooting" },
+    ],
+  },
+  {
+    text: "커뮤니티",
+    items: [
+      { text: "기여하기", link: "/ko/guide/contributing" },
+      { text: "문의하기", link: "/ko/guide/contact" },
+      { text: "GitHub에서 Star 하기", link: "/ko/guide/star" },
+      { text: "변경 로그", link: "https://github.com/nexu-io/nexu/releases" },
     ],
   },
 ];
@@ -209,7 +292,10 @@ const zhSidebar = [
         link: "/zh/guide/channels",
         items: [
           { text: "微信", link: "/zh/guide/channels/wechat" },
+          { text: "企业微信", link: "/zh/guide/channels/wecom" },
           { text: "飞书", link: "/zh/guide/channels/feishu" },
+          { text: "QQ", link: "/zh/guide/channels/qq" },
+          { text: "钉钉", link: "/zh/guide/channels/dingtalk" },
           { text: "Slack", link: "/zh/guide/channels/slack" },
           { text: "Discord", link: "/zh/guide/channels/discord" },
           { text: "Telegram", link: "/zh/guide/channels/telegram" },
@@ -220,6 +306,13 @@ const zhSidebar = [
       { text: "技能安装", link: "/zh/guide/skills" },
       { text: "Seedance 2.0 视频生成", link: "/zh/guide/seedance" },
       { text: "Seedance 2.0 视频生成（Windows 版）", link: "/zh/guide/seedance-windows" },
+    ],
+  },
+  {
+    text: "积分",
+    items: [
+      { text: "模型积分消耗说明", link: "/zh/guide/model-pricing" },
+      { text: "分享赚积分", link: "/zh/guide/rewards" },
     ],
   },
   {
@@ -236,7 +329,6 @@ const zhSidebar = [
       { text: "参与贡献", link: "/zh/guide/contributing" },
       { text: "联系我们", link: "/zh/guide/contact" },
       { text: "给我们 Star", link: "/zh/guide/star" },
-      { text: "分享获得积分", link: "/zh/guide/rewards" },
       { text: "更新日志", link: "https://github.com/nexu-io/nexu/releases" },
     ],
   },
@@ -272,6 +364,13 @@ export default defineConfig({
       title: "nexu",
       description: "nexu のチャンネル、モデル、スキルに関するドキュメント。",
       link: "/ja/",
+    },
+    ko: {
+      label: "한국어",
+      lang: "ko",
+      title: "nexu",
+      description: "nexu 채널, 모델 및 스킬 문서.",
+      link: "/ko/",
     },
   },
   head: [
@@ -368,6 +467,23 @@ export default defineConfig({
               },
             },
           },
+          ko: {
+            translations: {
+              button: {
+                buttonText: "문서 검색",
+                buttonAriaLabel: "문서 검색",
+              },
+              modal: {
+                noResultsText: "결과 없음",
+                resetButtonTitle: "검색 초기화",
+                footer: {
+                  selectText: "선택",
+                  navigateText: "이동",
+                  closeText: "닫기",
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -382,6 +498,7 @@ export default defineConfig({
       "/": enSidebar,
       "/zh/": zhSidebar,
       "/ja/": jaSidebar,
+      "/ko/": koSidebar,
     },
   },
 });
