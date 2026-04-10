@@ -125,7 +125,11 @@ export function UpdateBanner({
     phase === "idle" && experience === "local-validation";
   const isLocalTestFeed = phase === "idle" && experience === "local-test-feed";
 
-  if ((phase === "idle" && experience === "normal") || dismissed) {
+  if (phase === "idle" && !isLocalValidation && !isLocalTestFeed) {
+    return null;
+  }
+
+  if (dismissed) {
     return null;
   }
 
