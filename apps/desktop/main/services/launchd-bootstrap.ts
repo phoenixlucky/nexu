@@ -745,6 +745,11 @@ export async function bootstrapWithLaunchd(
     // (conservative: forces fresh start on first upgrade to version-aware code).
     const versionMismatch =
       env.appVersion != null && recovered.appVersion !== env.appVersion;
+    const missingRuntimeIdentityMismatch =
+      !versionMismatch &&
+      !env.isDev &&
+      env.runtimeIdentityPath != null &&
+      recovered.runtimeIdentityPath == null;
     // Check identity fields beyond version: if any of openclawStateDir,
     // userDataPath, or buildSource are present in both recovered metadata
     // and current env, they must match. A mismatch means two different
@@ -772,10 +777,12 @@ export async function bootstrapWithLaunchd(
           recoveredVal != null && envVal != null && recoveredVal !== envVal,
       );
 
-    if (versionMismatch || identityMismatch) {
+    if (versionMismatch || missingRuntimeIdentityMismatch || identityMismatch) {
       const reason = versionMismatch
         ? `App version changed (${recovered.appVersion} → ${env.appVersion})`
-        : "Build identity mismatch (openclawStateDir, userDataPath, buildSource, or runtimeIdentityPath differ)";
+        : missingRuntimeIdentityMismatch
+          ? "Build identity mismatch (runtimeIdentityPath missing from recovered packaged session metadata)"
+          : "Build identity mismatch (openclawStateDir, userDataPath, buildSource, or runtimeIdentityPath differ)";
       console.log(
         `[bootstrap] teardown: ${reason} (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"})`,
       );

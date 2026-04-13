@@ -88,6 +88,11 @@ export function decideLaunchdRecovery(args: {
 
   const versionMismatch =
     env.appVersion != null && recovered.appVersion !== env.appVersion;
+  const missingRuntimeIdentityMismatch =
+    !versionMismatch &&
+    !env.isDev &&
+    env.runtimeIdentityPath != null &&
+    recovered.runtimeIdentityPath == null;
   const identityMismatch =
     !versionMismatch &&
     (
@@ -102,12 +107,14 @@ export function decideLaunchdRecovery(args: {
         recoveredVal != null && envVal != null && recoveredVal !== envVal,
     );
 
-  if (versionMismatch || identityMismatch) {
+  if (versionMismatch || missingRuntimeIdentityMismatch || identityMismatch) {
     return {
       action: "teardown-stale-services",
       reason: versionMismatch
         ? `App version changed (${recovered.appVersion} -> ${env.appVersion})`
-        : "Build identity mismatch (openclawStateDir, userDataPath, buildSource, or runtimeIdentityPath differ)",
+        : missingRuntimeIdentityMismatch
+          ? "Build identity mismatch (runtimeIdentityPath missing from recovered packaged session metadata)"
+          : "Build identity mismatch (openclawStateDir, userDataPath, buildSource, or runtimeIdentityPath differ)",
       deleteSession: true,
     };
   }
