@@ -152,9 +152,10 @@ export async function createContainer(): Promise<ControllerContainer> {
   );
   const githubStarVerificationService = new GithubStarVerificationService();
 
-  // Wire cloud state change callback to sync refreshed cloud inventory without
-  // auto-switching the default model during startup or first-channel connect.
+  // Wire cloud state change callback to sync refreshed cloud inventory and
+  // auto-select a default model when inventory changes.
   configStore.onCloudStateChanged = async (change) => {
+    await modelProviderService.ensureValidDefaultModel();
     await openclawSyncService.syncAll();
     if (change.hadCloudInventory !== change.hasCloudInventory) {
       await openclawProcess.stop();
