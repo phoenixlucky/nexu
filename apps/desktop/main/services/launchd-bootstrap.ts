@@ -530,14 +530,36 @@ async function resolveUserShellPath(): Promise<string> {
     return fallback;
   }
 
+  // Use a unique sentinel to isolate the PATH value from any shell init
+  // output (motd, debug echo, etc.). Only the line between the two
+  // sentinel markers is extracted, so stray output is harmless.
+  const sentinel = `__NEXU_PATH_${Date.now()}__`;
   try {
     const shell = process.env.SHELL || "/bin/zsh";
-    const { stdout } = await execFileAsync(shell, ["-ilc", 'echo "$PATH"'], {
-      timeout: 5000,
-      env: { PATH: "/usr/bin:/bin" },
-    });
-    const resolved = stdout.trim();
-    return resolved || fallback;
+    const { stdout } = await execFileAsync(
+      shell,
+      ["-ilc", `echo "${sentinel}"; echo "$PATH"; echo "${sentinel}"`],
+      {
+        timeout: 5000,
+        env: {
+          PATH: "/usr/bin:/bin",
+          HOME: os.homedir(),
+          USER: os.userInfo().username,
+          SHELL: shell,
+        },
+      },
+    );
+
+    // Extract the PATH line between the two sentinel markers.
+    const lines = stdout.split("\n");
+    const startIdx = lines.indexOf(sentinel);
+    const endIdx = lines.indexOf(sentinel, startIdx + 1);
+    if (startIdx >= 0 && endIdx > startIdx) {
+      const pathLines = lines.slice(startIdx + 1, endIdx);
+      const resolved = pathLines.join("").trim();
+      return resolved || fallback;
+    }
+    return fallback;
   } catch {
     return fallback;
   }
