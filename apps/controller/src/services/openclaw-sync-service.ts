@@ -115,6 +115,8 @@ export class OpenClawSyncService {
   private static readonly DEBOUNCE_MS = 100;
   private static readonly SETTLING_MS = 3000;
   private syncCounter = 0;
+  /** Tracks the last-known skill allowlist to detect skill-specific changes. */
+  private lastSkillAllowlist: ReadonlySet<string> = new Set();
 
   constructor(
     private readonly env: ControllerEnv,
@@ -339,15 +341,45 @@ export class OpenClawSyncService {
       await this.watchTrigger.touchConfig();
     }
 
-    // 4. Nudge OpenClaw's skills chokidar watcher so it bumps snapshotVersion.
-    // Without this, existing sessions keep using a stale skills snapshot
-    // even after the allowlist changes, because OpenClaw's config-reload
-    // treats agents/skills changes as kind "none" (no hot-reload action).
+    // 4. Nudge OpenClaw's skills watcher + restart gateway ONLY when the
+    // agent skill allowlist actually changed. OpenClaw hot-reloads model,
+    // channel, and plugin changes just fine — only agents.list skill
+    // changes are treated as kind "none" and require a full restart.
+    // Gate on skill-list diff to avoid unnecessary restarts during
+    // normal model/channel/provider updates.
     if (configPushed) {
-      await this.watchTrigger.nudgeSkillsWatcher("config-pushed");
+      const prevSkills = this.lastSkillAllowlist;
+      const nextSkills = this.extractSkillAllowlist(compiled);
+      if (!this.skillAllowlistEqual(prevSkills, nextSkills)) {
+        await this.watchTrigger.nudgeSkillsWatcher("config-pushed");
+      }
     }
+    this.lastSkillAllowlist = this.extractSkillAllowlist(compiled);
 
     logger.info({ seq, configPushed }, "doSync: complete");
     return { configPushed };
+  }
+
+  private extractSkillAllowlist(
+    compiled: ReturnType<typeof compileOpenClawConfig>,
+  ): ReadonlySet<string> {
+    const skills = new Set<string>();
+    for (const agent of compiled.agents.list ?? []) {
+      for (const skill of agent.skills ?? []) {
+        skills.add(skill);
+      }
+    }
+    return skills;
+  }
+
+  private skillAllowlistEqual(
+    a: ReadonlySet<string>,
+    b: ReadonlySet<string>,
+  ): boolean {
+    if (a.size !== b.size) return false;
+    for (const skill of a) {
+      if (!b.has(skill)) return false;
+    }
+    return true;
   }
 }
