@@ -1122,4 +1122,49 @@ describe("compileOpenClawConfig", () => {
       primary: "openai-codex/gpt-5.4",
     });
   });
+
+  it("omits empty apiKey fields for oauth-backed providers in compiled models config", () => {
+    const result = compileOpenClawConfig(
+      createConfig({
+        providers: [],
+        models: {
+          mode: "merge",
+          providers: {
+            openai: {
+              enabled: true,
+              auth: "oauth",
+              api: "openai-completions",
+              apiKey: null,
+              oauthProfileRef: "openai-codex",
+              baseUrl: "https://api.openai.com/v1",
+              models: [
+                {
+                  id: "gpt-5.4",
+                  name: "GPT-5.4",
+                  reasoning: false,
+                  input: ["text"],
+                  cost: {
+                    input: 0,
+                    output: 0,
+                    cacheRead: 0,
+                    cacheWrite: 0,
+                  },
+                  contextWindow: 0,
+                  maxTokens: 0,
+                },
+              ],
+            },
+          },
+        },
+        desktop: {
+          selectedModelId: null,
+        },
+      }),
+      createEnv(),
+    );
+
+    expect(result.models?.providers.openai).toBeDefined();
+    expect(result.models?.providers.openai).not.toHaveProperty("apiKey");
+    expect(result.models?.providers.openai?.models[0]?.id).toBe("gpt-5.4");
+  });
 });

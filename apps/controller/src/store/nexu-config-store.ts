@@ -38,7 +38,10 @@ import {
 import type { z } from "zod";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
-import { resolveManagedCloudModel } from "../lib/managed-models.js";
+import {
+  isManagedCloudModelId,
+  resolveManagedCloudModel,
+} from "../lib/managed-models.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
 import {
   type CloudRewardService,
@@ -2685,7 +2688,8 @@ export class NexuConfigStore {
   }
 
   async disconnectDesktopCloud() {
-    const previousCloud = readDesktopCloud(await this.getConfig());
+    const previousConfig = await this.getConfig();
+    const previousCloud = readDesktopCloud(previousConfig);
     this.abortDesktopCloudPolling();
 
     await this.setDesktopCloudState({
@@ -2699,6 +2703,14 @@ export class NexuConfigStore {
       apiKey: null,
       models: [],
     });
+    if (
+      isManagedCloudModelId(
+        previousConfig.runtime.defaultModelId,
+        previousCloud.models,
+      )
+    ) {
+      await this.setDefaultModel("");
+    }
     await this.onCloudStateChanged?.({
       hadCloudInventory: (previousCloud.models?.length ?? 0) > 0,
       hasCloudInventory: false,

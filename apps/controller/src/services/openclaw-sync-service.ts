@@ -13,6 +13,7 @@ import type { OpenClawAuthProfilesStore } from "../runtime/openclaw-auth-profile
 import type { OpenClawAuthProfilesWriter } from "../runtime/openclaw-auth-profiles-writer.js";
 import type { OpenClawConfigWriter } from "../runtime/openclaw-config-writer.js";
 import type { OpenClawRuntimeModelWriter } from "../runtime/openclaw-runtime-model-writer.js";
+import { resolveNoModelConfiguredMessage } from "../runtime/openclaw-runtime-model-writer.js";
 import type { OpenClawRuntimePluginWriter } from "../runtime/openclaw-runtime-plugin-writer.js";
 import type { OpenClawWatchTrigger } from "../runtime/openclaw-watch-trigger.js";
 import type { WorkspaceTemplateWriter } from "../runtime/workspace-template-writer.js";
@@ -312,27 +313,56 @@ export class OpenClawSyncService {
     }
 
     // 2. Always write files once (persistence + watcher hot-reload path).
+    const hasAnyProvider =
+      Object.keys(compiled.models?.providers ?? {}).length > 0;
+
+    // When no model provider is configured (e.g. after link logout with no
+    // BYOK keys), strip the model from agents so OpenClaw cannot fall back
+    // to its built-in registry with the bare model name.  This is a
+    // hot-reload-safe change (agents.list → dynamic reads, no gateway restart).
+    if (!hasAnyProvider) {
+      if (compiled.agents.defaults?.model) {
+        compiled.agents.defaults = {
+          ...compiled.agents.defaults,
+          model: undefined,
+        };
+      }
+      for (const agent of compiled.agents.list ?? []) {
+        if (agent.model) {
+          agent.model = undefined;
+        }
+      }
+    }
+
     await this.configWriter.write(compiled);
     await this.authProfilesWriter.writeForAgents(
       compiled,
       config.models.providers,
     );
     this.gatewayService.noteConfigWritten(compiled);
-    const runtimeModelRef = resolvePrimaryModelRef(
-      compiled.agents.defaults?.model,
-      config,
-      compiled,
-      this.env,
-      oauthState,
-    );
+    const runtimeModelRef = hasAnyProvider
+      ? resolvePrimaryModelRef(
+          compiled.agents.defaults?.model,
+          config,
+          compiled,
+          this.env,
+          oauthState,
+        )
+      : null;
     logger.info({ seq, runtimeModelRef }, "doSync: resolved runtime model");
-    await this.runtimeModelWriter.write(runtimeModelRef);
     // Write locale state for the credit-guard patch in OpenClaw runtime.
     // Match the controller's own locale default: unset → "en" (not "zh-CN").
     const locale =
       (config.desktop as Record<string, unknown>).locale === "zh-CN"
         ? "zh-CN"
         : "en";
+    if (runtimeModelRef) {
+      await this.runtimeModelWriter.write(runtimeModelRef);
+    } else {
+      await this.runtimeModelWriter.writeNoModelState(
+        resolveNoModelConfiguredMessage(locale),
+      );
+    }
     await this.creditGuardStateWriter.write(locale);
     await this.compiledStore.saveConfig(compiled);
 
