@@ -323,10 +323,6 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
-  packages/pkg-utils: {}
-
-  packages/platform-utils: {}
-
   packages/shared:
     dependencies:
       zod:

@@ -1,4 +1,5 @@
 import { selectPreferredModel } from "@nexu/shared";
+import type { OpenClawConfig } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
 import {
@@ -11,6 +12,7 @@ import type { OpenClawAuthProfilesStore } from "../runtime/openclaw-auth-profile
 import type { OpenClawAuthProfilesWriter } from "../runtime/openclaw-auth-profiles-writer.js";
 import type { OpenClawConfigWriter } from "../runtime/openclaw-config-writer.js";
 import type { OpenClawRuntimeModelWriter } from "../runtime/openclaw-runtime-model-writer.js";
+import { resolveNoModelConfiguredMessage } from "../runtime/openclaw-runtime-model-writer.js";
 import type { OpenClawRuntimePluginWriter } from "../runtime/openclaw-runtime-plugin-writer.js";
 import type { OpenClawWatchTrigger } from "../runtime/openclaw-watch-trigger.js";
 import type { WorkspaceTemplateWriter } from "../runtime/workspace-template-writer.js";
@@ -145,6 +147,7 @@ export class OpenClawSyncService {
           .getAllInstalled()
           .filter((r) => r.source !== "workspace")
           .map((r) => r.slug)
+          .sort((left, right) => left.localeCompare(right))
       : undefined;
 
     const workspaceMap = this.workspaceScanner
@@ -279,13 +282,39 @@ export class OpenClawSyncService {
         )
       : undefined;
 
-    const compiled = compileOpenClawConfig(
+    const rawCompiled = compileOpenClawConfig(
       config,
       this.env,
       oauthState,
       installedSlugs,
       workspaceMap,
     );
+
+    const hasAnyProvider =
+      Object.keys(rawCompiled.models?.providers ?? {}).length > 0;
+
+    // When no model provider is configured (e.g. after link logout with no
+    // BYOK keys), strip the model from agents so OpenClaw cannot fall back
+    // to its built-in registry with the bare model name. This normalization
+    // must happen BEFORE shouldPushConfig() — otherwise the pre-normalized
+    // hash we diff against diverges from the post-normalized hash we store
+    // via noteConfigWritten(), which would mark every subsequent no-provider
+    // sync as changed and trigger spurious touchAnySkillMarker() runs.
+    // Rebuild immutably (no in-place mutation of the compiled object).
+    const compiled: OpenClawConfig = hasAnyProvider
+      ? rawCompiled
+      : {
+          ...rawCompiled,
+          agents: {
+            ...rawCompiled.agents,
+            defaults: rawCompiled.agents.defaults
+              ? { ...rawCompiled.agents.defaults, model: undefined }
+              : rawCompiled.agents.defaults,
+            list: (rawCompiled.agents.list ?? []).map((agent) =>
+              agent.model ? { ...agent, model: undefined } : agent,
+            ),
+          },
+        };
 
     logger.info(
       {
@@ -311,27 +340,41 @@ export class OpenClawSyncService {
     }
 
     // 2. Always write files once (persistence + watcher hot-reload path).
+
     await this.configWriter.write(compiled);
     await this.authProfilesWriter.writeForAgents(
       compiled,
       config.models.providers,
     );
     this.gatewayService.noteConfigWritten(compiled);
-    const runtimeModelRef = resolvePrimaryModelRef(
-      compiled.agents.defaults?.model,
-      config,
-      compiled,
-      this.env,
-      oauthState,
-    );
+    const runtimeModelRef = hasAnyProvider
+      ? resolvePrimaryModelRef(
+          compiled.agents.defaults?.model,
+          config,
+          compiled,
+          this.env,
+          oauthState,
+        )
+      : null;
     logger.info({ seq, runtimeModelRef }, "doSync: resolved runtime model");
-    await this.runtimeModelWriter.write(runtimeModelRef);
     // Write locale state for the credit-guard patch in OpenClaw runtime.
     // Match the controller's own locale default: unset → "en" (not "zh-CN").
     const locale =
       (config.desktop as Record<string, unknown>).locale === "zh-CN"
         ? "zh-CN"
         : "en";
+    if (runtimeModelRef) {
+      await this.runtimeModelWriter.write(runtimeModelRef);
+    } else {
+      // TODO(alche): This writes `noModelMessage` into the runtime-model state
+      // file, but the downstream OpenClaw/runtime consumer still primarily acts
+      // on non-empty `selectedModelRef` / `promptNotice`. Wire that reader path
+      // to surface `noModelMessage` explicitly so users see this guidance
+      // instead of falling through to a generic runtime/provider error.
+      await this.runtimeModelWriter.writeNoModelState(
+        resolveNoModelConfiguredMessage(locale),
+      );
+    }
     await this.creditGuardStateWriter.write(locale);
     await this.compiledStore.saveConfig(compiled);
 

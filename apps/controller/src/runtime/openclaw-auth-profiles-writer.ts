@@ -24,6 +24,23 @@ type AuthProfileRecord =
 
 type AuthProfileEntry = [string, AuthProfileRecord];
 
+function mergeAuthProfileEntries(
+  primaryEntries: AuthProfileEntry[],
+  fallbackEntries: AuthProfileEntry[],
+): AuthProfileEntry[] {
+  const merged = new Map<string, AuthProfileRecord>();
+
+  for (const [key, profile] of fallbackEntries) {
+    merged.set(key, profile);
+  }
+
+  for (const [key, profile] of primaryEntries) {
+    merged.set(key, profile);
+  }
+
+  return [...merged.entries()];
+}
+
 function isApiKeyProfile(profile: unknown): profile is { type: "api_key" } {
   return (
     typeof profile === "object" &&
@@ -65,28 +82,29 @@ export class OpenClawAuthProfilesWriter {
       providerSource,
     );
 
-    const effectiveEntries =
-      profileEntries.length > 0
-        ? profileEntries
-        : fallbackProviders.flatMap((provider): AuthProfileEntry[] => {
-            if (
-              typeof provider.apiKey === "string" &&
-              provider.apiKey.length > 0
-            ) {
-              return [
-                [
-                  `${provider.providerId}:default`,
-                  {
-                    type: "api_key",
-                    provider: provider.providerId,
-                    key: provider.apiKey,
-                  },
-                ],
-              ];
-            }
+    const fallbackEntries = fallbackProviders.flatMap(
+      (provider): AuthProfileEntry[] => {
+        if (typeof provider.apiKey === "string" && provider.apiKey.length > 0) {
+          return [
+            [
+              `${provider.providerId}:default`,
+              {
+                type: "api_key",
+                provider: provider.providerId,
+                key: provider.apiKey,
+              },
+            ],
+          ];
+        }
 
-            return [];
-          });
+        return [];
+      },
+    );
+
+    const effectiveEntries = mergeAuthProfileEntries(
+      profileEntries,
+      fallbackEntries,
+    );
 
     const profiles = Object.fromEntries(effectiveEntries) as Record<
       string,
