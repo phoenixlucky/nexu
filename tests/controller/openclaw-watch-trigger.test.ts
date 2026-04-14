@@ -6,6 +6,15 @@ import type { ControllerEnv } from "../../apps/controller/src/app/env.js";
 import type { OpenClawProcessManager } from "../../apps/controller/src/runtime/openclaw-process.js";
 import { OpenClawWatchTrigger } from "../../apps/controller/src/runtime/openclaw-watch-trigger.js";
 
+function createMockProcessManager(
+  overrides: Partial<OpenClawProcessManager> = {},
+): OpenClawProcessManager {
+  return {
+    restart: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  } as unknown as OpenClawProcessManager;
+}
+
 describe("OpenClawWatchTrigger", () => {
   let rootDir = "";
   let env: ControllerEnv;
@@ -114,7 +123,7 @@ describe("OpenClawWatchTrigger", () => {
       "utf8",
     );
 
-    const trigger = new OpenClawWatchTrigger(env);
+    const trigger = new OpenClawWatchTrigger(env, createMockProcessManager());
     await trigger.nudgeSkillsWatcher("test");
 
     const nextIndex = JSON.parse(
@@ -137,55 +146,43 @@ describe("OpenClawWatchTrigger", () => {
     expect(markerContent).toBe("");
   });
 
-  describe("restartGateway (via nudgeSkillsWatcher)", () => {
-    it("restarts via orchestrator mode when manageOpenclawProcess is true", async () => {
-      env.manageOpenclawProcess = true;
-      const mockProcess = {
-        stop: vi.fn().mockResolvedValue(undefined),
-        enableAutoRestart: vi.fn(),
-        start: vi.fn(),
-      } as unknown as OpenClawProcessManager;
-
-      const trigger = new OpenClawWatchTrigger(env);
-      trigger.setProcessManager(mockProcess);
+  describe("gateway restart delegation", () => {
+    it("delegates the restart to OpenClawProcessManager.restart with the supplied reason", async () => {
+      const restart = vi.fn().mockResolvedValue(undefined);
+      const trigger = new OpenClawWatchTrigger(
+        env,
+        createMockProcessManager({
+          restart,
+        } as Partial<OpenClawProcessManager>),
+      );
 
       await mkdir(env.openclawSkillsDir, { recursive: true });
       await trigger.nudgeSkillsWatcher("test-orchestrator");
 
-      expect(mockProcess.stop).toHaveBeenCalledOnce();
-      expect(mockProcess.enableAutoRestart).toHaveBeenCalledOnce();
-      expect(mockProcess.start).toHaveBeenCalledOnce();
+      expect(restart).toHaveBeenCalledExactlyOnceWith("test-orchestrator");
     });
 
-    it("skips restart when no process manager and no launchd label", async () => {
-      env.manageOpenclawProcess = false;
-      env.openclawLaunchdLabel = null;
+    it("absorbs restart failures so the nudge stays best-effort", async () => {
+      const restart = vi.fn().mockRejectedValue(new Error("launchctl missing"));
+      const trigger = new OpenClawWatchTrigger(
+        env,
+        createMockProcessManager({
+          restart,
+        } as Partial<OpenClawProcessManager>),
+      );
 
-      const trigger = new OpenClawWatchTrigger(env);
       await mkdir(env.openclawSkillsDir, { recursive: true });
 
-      // Should not throw — logs a warning and returns false
-      await trigger.nudgeSkillsWatcher("test-no-restart");
+      await expect(
+        trigger.nudgeSkillsWatcher("test-restart-failure"),
+      ).resolves.toBeUndefined();
 
+      // Marker still written even though restart failed, so the next gateway
+      // boot will pick up the snapshot invalidation on its own.
       const markerPath = path.join(env.openclawSkillsDir, ".controller-nudge");
       const markerContent = await readFile(markerPath, "utf8");
       expect(markerContent).toBe("");
-    });
-
-    it("does not restart when manageOpenclawProcess is true but no process manager set", async () => {
-      env.manageOpenclawProcess = true;
-      // Don't call setProcessManager — openclawProcess is null
-
-      const trigger = new OpenClawWatchTrigger(env);
-      await mkdir(env.openclawSkillsDir, { recursive: true });
-
-      // Should fall through to launchd check (null) then skip
-      await trigger.nudgeSkillsWatcher("test-no-pm");
-
-      // Marker should still be written (nudge completes even without restart)
-      const markerPath = path.join(env.openclawSkillsDir, ".controller-nudge");
-      const markerContent = await readFile(markerPath, "utf8");
-      expect(markerContent).toBe("");
+      expect(restart).toHaveBeenCalledOnce();
     });
   });
 });

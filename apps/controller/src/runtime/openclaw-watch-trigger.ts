@@ -1,4 +1,3 @@
-import { execFile } from "node:child_process";
 import type { Dirent } from "node:fs";
 import {
   appendFile,
@@ -8,14 +7,10 @@ import {
   utimes,
   writeFile,
 } from "node:fs/promises";
-import * as os from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
 import type { OpenClawProcessManager } from "./openclaw-process.js";
-
-const execFileAsync = promisify(execFile);
 
 /**
  * Dotfile sentinel inside the skills directory used as the single nudge
@@ -29,16 +24,10 @@ const SESSIONS_INDEX_NAME = "sessions.json";
 type SessionIndexRecord = Record<string, unknown>;
 
 export class OpenClawWatchTrigger {
-  private openclawProcess: OpenClawProcessManager | null = null;
-
-  constructor(private readonly env: ControllerEnv) {}
-
-  /**
-   * Inject the process manager after construction to avoid circular deps.
-   */
-  setProcessManager(pm: OpenClawProcessManager): void {
-    this.openclawProcess = pm;
-  }
+  constructor(
+    private readonly env: ControllerEnv,
+    private readonly openclawProcess: OpenClawProcessManager,
+  ) {}
 
   async touchConfig(): Promise<void> {
     await this.touchFile(this.env.openclawConfigPath);
@@ -74,14 +63,31 @@ export class OpenClawWatchTrigger {
       // silently skip the chokidar `change` event we depend on.
       const now = new Date();
       await utimes(marker, now, now);
-      const restarted = await this.restartGateway(reason);
+      // Delegate the actual gateway restart to OpenClawProcessManager so the
+      // dev-vs-launchd branching lives in exactly one place. `restart()`
+      // throws on launchctl failure; we absorb it here so the nudge stays
+      // best-effort (the snapshot invalidation + marker bump above are
+      // already on disk and will be picked up on the next gateway boot).
+      let gatewayRestarted = false;
+      try {
+        await this.openclawProcess.restart(reason);
+        gatewayRestarted = true;
+      } catch (err) {
+        logger.warn(
+          {
+            reason,
+            err: err instanceof Error ? err.message : String(err),
+          },
+          "openclaw gateway restart failed during skills watcher nudge",
+        );
+      }
       logger.info(
         {
           reason,
           marker,
           mtime: now.toISOString(),
           invalidatedSessions,
-          gatewayRestarted: restarted,
+          gatewayRestarted,
         },
         "openclaw skills watcher nudged",
       );
@@ -94,49 +100,6 @@ export class OpenClawWatchTrigger {
         },
         "openclaw skills watcher nudge failed",
       );
-    }
-  }
-
-  /**
-   * Restart the OpenClaw gateway so it re-reads the runtime config
-   * (including the updated agent skill allowlist). OpenClaw's config
-   * hot-reload treats `agents.list` skill changes as kind "none" and
-   * does not apply them — a full process restart is required.
-   *
-   * Handles both orchestrator mode (direct child process) and launchd
-   * mode (kickstart via launchctl).
-   */
-  private async restartGateway(reason: string): Promise<boolean> {
-    try {
-      if (this.env.manageOpenclawProcess && this.openclawProcess) {
-        await this.openclawProcess.stop();
-        this.openclawProcess.enableAutoRestart();
-        this.openclawProcess.start();
-        logger.info({ reason }, "openclaw gateway restarted (orchestrator)");
-        return true;
-      }
-
-      if (this.env.openclawLaunchdLabel) {
-        const domain = `gui/${os.userInfo().uid}/${this.env.openclawLaunchdLabel}`;
-        await execFileAsync("launchctl", ["kickstart", "-k", domain]);
-        logger.info({ reason, domain }, "openclaw gateway restarted (launchd)");
-        return true;
-      }
-
-      logger.warn(
-        { reason },
-        "openclaw gateway restart skipped: no process manager or launchd label",
-      );
-      return false;
-    } catch (error) {
-      logger.warn(
-        {
-          reason,
-          err: error instanceof Error ? error.message : String(error),
-        },
-        "openclaw gateway restart failed",
-      );
-      return false;
     }
   }
 
