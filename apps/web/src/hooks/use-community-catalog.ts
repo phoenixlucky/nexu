@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import {
   getApiV1SkillhubCatalog,
+  postApiV1SkillhubCancel,
   postApiV1SkillhubImport,
   postApiV1SkillhubInstall,
   postApiV1SkillhubRefresh,
@@ -80,6 +81,25 @@ export function useInstallSkill() {
       if (result.queued) {
         toast.info(t("skills.installQueued"));
       }
+      return result;
+    },
+  });
+}
+
+export function useCancelInstall() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (slug: string) => {
+      const { data, error } = await postApiV1SkillhubCancel({
+        body: { slug },
+      });
+      if (error) throw new Error("Cancel request failed");
+      const result = data as { ok: boolean; cancelled: boolean };
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CATALOG_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: DETAIL_QUERY_KEY }),
+      ]);
       return result;
     },
   });
