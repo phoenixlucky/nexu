@@ -162,12 +162,12 @@ export function buildDeveloperPrPayload({ author, labels, prUrl }) {
           {
             tag: "markdown",
             content: [
-              "Nexu 还有一批新手友好任务等你认领 👇 提交后 24 小时内审核回复",
+              "Nexu 还准备了一批新手友好的 Good First Issue 等你来领 👇 提交后 24 小时内审核回复",
               createRewardCopy(),
             ].join("\n"),
           },
           createButtonColumns([
-            createButton("领取任务", GOOD_FIRST_ISSUE_URL),
+            createButton("Good First Issue", GOOD_FIRST_ISSUE_URL),
             createButton("贡献者指南", CONTRIBUTOR_GUIDE_URL),
             createButton("查看全部 Issue", ALL_ISSUES_URL),
           ]),
@@ -215,7 +215,7 @@ export function buildDeveloperIssuePayload({
             content: createRewardCopy(),
           },
           createButtonColumns([
-            createButton("领取新手友好 Issue", GOOD_FIRST_ISSUE_URL),
+            createButton("Good First Issue", GOOD_FIRST_ISSUE_URL),
             createButton("贡献者指南", CONTRIBUTOR_GUIDE_URL),
             createButton("查看全部 Issue", ALL_ISSUES_URL),
           ]),
