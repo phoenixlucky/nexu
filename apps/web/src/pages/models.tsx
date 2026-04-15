@@ -1322,12 +1322,19 @@ function AddCustomProviderDetail({
               })
             }
           >
-            <SelectTrigger id="custom-provider-template" className="w-full">
+            <SelectTrigger
+              id="custom-provider-template"
+              className="w-full rounded-xl border-border bg-surface-0 text-text-primary shadow-none hover:bg-surface-1"
+            >
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-2xl border-border bg-surface-0 text-text-primary shadow-[0_12px_32px_rgba(0,0,0,0.08)]">
               {customTemplates.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
+                <SelectItem
+                  key={item.id}
+                  value={item.id}
+                  className="rounded-xl px-4 py-2 text-text-secondary focus:bg-surface-2 focus:text-text-primary data-[highlighted]:bg-surface-2 data-[highlighted]:text-text-primary data-[state=checked]:bg-surface-2 data-[state=checked]:text-text-primary"
+                >
                   {getCustomProviderTemplateLabel(
                     item.id as CustomProviderTemplateId,
                     t,
