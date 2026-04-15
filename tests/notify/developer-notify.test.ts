@@ -36,11 +36,20 @@ describe("developer-notify", () => {
     });
 
     expect(payload.card.header.title.content).toContain("新增 1 位贡献者");
-    expect(payload.card.body.elements[2]).toMatchObject({
+    expect(payload.card.body.elements[0]).toMatchObject({
+      tag: "markdown",
+      content: expect.stringContaining("**Author:** alice"),
+    });
+    expect(payload.card.body.elements[1]).toMatchObject({
       tag: "column_set",
       flex_mode: "flow",
     });
-    expect(payload.card.body.elements[2].columns).toEqual([
+    expect(
+      payload.card.body.elements[1].columns.map(
+        (column) => column.elements[0].text.content,
+      ),
+    ).toEqual(["查看贡献 PR"]);
+    expect(payload.card.body.elements[1].columns).toEqual([
       expect.objectContaining({
         elements: [
           expect.objectContaining({
@@ -50,12 +59,12 @@ describe("developer-notify", () => {
         ],
       }),
     ]);
-    expect(payload.card.body.elements[4]).toMatchObject({ tag: "column_set" });
+    expect(payload.card.body.elements[3]).toMatchObject({ tag: "column_set" });
     expect(
-      payload.card.body.elements[4].columns.map(
+      payload.card.body.elements[3].columns.map(
         (column) => column.elements[0].text.content,
       ),
-    ).toEqual(["贡献者指南", "立即贡献"]);
+    ).toEqual(["立即贡献", "贡献者指南"]);
   });
 
   it("builds the developer issue payload with three actions", () => {

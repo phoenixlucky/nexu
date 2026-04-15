@@ -83,8 +83,7 @@ function createButtonColumns(actions) {
     flex_mode: "flow",
     columns: actions.map((action) => ({
       tag: "column",
-      width: "weighted",
-      weight: 1,
+      width: "auto",
       elements: [action],
     })),
   };
@@ -108,8 +107,10 @@ export function buildDeveloperPrPayload({ author, labels, prUrl }) {
       body: {
         direction: "vertical",
         elements: [
-          { tag: "markdown", content: `**Author:** ${safeAuthor}` },
-          { tag: "markdown", content: `**Labels:** ${safeLabels}` },
+          {
+            tag: "markdown",
+            content: `**Author:** ${safeAuthor}\n**Labels:** ${safeLabels}`,
+          },
           createButtonColumns([createButton("查看贡献 PR", prUrl, "primary")]),
           {
             tag: "markdown",
@@ -117,8 +118,8 @@ export function buildDeveloperPrPayload({ author, labels, prUrl }) {
               "Nexu 准备好一批对新手友好任务的 Good First Issue 👇\n只需 3 步💥，选任务 — 认领 —— 提交，即可获得 GitHub README 公开致谢 + 积分奖励 + Github 社区徽章🎉。（详情请看群公告）",
           },
           createButtonColumns([
-            createButton("贡献者指南", CONTRIBUTOR_GUIDE_URL),
             createButton("立即贡献", GOOD_FIRST_ISSUE_URL),
+            createButton("贡献者指南", CONTRIBUTOR_GUIDE_URL),
           ]),
         ],
       },
