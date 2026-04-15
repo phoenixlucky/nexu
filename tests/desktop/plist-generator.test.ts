@@ -249,6 +249,7 @@ describe("generatePlist", () => {
       "run",
       "--port",
       String(mockEnv.openclawPort),
+      "--allow-unconfigured",
       "--auth",
       "token",
     ]);

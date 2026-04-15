@@ -25,6 +25,10 @@ export default defineConfig({
         import.meta.dirname,
         "apps/web/node_modules/react/jsx-dev-runtime.js",
       ),
+      "@nexu/slimclaw": path.resolve(
+        import.meta.dirname,
+        "packages/slimclaw/src/index.ts",
+      ),
       "react-dom": path.resolve(
         import.meta.dirname,
         "apps/web/node_modules/react-dom",
