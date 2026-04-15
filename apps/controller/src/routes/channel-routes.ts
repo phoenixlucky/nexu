@@ -514,7 +514,7 @@ export function registerChannelRoutes(
         const locale = await getControllerLocale(container);
         const response = logChannelConnectFailure(container, {
           requestId,
-          channel: "dingtalk",
+          channel: "telegram",
           locale,
           error,
         });

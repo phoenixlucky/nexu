@@ -1185,11 +1185,20 @@ export class ChannelService {
     const { clientId, clientSecret } =
       await this.verifyDingtalkCredentials(input);
 
-    const channel = await this.configStore.connectDingtalk({
-      clientId,
-      clientSecret,
-    });
-    await this.syncService.syncAll();
+    let channel: ChannelResponse;
+    try {
+      channel = await this.configStore.connectDingtalk({
+        clientId,
+        clientSecret,
+      });
+    } catch (error) {
+      throw this.toPersistConnectError(error, "dingtalk");
+    }
+    try {
+      await this.syncService.syncAll();
+    } catch (error) {
+      throw this.toSyncConnectError(error, "dingtalk");
+    }
     this.logChannelConnectSuccess(channel);
     logger.info(
       { channelId: channel.id, clientId },
@@ -1707,7 +1716,7 @@ export class ChannelService {
 
   private toSyncConnectError(
     error: unknown,
-    channel: "discord" | "telegram",
+    channel: "discord" | "telegram" | "dingtalk",
   ): ChannelConnectError {
     if (error instanceof ChannelConnectError) {
       return error;
@@ -1719,7 +1728,7 @@ export class ChannelService {
         : "Runtime sync failed";
 
     return new ChannelConnectError({
-      message: `${channel === "discord" ? "Discord" : "Telegram"} credentials were saved, but runtime sync failed: ${message}`,
+      message: `${channel === "discord" ? "Discord" : channel === "telegram" ? "Telegram" : "DingTalk"} credentials were saved, but runtime sync failed: ${message}`,
       code: "sync_failed",
       status: 503,
       retryable: true,
@@ -1729,7 +1738,7 @@ export class ChannelService {
 
   private toPersistConnectError(
     error: unknown,
-    channel: "discord" | "telegram",
+    channel: "discord" | "telegram" | "dingtalk",
   ): ChannelConnectError {
     if (error instanceof ChannelConnectError) {
       return error;
@@ -1741,7 +1750,7 @@ export class ChannelService {
         : "Local config persistence failed";
 
     return new ChannelConnectError({
-      message: `${channel === "discord" ? "Discord" : "Telegram"} credentials were verified, but saving local channel config failed: ${message}`,
+      message: `${channel === "discord" ? "Discord" : channel === "telegram" ? "Telegram" : "DingTalk"} credentials were verified, but saving local channel config failed: ${message}`,
       code: "sync_failed",
       status: 503,
       retryable: true,
