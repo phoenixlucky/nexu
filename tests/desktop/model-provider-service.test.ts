@@ -446,6 +446,63 @@ describe("ModelProviderService", () => {
     }
   });
 
+  it("falls back to /v1/models for anthropic-compatible base URLs without a version suffix", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = createService(store, env);
+    const originalFetch = globalThis.fetch;
+    const seenUrls: string[] = [];
+
+    globalThis.fetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const url = String(input);
+      seenUrls.push(url);
+
+      expect(init?.headers).toEqual({
+        "x-api-key": "openrouter-test-key",
+        "anthropic-version": "2023-06-01",
+      });
+
+      if (url === "https://openrouter.ai/api/models") {
+        return new Response("not found", {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      expect(url).toBe("https://openrouter.ai/api/v1/models");
+      return new Response(
+        JSON.stringify({
+          data: [{ id: "anthropic/claude-3.7-sonnet" }],
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }) as typeof globalThis.fetch;
+
+    try {
+      const result = await service.verifyProvider("custom-anthropic", {
+        apiKey: "openrouter-test-key",
+        baseUrl: "https://openrouter.ai/api",
+      });
+
+      expect(seenUrls).toEqual([
+        "https://openrouter.ai/api/models",
+        "https://openrouter.ai/api/v1/models",
+      ]);
+      expect(result).toEqual({
+        valid: true,
+        models: ["anthropic/claude-3.7-sonnet"],
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("uses bundled Xiaomi MiMo models when discovery endpoint is unavailable", async () => {
     const env = createEnv(tempDir);
     const store = new NexuConfigStore(env);

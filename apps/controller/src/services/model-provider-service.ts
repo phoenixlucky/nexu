@@ -213,6 +213,25 @@ function buildProviderUrl(
   return `${normalizedBaseUrl}${normalizedPath}`;
 }
 
+function buildAnthropicModelDiscoveryUrls(
+  baseUrl: string | null | undefined,
+): string[] {
+  if (!baseUrl || baseUrl.trim().length === 0) {
+    return [];
+  }
+
+  const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+  const candidateBaseUrls = [normalizedBaseUrl];
+
+  if (!/\/v\d+(?:alpha|beta)?$/i.test(normalizedBaseUrl)) {
+    candidateBaseUrls.push(`${normalizedBaseUrl}/v1`);
+  }
+
+  return [...new Set(candidateBaseUrls)]
+    .map((candidateBaseUrl) => buildProviderUrl(candidateBaseUrl, "/models"))
+    .filter((url): url is string => typeof url === "string" && url.length > 0);
+}
+
 function buildGoogleModelsUrl(
   baseUrl: string | null | undefined,
 ): string | null {
@@ -730,11 +749,21 @@ export class ModelProviderService {
     const resolvedBaseUrl =
       input.baseUrl ?? storedProvider?.baseUrl ?? defaultBaseUrl;
 
-    const verifyUrl =
+    const verifyUrls =
       runtimePolicy.apiKind === "google-generative-ai"
-        ? (buildGoogleModelsUrl(resolvedBaseUrl) ?? "")
-        : (buildProviderUrl(resolvedBaseUrl, "/models") ?? "");
-    if (verifyUrl.length === 0) {
+        ? [buildGoogleModelsUrl(resolvedBaseUrl)].filter(
+            (url): url is string => typeof url === "string" && url.length > 0,
+          )
+        : runtimePolicy.apiKind === "anthropic-messages"
+          ? buildAnthropicModelDiscoveryUrls(resolvedBaseUrl)
+          : [buildProviderUrl(resolvedBaseUrl, "/models")].filter(
+              (url): url is string => typeof url === "string" && url.length > 0,
+            );
+    if (verifyUrls.length === 0) {
+      return { valid: false, error: "Unknown provider and no baseUrl given" };
+    }
+    const primaryVerifyUrl = verifyUrls[0];
+    if (!primaryVerifyUrl) {
       return { valid: false, error: "Unknown provider and no baseUrl given" };
     }
 
@@ -746,7 +775,7 @@ export class ModelProviderService {
         }
 
         const response = await proxyFetch(
-          buildProviderUrl(resolvedBaseUrl, "/api/tags") ?? verifyUrl,
+          buildProviderUrl(resolvedBaseUrl, "/api/tags") ?? primaryVerifyUrl,
           {
             headers: Object.keys(headers).length > 0 ? headers : undefined,
             timeoutMs: 10000,
@@ -774,7 +803,7 @@ export class ModelProviderService {
       }
 
       if (runtimePolicy.apiKind === "google-generative-ai") {
-        const response = await proxyFetch(verifyUrl, {
+        const response = await proxyFetch(primaryVerifyUrl, {
           headers: {
             "x-goog-api-key": apiKey,
           },
@@ -807,44 +836,80 @@ export class ModelProviderService {
             }
           : { Authorization: `Bearer ${apiKey}` };
 
-      const response = await proxyFetch(verifyUrl, {
-        headers,
-        timeoutMs: 10000,
-      });
-      if (!response.ok) {
-        if (providerId === "minimax" && response.status === 404) {
-          return { valid: true, models: MINI_MAX_API_MODELS };
+      let lastStatus: number | null = null;
+
+      for (const verifyUrl of verifyUrls) {
+        const response = await proxyFetch(verifyUrl, {
+          headers,
+          timeoutMs: 10000,
+        });
+        if (!response.ok) {
+          lastStatus = response.status;
+          if (
+            runtimePolicy.apiKind === "anthropic-messages" &&
+            response.status === 404
+          ) {
+            continue;
+          }
+          if (providerId === "minimax" && response.status === 404) {
+            return { valid: true, models: MINI_MAX_API_MODELS };
+          }
+          if (providerId === "xiaomi" && response.status === 404) {
+            return {
+              valid: true,
+              models: getBundledProviderModelIds(providerId),
+            };
+          }
+          return { valid: false, error: `HTTP ${response.status}` };
         }
-        if (providerId === "xiaomi" && response.status === 404) {
+
+        let payload: { data?: Array<{ id: string }> };
+        try {
+          payload = (await response.json()) as {
+            data?: Array<{ id: string }>;
+          };
+        } catch {
+          if (runtimePolicy.apiKind === "anthropic-messages") {
+            continue;
+          }
+          throw new Error("Invalid JSON response");
+        }
+
+        if (providerId === "xiaomi") {
           return {
             valid: true,
-            models: getBundledProviderModelIds(providerId),
+            models:
+              Array.isArray(payload.data) && payload.data.length > 0
+                ? payload.data.map((item) => item.id)
+                : getBundledProviderModelIds(providerId),
           };
         }
-        return { valid: false, error: `HTTP ${response.status}` };
-      }
 
-      const payload = (await response.json()) as {
-        data?: Array<{ id: string }>;
-      };
-      if (providerId === "xiaomi") {
         return {
           valid: true,
           models:
             Array.isArray(payload.data) && payload.data.length > 0
               ? payload.data.map((item) => item.id)
-              : getBundledProviderModelIds(providerId),
+              : providerId === "minimax"
+                ? MINI_MAX_API_MODELS
+                : [],
         };
       }
 
-      return {
-        valid: true,
-        models: Array.isArray(payload.data)
-          ? payload.data.map((item) => item.id)
-          : providerId === "minimax"
-            ? MINI_MAX_API_MODELS
-            : [],
-      };
+      if (providerId === "minimax" && lastStatus === 404) {
+        return { valid: true, models: MINI_MAX_API_MODELS };
+      }
+      if (providerId === "xiaomi" && lastStatus === 404) {
+        return {
+          valid: true,
+          models: getBundledProviderModelIds(providerId),
+        };
+      }
+      if (lastStatus !== null) {
+        return { valid: false, error: `HTTP ${lastStatus}` };
+      }
+
+      return { valid: false, error: "Invalid JSON response" };
     } catch (error) {
       return {
         valid: false,
