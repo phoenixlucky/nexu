@@ -537,7 +537,7 @@ OpenClaw 内置：`extensions/whatsapp/` 从 2026-01-18（v2026.1.22）就存在
 
 ## 8. 关键文件索引
 
-### Nexu 侧集成点（路径相对 `/Users/elian/Documents/refly/nexu/`）
+### Nexu 侧集成点（路径相对 repo 根目录）
 
 | 类别 | 文件 |
 |------|------|
@@ -573,7 +573,7 @@ OpenClaw 内置：`extensions/whatsapp/` 从 2026-01-18（v2026.1.22）就存在
 | 4.5 worker plugin CPU 饱和 | [openclaw/openclaw#62051](https://github.com/openclaw/openclaw/issues/62051) |
 | 4.9 Windows CLI SIGKILL | [openclaw/openclaw#63609](https://github.com/openclaw/openclaw/issues/63609) |
 | WeChat 插件 npm | `@tencent-weixin/openclaw-weixin` |
-| OpenClaw CHANGELOG | `/Users/elian/Documents/openclaw/CHANGELOG.md` |
+| OpenClaw CHANGELOG | [`openclaw/openclaw` CHANGELOG.md](https://github.com/openclaw/openclaw/blob/main/CHANGELOG.md) |
 
 ---
 
