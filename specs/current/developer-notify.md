@@ -30,21 +30,11 @@ Runs on `pull_request_target: [opened]` via `.github/workflows/developer-pr-noti
 3. Skips notifications for `sentry[bot]`.
 4. Sends the external-contributor PR card to the shared developer webhook.
 
-## Card content
+## Notification payloads
 
-### PR card
-
-- 标题：`🎉 又新增 1 位贡献者给 Nexu 提 PR 啦～ 立即派出奖励💰！`
-- 内容包含 author、labels、PR 链接按钮
-- 按钮采用 Feishu V2 `button` + `column_set`（`flex_mode: flow`）组合
-- 额外提供：`贡献者指南`、`立即贡献`
-
-### Issue card
-
-- 标题：`一批新手友好 Issue 等你领取，做贡献领积分奖励💰🎉`
-- 内容包含社区引导文案
-- 按钮：`查看 issue`、`领取新手友好 issue`、`贡献者指南`
-- 多按钮区域使用 Feishu V2 `column_set`，不再使用已废弃的 `action`
+- `scripts/notify/developer-notify.mjs` is the single payload builder and delivery entrypoint for both developer issue and developer PR notifications.
+- The script selects the payload by `EVENT_KIND` (`issue` or `pr`) and sends a Feishu interactive card to the shared developer webhook.
+- Payload layout details are intentionally not documented here; treat the script as the source of truth for message structure.
 
 ## Safety and isolation
 
