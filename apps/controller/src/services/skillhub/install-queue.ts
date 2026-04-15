@@ -323,7 +323,10 @@ export class InstallQueue {
             item.errorCode = code;
             this.active.delete(item.slug);
             this.completed.push(item);
-            this.scheduleCleanup(item);
+            // Failed items are retained so the UI can render a failed card
+            // with a Retry affordance. Eviction happens only when the user
+            // explicitly retries (re-enqueue clears the prior failed entry)
+            // or cancels (cancel() evicts).
             this.drain();
             return;
           }
@@ -334,14 +337,15 @@ export class InstallQueue {
           this.pending.unshift(item);
           this.pauseQueue(pauseMs);
         } else {
-          // Non-rate-limit error: fail immediately
+          // Non-rate-limit error: fail immediately. Retain the item so the
+          // UI shows a failed card with Retry; eviction happens on user
+          // retry (re-enqueue) or explicit cancel.
           item.status = "failed";
           item.errorCode = code;
           item.error = message;
           this.active.delete(item.slug);
           this.completed.push(item);
           this.log("error", `Install failed for ${item.slug}: ${message}`);
-          this.scheduleCleanup(item);
           this.drain();
         }
       },

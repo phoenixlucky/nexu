@@ -7,7 +7,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { basename, posix, resolve } from "node:path";
+import { basename, posix, resolve, sep } from "node:path";
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,127}$/;
 const MAX_ZIP_SIZE = 50 * 1024 * 1024; // 50 MB
@@ -147,10 +147,12 @@ export function importSkillZip(
     }
     extractZipArchive(zipPath, stagingDir);
 
-    // Validate no files escaped staging dir (zip-slip defense)
-    const normalizedStaging = stagingDir.endsWith("/")
+    // Validate no files escaped staging dir (zip-slip defense).
+    // Use the platform separator so the prefix check works on Windows
+    // (resolve() returns backslash-separated paths there).
+    const normalizedStaging = stagingDir.endsWith(sep)
       ? stagingDir
-      : `${stagingDir}/`;
+      : stagingDir + sep;
     for (const entry of readdirSync(stagingDir, {
       withFileTypes: true,
       recursive: true,
