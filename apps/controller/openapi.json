@@ -1038,23 +1038,49 @@
                     "ready": {
                       "type": "boolean"
                     },
+                    "coreReady": {
+                      "type": "boolean"
+                    },
+                    "degraded": {
+                      "type": "boolean"
+                    },
+                    "bootPhase": {
+                      "type": "string",
+                      "enum": [
+                        "preparing",
+                        "starting-managed-runtime",
+                        "attaching-external-runtime",
+                        "reconciling-runtime",
+                        "stabilizing-runtime",
+                        "ready"
+                      ]
+                    },
                     "workspacePath": {
                       "type": "string"
                     },
-                    "runtime": {
+                    "controlPlane": {
                       "type": "object",
                       "properties": {
                         "ok": {
                           "type": "boolean"
                         },
-                        "status": {
-                          "type": "number",
-                          "nullable": true
+                        "phase": {
+                          "type": "string",
+                          "enum": [
+                            "disconnected",
+                            "connecting",
+                            "ready",
+                            "degraded"
+                          ]
+                        },
+                        "wsConnected": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
                         "ok",
-                        "status"
+                        "phase",
+                        "wsConnected"
                       ]
                     },
                     "status": {
@@ -1069,8 +1095,11 @@
                   },
                   "required": [
                     "ready",
+                    "coreReady",
+                    "degraded",
+                    "bootPhase",
                     "workspacePath",
-                    "runtime",
+                    "controlPlane",
                     "status"
                   ]
                 }
@@ -10571,6 +10600,8 @@
                             "enum": [
                               "skill_not_found",
                               "rate_limit",
+                              "npm_missing",
+                              "deps_install_failed",
                               "unknown"
                             ]
                           },
@@ -11013,6 +11044,16 @@
                     },
                     "error": {
                       "type": "string"
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "skill_not_found",
+                        "rate_limit",
+                        "npm_missing",
+                        "deps_install_failed",
+                        "unknown"
+                      ]
                     }
                   },
                   "required": [
@@ -11023,25 +11064,34 @@
             }
           },
           "400": {
-            "description": "Bad request",
+            "description": "Import rejected or failed",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
+                      "type": "boolean"
+                    },
+                    "slug": {
+                      "type": "string"
                     },
                     "error": {
                       "type": "string"
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "skill_not_found",
+                        "rate_limit",
+                        "npm_missing",
+                        "deps_install_failed",
+                        "unknown"
+                      ]
                     }
                   },
                   "required": [
-                    "ok",
-                    "error"
+                    "ok"
                   ]
                 }
               }
