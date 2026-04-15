@@ -4099,11 +4099,6 @@ function ByokProviderDetail({
           </button>
         </div>
         <div className="space-y-0.5">
-          {displayModels.length === 0 && (
-            <div className="text-[11px] text-text-muted/60 py-3 text-center">
-              {t("models.byok.none")}
-            </div>
-          )}
           {displayModels.map((modelId) => {
             const scopedModelId = getScopedByokModelId(modelId);
             const isSelected = isByokModelSelected(
@@ -4230,29 +4225,30 @@ function ByokProviderDetail({
             );
           })}
 
-          {!addModelOpen ? (
-            <button
-              type="button"
-              onClick={() => setAddModelOpen(true)}
-              className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-[11px] font-medium text-text-muted transition-colors hover:border-border-subtle hover:bg-surface-1 hover:text-text-secondary"
-            >
-              <span className="text-[13px] leading-none">+</span>
-              {t("models.byok.addModel")}
-            </button>
-          ) : (
-            <AddModelCombobox
-              query={addModelQuery}
-              onQueryChange={setAddModelQuery}
-              results={availableModelSearchResults}
-              queryIsNovel={queryIsNovelModelId}
-              onAdd={handleAddModel}
-              onClose={() => {
-                setAddModelOpen(false);
-                setAddModelQuery("");
-              }}
-              t={t}
-            />
-          )}
+          {isProviderConfigured &&
+            (!addModelOpen ? (
+              <button
+                type="button"
+                onClick={() => setAddModelOpen(true)}
+                className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-[11px] font-medium text-text-muted transition-colors hover:border-border-subtle hover:bg-surface-1 hover:text-text-secondary"
+              >
+                <span className="text-[13px] leading-none">+</span>
+                {t("models.byok.addModel")}
+              </button>
+            ) : (
+              <AddModelCombobox
+                query={addModelQuery}
+                onQueryChange={setAddModelQuery}
+                results={availableModelSearchResults}
+                queryIsNovel={queryIsNovelModelId}
+                onAdd={handleAddModel}
+                onClose={() => {
+                  setAddModelOpen(false);
+                  setAddModelQuery("");
+                }}
+                t={t}
+              />
+            ))}
         </div>
       </div>
     </div>

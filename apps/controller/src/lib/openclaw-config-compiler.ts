@@ -126,9 +126,10 @@ function compileModelsConfig(
     // with "Unknown model: link/...").
     const hasUsableApiKey =
       apiKey !== null && !(typeof apiKey === "string" && apiKey.length === 0);
-    providers[descriptor.runtimeKey] = {
+    const providerConfig: NonNullable<
+      OpenClawConfig["models"]
+    >["providers"][string] = {
       baseUrl: descriptor.provider.baseUrl,
-      ...(hasUsableApiKey ? { apiKey } : {}),
       api: descriptor.apiKind,
       ...(descriptor.authHeader ? { authHeader: true } : {}),
       ...(descriptor.defaultHeaders
@@ -141,6 +142,12 @@ function compileModelsConfig(
         ),
       ),
     };
+
+    if (hasUsableApiKey && apiKey !== undefined) {
+      providerConfig.apiKey = apiKey;
+    }
+
+    providers[descriptor.runtimeKey] = providerConfig;
   }
 
   const desktopCloud = isDesktopCloudConfig(config.desktop.cloud)
