@@ -11,10 +11,9 @@ import {
 } from "node:fs/promises";
 import { basename, dirname, relative, resolve } from "node:path";
 
-const OPENCLAW_PACKAGE_PATCH_DIRNAME = "openclaw";
 const STAGE_MANIFEST_FILENAME = "manifest.json";
 const STAGE_PATCH_VERSION =
-  "2026-04-15-slimclaw-runtime-stage-v6-builtin-weixin-artifact";
+  "2026-04-15-slimclaw-runtime-stage-v7-remove-feishu-patches";
 const REPLY_OUTCOME_HELPER_SEARCH = `
 const sessionKey = ctx.SessionKey;
 	const startTime = diagnosticsEnabled ? Date.now() : 0;
@@ -61,16 +60,6 @@ emitReplyOutcome("failed", "dispatch_threw", err instanceof Error ? err.message 
 		recordProcessed("error", { error: String(err) });
 		markIdle("message_error");
 `.trim();
-const FEISHU_ERROR_REPLY_SUPPRESS_GUARD_SEARCH = `
-const genericErrorText = "The AI service returned an error. Please try again.";
-	const suppressErrorTextReply = params.messageChannel === "feishu" && lastAssistantErrored;
-	if (errorText && !suppressErrorTextReply) replyItems.push({
-`.trim();
-const FEISHU_ERROR_REPLY_SUPPRESS_GUARD_REPLACEMENT = `
-const genericErrorText = "The AI service returned an error. Please try again.";
-	const suppressErrorTextReply = (params.messageChannel === "feishu" || params.messageProvider === "feishu") && lastAssistantErrored;
-	if (errorText && !suppressErrorTextReply) replyItems.push({
-`.trim();
 const CORE_EMBEDDED_PAYLOAD_MESSAGE_CHANNEL_SEARCH = `
 toolResultFormat: resolvedToolResultFormat,
 					messageChannel: params.messageChannel,
@@ -84,33 +73,6 @@ toolResultFormat: resolvedToolResultFormat,
 					suppressToolErrorWarnings: params.suppressToolErrorWarnings,
 					inlineToolResultsAllowed: false,
 `.trim();
-const FEISHU_PRE_REPLY_FINAL_SEARCH = [
-  "defaultRuntime.error(`Embedded agent failed before reply: ${message}`);",
-  '\t\tconst trimmedMessage = (isTransientHttp ? sanitizeUserFacingText(message, { errorContext: true }) : message).replace(/\\.\\s*$/, "");',
-  "\t\treturn {",
-  '\t\t\tkind: "final",',
-  '\t\t\tpayload: { text: isContextOverflow ? "⚠️ Context overflow — prompt too large for this model. Try a shorter message or a larger-context model." : isRoleOrderingError ? "⚠️ Message ordering conflict - please try again. If this persists, use /new to start a fresh session." : `⚠️ Agent failed before reply: ${trimmedMessage}.\\nLogs: openclaw logs --follow` }',
-  "\t\t};",
-].join("\n");
-const FEISHU_PRE_REPLY_FINAL_REPLACEMENT = [
-  "defaultRuntime.error(`Embedded agent failed before reply: ${message}`);",
-  '\t\tconst trimmedMessage = (isTransientHttp ? sanitizeUserFacingText(message, { errorContext: true }) : message).replace(/\\.\\s*$/, "");',
-  '\t\tif (resolveMessageChannel(params.sessionCtx.Surface, params.sessionCtx.Provider) === "feishu") return {',
-  '\t\t\tkind: "success",',
-  "\t\t\trunId,",
-  "\t\t\trunResult: { payloads: [] },",
-  "\t\t\tfallbackProvider,",
-  "\t\t\tfallbackModel,",
-  "\t\t\tfallbackAttempts,",
-  "\t\t\tdidLogHeartbeatStrip,",
-  "\t\t\tautoCompactionCompleted,",
-  "\t\t\tdirectlySentBlockKeys: directlySentBlockKeys.size > 0 ? directlySentBlockKeys : void 0",
-  "\t\t};",
-  "\t\treturn {",
-  '\t\t\tkind: "final",',
-  '\t\t\tpayload: { text: isContextOverflow ? "⚠️ Context overflow — prompt too large for this model. Try a shorter message or a larger-context model." : isRoleOrderingError ? "⚠️ Message ordering conflict - please try again. If this persists, use /new to start a fresh session." : `⚠️ Agent failed before reply: ${trimmedMessage}.\\nLogs: openclaw logs --follow` }',
-  "\t\t};",
-].join("\n");
 const CONTEXT_OVERFLOW_PATCHES = [
   {
     search:
@@ -217,98 +179,6 @@ const PLUGIN_SDK_BUNDLE_PATTERNS = [
   /^dispatch-.*\.js$/u,
 ] as const;
 const CORE_DIST_REPLY_BUNDLE_PATTERNS = [/^reply-.*\.js$/u] as const;
-const FEISHU_PRE_LLM_SINGLE_AGENT_SEARCH = `
-      // --- Single-agent dispatch (existing behavior) ---
-      const ctxPayload = buildCtxPayloadForAgent(
-        route.sessionKey,
-        route.accountId,
-        ctx.mentionedBot,
-      );
-`.trim();
-const FEISHU_SYNTHETIC_PRE_LLM_LINES = [
-  "      const syntheticFailureTriggerPrefix = process.env.NEXU_FEISHU_TEST_TRIGGER_PREFIX?.trim();",
-  "      if (syntheticFailureTriggerPrefix && ctx.content.includes(syntheticFailureTriggerPrefix)) {",
-  "        const syntheticInput = ctx.content.slice(ctx.content.indexOf(syntheticFailureTriggerPrefix) + syntheticFailureTriggerPrefix.length).trim();",
-  "        runtime.log?.(`NEXU_EVENT channel.reply_outcome ${JSON.stringify({",
-  '          channel: "feishu",',
-  '          status: "failed",',
-  '          reasonCode: "synthetic_pre_llm_failure",',
-  "          accountId: account.accountId,",
-  "          chatId: ctx.chatId,",
-  "          replyToMessageId: replyTargetMessageId,",
-  "          threadId: ctx.rootId,",
-  "          sessionKey: route.sessionKey,",
-  "          syntheticInput,",
-  '          error: "synthetic pre-llm failure",',
-  "          ts: new Date().toISOString(),",
-  "        })}`);",
-  "        log(",
-  "          `feishu[${account.accountId}]: synthetic pre-llm failure triggered (session=${route.sessionKey})`,",
-  "        );",
-  "        return;",
-  "      }",
-] as const;
-const FEISHU_SYNTHETIC_PRE_LLM_BLOCK =
-  FEISHU_SYNTHETIC_PRE_LLM_LINES.join("\n");
-const FEISHU_PRE_LLM_SINGLE_AGENT_REPLACEMENT = [
-  "      // --- Single-agent dispatch (existing behavior) ---",
-  "      const ctxPayload = buildCtxPayloadForAgent(",
-  "        route.sessionKey,",
-  "        route.accountId,",
-  "        ctx.mentionedBot,",
-  "      );",
-  ...FEISHU_SYNTHETIC_PRE_LLM_LINES,
-].join("\n");
-const LEGACY_FEISHU_TRIGGER_CALLSITE = `
-        accountId: account.accountId,
-        syntheticFailureTriggerText: ctx.content,
-        messageCreateTimeMs,
-`.trim();
-const LEGACY_FEISHU_TRIGGER_CALLSITE_REPLACEMENT = `
-        accountId: account.accountId,
-        messageCreateTimeMs,
-`.trim();
-const LEGACY_FEISHU_PRE_LLM_BLOCK = [
-  '                if (ctx.content.includes("__fail_reply__")) {',
-  "        runtime.log?.(`NEXU_EVENT channel.reply_outcome ${JSON.stringify({",
-  '          channel: "feishu",',
-  '          status: "failed",',
-  '          reasonCode: "synthetic_pre_llm_failure",',
-  "          accountId: account.accountId,",
-  "          chatId: ctx.chatId,",
-  "          replyToMessageId: replyTargetMessageId,",
-  "          threadId: ctx.rootId,",
-  "          sessionKey: route.sessionKey,",
-  '          error: "synthetic pre-llm failure",',
-  "          ts: new Date().toISOString(),",
-  "        })}`);",
-  "        log(",
-  "          `feishu[${account.accountId}]: synthetic pre-llm failure triggered (session=${route.sessionKey})`,",
-  "        );",
-  "        return;",
-  "      }",
-  "",
-].join("\n");
-const LEGACY_FEISHU_SINGLE_AGENT_TRIGGER_BLOCK = [
-  '      if (ctx.content.includes("__fail_reply__")) {',
-  "        runtime.log?.(`NEXU_EVENT channel.reply_outcome ${JSON.stringify({",
-  '          channel: "feishu",',
-  '          status: "failed",',
-  '          reasonCode: "synthetic_pre_llm_failure",',
-  "          accountId: account.accountId,",
-  "          chatId: ctx.chatId,",
-  "          replyToMessageId: replyTargetMessageId,",
-  "          threadId: ctx.rootId,",
-  "          sessionKey: route.sessionKey,",
-  '          error: "synthetic pre-llm failure",',
-  "          ts: new Date().toISOString(),",
-  "        })}`);",
-  "        log(",
-  "          `feishu[${account.accountId}]: synthetic pre-llm failure triggered (session=${route.sessionKey})`,",
-  "        );",
-  "        return;",
-  "      }",
-].join("\n");
 
 type StageLog = (message: string) => void;
 
@@ -320,12 +190,10 @@ type StageManifest = {
 
 export type ComputeSlimclawRuntimeStageFingerprintOptions = {
   sourceOpenclawRoot: string;
-  patchRoot: string;
 };
 
 export type PrepareSlimclawRuntimeStageInternalOptions = {
   sourceOpenclawRoot: string;
-  patchRoot: string;
   targetStageRoot: string;
   log?: StageLog;
 };
@@ -400,39 +268,6 @@ async function collectFiles(rootPath: string): Promise<string[]> {
   return files;
 }
 
-async function readOverlayFiles(
-  patchRoot: string,
-  log?: StageLog,
-): Promise<Map<string, string>> {
-  const patchedFiles = new Map<string, string>();
-  const openclawPackagePatchRoot = resolve(
-    patchRoot,
-    OPENCLAW_PACKAGE_PATCH_DIRNAME,
-  );
-
-  if (!(await directoryExists(openclawPackagePatchRoot))) {
-    return patchedFiles;
-  }
-
-  const patchFiles = await collectFiles(openclawPackagePatchRoot);
-
-  for (const patchFilePath of patchFiles) {
-    patchedFiles.set(
-      relative(openclawPackagePatchRoot, patchFilePath),
-      await readFile(patchFilePath, "utf8"),
-    );
-  }
-
-  if (patchFiles.length > 0) {
-    emitLog(
-      log,
-      `[slimclaw-runtime-stage] prepared ${patchFiles.length} overlay patch file(s) from ${openclawPackagePatchRoot}`,
-    );
-  }
-
-  return patchedFiles;
-}
-
 function applyExactReplacement(
   source: string,
   search: string,
@@ -444,24 +279,6 @@ function applyExactReplacement(
   }
 
   return source.replace(search, replacement);
-}
-
-function countOccurrences(source: string, search: string): number {
-  if (search.length === 0) {
-    return 0;
-  }
-
-  let count = 0;
-  let index = 0;
-
-  while (true) {
-    const nextIndex = source.indexOf(search, index);
-    if (nextIndex === -1) {
-      return count;
-    }
-    count += 1;
-    index = nextIndex + search.length;
-  }
 }
 
 function injectKnownLinkErrorMappings(
@@ -498,71 +315,6 @@ async function patchReplyOutcomeBridge(
   log?: StageLog,
 ): Promise<Map<string, string>> {
   const patchedFiles = new Map<string, string>();
-  const feishuBotPath = resolve(
-    openclawPackageRoot,
-    "extensions",
-    "feishu",
-    "src",
-    "bot.ts",
-  );
-  let feishuBotSource = await readFile(feishuBotPath, "utf8");
-
-  if (feishuBotSource.includes(LEGACY_FEISHU_PRE_LLM_BLOCK)) {
-    feishuBotSource = feishuBotSource.replaceAll(
-      LEGACY_FEISHU_PRE_LLM_BLOCK,
-      "",
-    );
-  }
-
-  if (feishuBotSource.includes(LEGACY_FEISHU_SINGLE_AGENT_TRIGGER_BLOCK)) {
-    feishuBotSource = feishuBotSource.replaceAll(
-      LEGACY_FEISHU_SINGLE_AGENT_TRIGGER_BLOCK,
-      FEISHU_PRE_LLM_SINGLE_AGENT_REPLACEMENT,
-    );
-  }
-
-  if (feishuBotSource.includes(LEGACY_FEISHU_TRIGGER_CALLSITE)) {
-    feishuBotSource = feishuBotSource.replaceAll(
-      LEGACY_FEISHU_TRIGGER_CALLSITE,
-      LEGACY_FEISHU_TRIGGER_CALLSITE_REPLACEMENT,
-    );
-  }
-
-  if (feishuBotSource.includes(FEISHU_SYNTHETIC_PRE_LLM_BLOCK)) {
-    feishuBotSource = feishuBotSource.replaceAll(
-      FEISHU_SYNTHETIC_PRE_LLM_BLOCK,
-      "",
-    );
-  }
-
-  if (feishuBotSource.includes(FEISHU_PRE_LLM_SINGLE_AGENT_SEARCH)) {
-    feishuBotSource = feishuBotSource.replace(
-      FEISHU_PRE_LLM_SINGLE_AGENT_SEARCH,
-      FEISHU_PRE_LLM_SINGLE_AGENT_REPLACEMENT,
-    );
-    emitLog(
-      log,
-      "[slimclaw-runtime-stage] patched feishu single-agent pre-llm trigger",
-    );
-  }
-
-  if (countOccurrences(feishuBotSource, FEISHU_SYNTHETIC_PRE_LLM_BLOCK) !== 1) {
-    throw new Error(
-      "Feishu bot patch did not converge to a single synthetic pre-llm block.",
-    );
-  }
-
-  if (feishuBotSource.includes("return;\n      }\n        route.sessionKey,")) {
-    throw new Error(
-      "Feishu bot patch left a dangling buildCtxPayloadForAgent argument tail.",
-    );
-  }
-
-  patchedFiles.set(
-    relative(openclawPackageRoot, feishuBotPath),
-    feishuBotSource,
-  );
-
   const patchBundleGroup = async (
     bundleDir: string,
     patterns: readonly RegExp[],
@@ -606,19 +358,6 @@ async function patchReplyOutcomeBridge(
         );
       }
 
-      if (source.includes(FEISHU_ERROR_REPLY_SUPPRESS_GUARD_SEARCH)) {
-        source = applyExactReplacement(
-          source,
-          FEISHU_ERROR_REPLY_SUPPRESS_GUARD_SEARCH,
-          FEISHU_ERROR_REPLY_SUPPRESS_GUARD_REPLACEMENT,
-          `${bundleName}: feishu error reply suppress guard`,
-        );
-        emitLog(
-          log,
-          `[slimclaw-runtime-stage] patched feishu error final suppression in ${bundleName}`,
-        );
-      }
-
       if (source.includes(CORE_EMBEDDED_PAYLOAD_MESSAGE_CHANNEL_SEARCH)) {
         source = applyExactReplacement(
           source,
@@ -629,22 +368,6 @@ async function patchReplyOutcomeBridge(
         emitLog(
           log,
           `[slimclaw-runtime-stage] patched embedded payload message provider in ${bundleName}`,
-        );
-      }
-
-      if (
-        !source.includes("runResult: { payloads: [] }") &&
-        source.includes(FEISHU_PRE_REPLY_FINAL_SEARCH)
-      ) {
-        source = applyExactReplacement(
-          source,
-          FEISHU_PRE_REPLY_FINAL_SEARCH,
-          FEISHU_PRE_REPLY_FINAL_REPLACEMENT,
-          `${bundleName}: feishu pre-reply final suppression`,
-        );
-        emitLog(
-          log,
-          `[slimclaw-runtime-stage] patched feishu pre-reply final suppression in ${bundleName}`,
         );
       }
 
@@ -942,13 +665,9 @@ async function patchReplyOutcomeBridge(
 
 async function collectFingerprintFiles(
   sourceOpenclawRoot: string,
-  patchRoot: string,
 ): Promise<Array<{ label: string; path: string }>> {
   const files: Array<{ label: string; path: string }> = [];
-  const sourceCandidates = [
-    resolve(sourceOpenclawRoot, "package.json"),
-    resolve(sourceOpenclawRoot, "extensions", "feishu", "src", "bot.ts"),
-  ];
+  const sourceCandidates = [resolve(sourceOpenclawRoot, "package.json")];
 
   for (const sourceFilePath of sourceCandidates) {
     if (await pathExists(sourceFilePath)) {
@@ -1008,19 +727,6 @@ async function collectFingerprintFiles(
     }
   }
 
-  const openclawPackagePatchRoot = resolve(
-    patchRoot,
-    OPENCLAW_PACKAGE_PATCH_DIRNAME,
-  );
-  if (await directoryExists(openclawPackagePatchRoot)) {
-    for (const patchFilePath of await collectFiles(openclawPackagePatchRoot)) {
-      files.push({
-        label: `patch:${relative(openclawPackagePatchRoot, patchFilePath)}`,
-        path: patchFilePath,
-      });
-    }
-  }
-
   return files;
 }
 
@@ -1032,7 +738,6 @@ export async function computeSlimclawRuntimeStageFingerprint(
 
   for (const file of await collectFingerprintFiles(
     options.sourceOpenclawRoot,
-    options.patchRoot,
   )) {
     hash.update(`${file.label}\n`);
     hash.update(await readFile(file.path));
@@ -1064,7 +769,6 @@ export async function prepareSlimclawRuntimeStageInternal(
   );
   const fingerprint = await computeSlimclawRuntimeStageFingerprint({
     sourceOpenclawRoot: options.sourceOpenclawRoot,
-    patchRoot: options.patchRoot,
   });
   stageTimer.mark(
     `[slimclaw-runtime-stage] computed runtime stage fingerprint for ${options.targetStageRoot}`,
@@ -1109,14 +813,13 @@ export async function prepareSlimclawRuntimeStageInternal(
   );
 
   stageTimer.mark(
-    `[slimclaw-runtime-stage] applying overlay and compatibility patches inside ${stageRoot}`,
+    `[slimclaw-runtime-stage] applying compatibility patches inside ${stageRoot}`,
   );
-  const overlayFiles = await readOverlayFiles(options.patchRoot, options.log);
   const bridgePatchedFiles = await patchReplyOutcomeBridge(
     stagedOpenclawRoot,
     options.log,
   );
-  const patchedFiles = new Map([...overlayFiles, ...bridgePatchedFiles]);
+  const patchedFiles = bridgePatchedFiles;
 
   for (const [patchRelativePath, patchedSource] of patchedFiles) {
     await writeFile(
