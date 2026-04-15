@@ -83,7 +83,13 @@ export async function checkOrganizationMembership({ token, org, username }) {
     return true;
   }
 
-  if (response.status === 302 || response.status === 404) {
+  if (
+    response.status === 301 ||
+    response.status === 302 ||
+    response.status === 307 ||
+    response.status === 308 ||
+    response.status === 404
+  ) {
     return false;
   }
 

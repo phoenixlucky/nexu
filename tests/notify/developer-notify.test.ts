@@ -99,6 +99,19 @@ describe("developer-notify", () => {
     ).resolves.toBe(false);
   });
 
+  it("treats permanent and preserved redirects as non-member", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 307, ok: false });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      checkOrganizationMembership({
+        token: "token",
+        org: "nexu-io",
+        username: "octocat",
+      }),
+    ).resolves.toBe(false);
+  });
+
   it("times out stalled membership lookups", async () => {
     const abortError = new Error("aborted");
     abortError.name = "AbortError";
