@@ -42,6 +42,7 @@ import {
   LogIn,
   Monitor,
   RefreshCw,
+  Search,
   Shield,
   Trash2,
   User,
@@ -516,6 +517,239 @@ function normalizeVerifiedModelIds(models: unknown[] | undefined): string[] {
       return null;
     })
     .filter((modelId): modelId is string => Boolean(modelId));
+}
+
+function normalizeModelIdList(modelIds: string[]): string[] {
+  const seen = new Set<string>();
+
+  return modelIds.flatMap((modelId) => {
+    const normalized = modelId.trim();
+    if (normalized.length === 0) {
+      return [];
+    }
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) {
+      return [];
+    }
+    seen.add(key);
+    return [normalized];
+  });
+}
+
+function mergeModelIdLists(...lists: string[][]): string[] {
+  return normalizeModelIdList(lists.flat());
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function renderHighlightedText(text: string, query: string) {
+  const normalizedQuery = query.trim();
+  if (normalizedQuery.length === 0) {
+    return text;
+  }
+
+  const pattern = new RegExp(`(${escapeRegExp(normalizedQuery)})`, "ig");
+  const parts = text.split(pattern);
+  let cursor = 0;
+
+  return parts.map((part) => {
+    const key = `${text}-${cursor}-${part}`;
+    cursor += part.length;
+
+    return part.toLowerCase() === normalizedQuery.toLowerCase() ? (
+      <mark key={key} className="rounded bg-accent/15 px-0.5 text-accent">
+        {part}
+      </mark>
+    ) : (
+      <span key={key}>{part}</span>
+    );
+  });
+}
+
+function getStoredProviderModelIdFromApiModel(
+  providerKey: string,
+  model: { id: string; provider: string },
+): string {
+  return model.id.startsWith(`${providerKey}/`)
+    ? model.id.slice(providerKey.length + 1)
+    : model.id.includes("/")
+      ? model.id.split("/").slice(1).join("/")
+      : model.id;
+}
+
+function matchesProviderModelOption(
+  providerKey: string,
+  providerId: string,
+  model: { id: string; provider: string },
+): boolean {
+  if (model.provider === providerKey) {
+    return true;
+  }
+
+  const normalizedProviderKey = normalizeProviderId(providerKey) ?? providerKey;
+  const normalizedProviderId = normalizeProviderId(providerId) ?? providerId;
+  const normalizedModelProvider =
+    normalizeProviderId(model.provider) ?? model.provider;
+
+  return (
+    normalizedModelProvider === normalizedProviderKey ||
+    normalizedModelProvider === normalizedProviderId
+  );
+}
+
+function AddModelCombobox({
+  query,
+  onQueryChange,
+  results,
+  queryIsNovel,
+  onAdd,
+  onClose,
+  t,
+}: {
+  query: string;
+  onQueryChange: (value: string) => void;
+  results: Array<{ scopedId: string; storedId: string; name: string }>;
+  queryIsNovel: boolean;
+  onAdd: (modelId: string) => void;
+  onClose: () => void;
+  t: (key: string, options?: Record<string, string>) => string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const trimmedQuery = query.trim();
+  const exactMatchedResult = useMemo(
+    () =>
+      results.find(
+        (result) =>
+          result.storedId.toLowerCase() === trimmedQuery.toLowerCase(),
+      ) ?? null,
+    [results, trimmedQuery],
+  );
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        onClose();
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [onClose]);
+
+  const handleKeyDown = (event: {
+    key: string;
+    preventDefault: () => void;
+  }) => {
+    if (event.key === "Escape") {
+      onClose();
+      return;
+    }
+
+    if (event.key === "Enter" && trimmedQuery.length > 0) {
+      event.preventDefault();
+      onAdd(exactMatchedResult?.storedId ?? trimmedQuery);
+    }
+  };
+
+  const shouldShowDropdown =
+    results.length > 0 || queryIsNovel || trimmedQuery.length > 0;
+
+  return (
+    <div ref={containerRef} className="relative mt-1">
+      <div className="flex items-center gap-2 rounded-lg border border-[var(--color-brand-primary)]/30 bg-surface-0 px-3 py-2 ring-2 ring-[var(--color-brand-primary)]/10">
+        <Search size={13} className="shrink-0 text-text-muted" />
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={t("models.byok.addModelPlaceholder")}
+          className="flex-1 bg-transparent text-[12px] text-text-primary placeholder:text-text-muted/50 outline-none"
+        />
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 rounded p-0.5 text-text-muted transition-colors hover:bg-surface-2 hover:text-text-primary"
+          aria-label={t("models.byok.remove")}
+        >
+          <X size={13} />
+        </button>
+      </div>
+
+      {shouldShowDropdown && (
+        <div className="absolute left-0 right-0 z-10 mt-1 rounded-lg border border-border bg-surface-0 p-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
+          {results.length > 0 && (
+            <>
+              <div className="px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-wider text-text-muted">
+                {t("models.byok.availableModels")}
+              </div>
+              {results.map((model) => (
+                <button
+                  key={model.scopedId}
+                  type="button"
+                  onClick={() => onAdd(model.storedId)}
+                  className="flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-surface-2"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-[12px] font-medium text-text-primary">
+                      {renderHighlightedText(model.storedId, query)}
+                    </div>
+                    {model.name !== model.storedId && (
+                      <div className="truncate text-[10px] text-text-muted">
+                        {renderHighlightedText(model.name, query)}
+                      </div>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-[10px] font-medium text-link">
+                    + {t("models.byok.addModel")}
+                  </span>
+                </button>
+              ))}
+            </>
+          )}
+
+          {results.length === 0 && trimmedQuery.length > 0 && (
+            <div className="px-2.5 py-2 text-[11px] text-text-muted">
+              {t("models.byok.searchEmpty")}
+            </div>
+          )}
+
+          {queryIsNovel && (
+            <>
+              {results.length > 0 && (
+                <div className="mx-2 my-1.5 border-t border-border-subtle" />
+              )}
+              <button
+                type="button"
+                onClick={() => onAdd(trimmedQuery)}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] transition-colors hover:bg-surface-2"
+              >
+                <span className="text-text-muted">↵</span>
+                <span className="truncate text-text-secondary">
+                  {t("models.byok.addCustomModelHint", {
+                    modelId: trimmedQuery,
+                  })}
+                </span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── BYOK provider sidebar entries ─────────────────────────────
@@ -2164,6 +2398,7 @@ export function ModelsPage() {
                           : removeBuiltinProviderConfig
                       }
                       queryClient={queryClient}
+                      allModels={models}
                       currentModelId={currentModelId}
                       onAutoSelectModel={handleAutoSelectModel}
                       onSelectModel={(modelId) => updateModel.mutate(modelId)}
@@ -2483,6 +2718,7 @@ function ByokProviderDetail({
   onSaveProviderConfig,
   onDeleteProviderConfig,
   queryClient,
+  allModels,
   currentModelId,
   onAutoSelectModel,
   onSelectModel,
@@ -2496,6 +2732,7 @@ function ByokProviderDetail({
   ) => Promise<void>;
   onDeleteProviderConfig: (provider: ByokProviderEntry) => Promise<void>;
   queryClient: ReturnType<typeof useQueryClient>;
+  allModels: Array<{ id: string; name: string; provider: string }>;
   currentModelId: string;
   onAutoSelectModel: (modelId: string) => void;
   onSelectModel: (modelId: string) => void;
@@ -2562,6 +2799,14 @@ function ByokProviderDetail({
 
   // Available models from verification
   const [verifiedModels, setVerifiedModels] = useState<string[] | null>(null);
+  const [configuredModelIds, setConfiguredModelIds] = useState<string[]>(
+    normalizeModelIdList(
+      providerConfig?.models?.map((model) => model.id) ?? [],
+    ),
+  );
+  const [addModelOpen, setAddModelOpen] = useState(false);
+  const [addModelQuery, setAddModelQuery] = useState("");
+  const [didAutoDiscoverModels, setDidAutoDiscoverModels] = useState(false);
 
   // ── OAuth state (OpenAI only) ──────────────────────────
   const isOAuthProvider = providerId === "openai";
@@ -2757,6 +3002,14 @@ function ByokProviderDetail({
     setOauthRegion(providerConfig?.oauthRegion ?? "global");
     setIsEditingApiKey(!providerConfig?.apiKey);
     setVerifiedModels(null);
+    setConfiguredModelIds(
+      normalizeModelIdList(
+        providerConfig?.models?.map((model) => model.id) ?? [],
+      ),
+    );
+    setAddModelOpen(false);
+    setAddModelQuery("");
+    setDidAutoDiscoverModels(false);
     setOauthPending(false);
     setCodingPlanKey("");
     setCodingPlanRegion("global");
@@ -2774,6 +3027,44 @@ function ByokProviderDetail({
 
     setVerifiedModels(storedModelIds.length > 0 ? storedModelIds : null);
   }, [authMode, isMiniMax, storedModelIds]);
+
+  const getModelListUnsupportedMessage = useCallback(
+    (error?: string) => {
+      if (error?.includes("HTTP 404")) {
+        return t("models.byok.modelListUnsupportedManualAdd");
+      }
+
+      return error ?? t("models.byok.keyInvalidUnknown");
+    },
+    [t],
+  );
+
+  useEffect(() => {
+    if (!addModelOpen || didAutoDiscoverModels || !canRefreshModels) {
+      return;
+    }
+
+    setDidAutoDiscoverModels(true);
+
+    void verifyApiKey(
+      providerKey,
+      providerId,
+      validationApiKey,
+      baseUrl || undefined,
+    ).then((result) => {
+      if (result.valid) {
+        setVerifiedModels(normalizeVerifiedModelIds(result.models));
+      }
+    });
+  }, [
+    addModelOpen,
+    baseUrl,
+    canRefreshModels,
+    didAutoDiscoverModels,
+    providerId,
+    providerKey,
+    validationApiKey,
+  ]);
 
   // ── Verify mutation ──────────────────────────────────
   const verifyMutation = useMutation({
@@ -2819,7 +3110,11 @@ function ByokProviderDetail({
       setVerifiedModels(models);
 
       if (hasSavedAccess || isOllama) {
-        await onSaveProviderConfig(provider, buildProviderConfig(models));
+        await onSaveProviderConfig(
+          provider,
+          buildProviderConfig(configuredModelIds),
+        );
+        return configuredModelIds;
       }
 
       return models;
@@ -2828,14 +3123,17 @@ function ByokProviderDetail({
       toast.success(t("models.byok.refreshSuccess", { count: models.length }));
     },
     onError: (error) => {
-      toast.error(error.message || t("models.byok.refreshFailed"));
+      toast.error(
+        error.message
+          ? getModelListUnsupportedMessage(error.message)
+          : t("models.byok.refreshFailed"),
+      );
     },
   });
 
   // ── Save mutation ────────────────────────────────────
   const saveMutation = useMutation({
     mutationFn: async () => {
-      let models = displayModels;
       if (isOllama || isAwsSdkProvider || effectiveApiKey || hasSavedApiKey) {
         const result = await verifyApiKey(
           providerKey,
@@ -2844,14 +3142,18 @@ function ByokProviderDetail({
           baseUrl || undefined,
         );
         if (result.valid && result.models) {
-          models = normalizeVerifiedModelIds(result.models);
-          setVerifiedModels(models);
+          const verifiedModelIds = normalizeVerifiedModelIds(result.models);
+          setVerifiedModels(verifiedModelIds);
         }
       }
 
-      await onSaveProviderConfig(provider, buildProviderConfig(models));
+      setConfiguredModelIds(configuredModelIds);
+      await onSaveProviderConfig(
+        provider,
+        buildProviderConfig(configuredModelIds),
+      );
 
-      return { models };
+      return { models: configuredModelIds };
     },
     onSuccess: ({ models }) => {
       track("workspace_provider_save", {
@@ -2890,6 +3192,10 @@ function ByokProviderDetail({
       setBaseUrl(getProviderDefaultBaseUrl(provider));
       setIsEditingApiKey(true);
       setVerifiedModels(null);
+      setConfiguredModelIds([]);
+      setAddModelOpen(false);
+      setAddModelQuery("");
+      setDidAutoDiscoverModels(false);
     },
   });
 
@@ -2978,10 +3284,8 @@ function ByokProviderDetail({
 
   // Model list to show: verified > DB stored > defaults
   const displayModels = useMemo(() => {
-    if (verifiedModels && verifiedModels.length > 0) return verifiedModels;
-    if (storedModelIds.length > 0) return storedModelIds;
-    return [];
-  }, [storedModelIds, verifiedModels]);
+    return configuredModelIds;
+  }, [configuredModelIds]);
 
   const getScopedByokModelId = useCallback(
     (modelId: string) =>
@@ -2990,6 +3294,90 @@ function ByokProviderDetail({
         : `${providerKey}/${modelId}`,
     [providerKey],
   );
+
+  const availableModelSearchResults = useMemo(() => {
+    const existingModelKeys = new Set(
+      displayModels.map((model) => model.toLowerCase()),
+    );
+    const query = addModelQuery.trim().toLowerCase();
+    const verifiedModelOptions = (verifiedModels ?? []).map((modelId) => ({
+      scopedId: getScopedByokModelId(modelId),
+      storedId: modelId,
+      name: modelId,
+    }));
+    const fallbackModelOptions = allModels
+      .filter((model) =>
+        matchesProviderModelOption(providerKey, providerId, model),
+      )
+      .map((model) => ({
+        scopedId: model.id,
+        storedId: getStoredProviderModelIdFromApiModel(providerKey, model),
+        name: model.name,
+      }));
+    const searchSource =
+      verifiedModelOptions.length > 0
+        ? verifiedModelOptions
+        : fallbackModelOptions;
+
+    return searchSource
+      .filter((model) => !existingModelKeys.has(model.storedId.toLowerCase()))
+      .filter(
+        (model) =>
+          query.length === 0 ||
+          model.storedId.toLowerCase().includes(query) ||
+          model.name.toLowerCase().includes(query),
+      )
+      .slice(0, 6);
+  }, [
+    addModelQuery,
+    allModels,
+    displayModels,
+    getScopedByokModelId,
+    providerId,
+    providerKey,
+    verifiedModels,
+  ]);
+
+  const queryIsNovelModelId = useMemo(() => {
+    const trimmed = addModelQuery.trim();
+    if (trimmed.length === 0) {
+      return false;
+    }
+
+    const normalized = trimmed.toLowerCase();
+    if (displayModels.some((model) => model.toLowerCase() === normalized)) {
+      return false;
+    }
+
+    if (
+      availableModelSearchResults.some(
+        (result) => result.storedId.toLowerCase() === normalized,
+      )
+    ) {
+      return false;
+    }
+
+    return true;
+  }, [addModelQuery, availableModelSearchResults, displayModels]);
+
+  const addModelId = useCallback((modelId: string) => {
+    setConfiguredModelIds((previous) => mergeModelIdLists(previous, [modelId]));
+  }, []);
+
+  const handleAddModel = useCallback(
+    (modelId: string) => {
+      addModelId(modelId);
+      setAddModelQuery("");
+    },
+    [addModelId],
+  );
+
+  const removeModelId = useCallback((modelId: string) => {
+    const target = modelId.trim().toLowerCase();
+    setConfiguredModelIds((previous) =>
+      previous.filter((candidate) => candidate.trim().toLowerCase() !== target),
+    );
+  }, []);
 
   return (
     <div>
@@ -3396,9 +3784,9 @@ function ByokProviderDetail({
                         count: verifyMutation.data.models?.length ?? 0,
                       })
                     : t("models.byok.keyInvalid", {
-                        error:
-                          verifyMutation.data?.error ??
-                          t("models.byok.keyInvalidUnknown"),
+                        error: getModelListUnsupportedMessage(
+                          verifyMutation.data?.error,
+                        ),
                       })}
                 </div>
               )}
@@ -3468,9 +3856,9 @@ function ByokProviderDetail({
                       count: verifyMutation.data.models?.length ?? 0,
                     })
                   : t("models.byok.keyInvalid", {
-                      error:
-                        verifyMutation.data?.error ??
-                        t("models.byok.keyInvalidUnknown"),
+                      error: getModelListUnsupportedMessage(
+                        verifyMutation.data?.error,
+                      ),
                     })}
               </div>
             )}
@@ -3583,43 +3971,87 @@ function ByokProviderDetail({
               currentModelId,
             );
             return (
-              <button
+              <div
                 key={modelId}
-                type="button"
-                disabled={!isProviderConfigured}
-                onClick={() => {
-                  if (!isProviderConfigured || isSelected) return;
-                  onSelectModel(scopedModelId);
-                }}
                 className={cn(
-                  "w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors",
+                  "group flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors",
                   isSelected ? "bg-surface-2" : "hover:bg-surface-2",
-                  !isProviderConfigured &&
-                    "cursor-not-allowed opacity-60 hover:bg-transparent",
                 )}
               >
-                <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-white border border-border-subtle">
-                  <ModelLogo model={modelId} provider={providerId} size={14} />
-                </span>
-                <span
+                <button
+                  type="button"
+                  disabled={!isProviderConfigured}
+                  onClick={() => {
+                    if (!isProviderConfigured || isSelected) return;
+                    onSelectModel(scopedModelId);
+                  }}
                   className={cn(
-                    "flex-1 text-[12px] truncate",
-                    isSelected
-                      ? "font-semibold text-text-primary"
-                      : "font-medium text-text-primary",
+                    "flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 py-1 text-left transition-colors",
+                    !isProviderConfigured &&
+                      "cursor-not-allowed opacity-60 hover:bg-transparent",
                   )}
                 >
-                  {modelId}
-                </span>
+                  <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-white border border-border-subtle">
+                    <ModelLogo
+                      model={modelId}
+                      provider={providerId}
+                      size={14}
+                    />
+                  </span>
+                  <span
+                    className={cn(
+                      "flex-1 truncate text-[12px]",
+                      isSelected
+                        ? "font-semibold text-text-primary"
+                        : "font-medium text-text-primary",
+                    )}
+                  >
+                    {modelId}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    removeModelId(modelId);
+                  }}
+                  className="pointer-events-none rounded p-1 text-text-muted opacity-0 transition-all hover:bg-surface-3 hover:text-text-primary group-hover:pointer-events-auto group-hover:opacity-100"
+                  aria-label={t("models.byok.removeModel")}
+                >
+                  <X size={12} />
+                </button>
                 {isSelected && (
                   <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-secondary shrink-0">
                     <Check size={12} />
                     Active
                   </span>
                 )}
-              </button>
+              </div>
             );
           })}
+
+          {!addModelOpen ? (
+            <button
+              type="button"
+              onClick={() => setAddModelOpen(true)}
+              className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-[11px] font-medium text-text-muted transition-colors hover:border-border-subtle hover:bg-surface-1 hover:text-text-secondary"
+            >
+              <span className="text-[13px] leading-none">+</span>
+              {t("models.byok.addModel")}
+            </button>
+          ) : (
+            <AddModelCombobox
+              query={addModelQuery}
+              onQueryChange={setAddModelQuery}
+              results={availableModelSearchResults}
+              queryIsNovel={queryIsNovelModelId}
+              onAdd={handleAddModel}
+              onClose={() => {
+                setAddModelOpen(false);
+                setAddModelQuery("");
+              }}
+              t={t}
+            />
+          )}
         </div>
       </div>
     </div>

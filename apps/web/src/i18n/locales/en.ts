@@ -599,9 +599,12 @@ const en = {
     "For security, the saved key is not shown. Enter a new key only if you want to replace it.",
   "models.byok.changeApiKey": "Replace key",
   "models.byok.verify": "Check",
-  "models.byok.keyValid": "Key valid — {{count}} models detected",
+  "models.byok.keyValid":
+    "Connection verified — {{count}} available models found",
   "models.byok.keyInvalid": "Key invalid: {{error}}",
   "models.byok.keyInvalidUnknown": "Unknown error",
+  "models.byok.modelListUnsupportedManualAdd":
+    "This provider does not support the model list API. Add the models you need manually.",
   "models.byok.proxyUrl": "API Proxy URL",
   "models.byok.modelList": "Model list",
   "models.byok.modelsTotalCount": "{{count}} models total",
@@ -611,6 +614,12 @@ const en = {
   "models.byok.none": "None",
   "models.byok.refreshModels": "Refresh",
   "models.byok.fetchingModels": "Fetching models...",
+  "models.byok.addModelPlaceholder": "Search or type a model ID...",
+  "models.byok.availableModels": "Available models",
+  "models.byok.searchEmpty": "No matching models",
+  "models.byok.addCustomModelHint": 'Add "{{modelId}}" as custom model',
+  "models.byok.addModel": "Add",
+  "models.byok.removeModel": "Remove model",
   "models.byok.refreshSuccess": "Model list refreshed: {{count}} models",
   "models.byok.refreshFailed":
     "Failed to refresh model list. Please try again.",
