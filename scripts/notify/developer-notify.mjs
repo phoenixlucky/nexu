@@ -77,10 +77,16 @@ function createButton(text, url, type = "default") {
   };
 }
 
-function createActionRow(actions) {
+function createButtonColumns(actions) {
   return {
-    tag: "action",
-    actions,
+    tag: "column_set",
+    flex_mode: "flow",
+    columns: actions.map((action) => ({
+      tag: "column",
+      width: "weighted",
+      weight: 1,
+      elements: [action],
+    })),
   };
 }
 
@@ -104,13 +110,13 @@ export function buildDeveloperPrPayload({ author, labels, prUrl }) {
         elements: [
           { tag: "markdown", content: `**Author:** ${safeAuthor}` },
           { tag: "markdown", content: `**Labels:** ${safeLabels}` },
-          createActionRow([createButton("查看贡献 PR", prUrl, "primary")]),
+          createButtonColumns([createButton("查看贡献 PR", prUrl, "primary")]),
           {
             tag: "markdown",
             content:
               "Nexu 准备好一批对新手友好任务的 Good First Issue 👇\n只需 3 步💥，选任务 — 认领 —— 提交，即可获得 GitHub README 公开致谢 + 积分奖励 + Github 社区徽章🎉。（详情请看群公告）",
           },
-          createActionRow([
+          createButtonColumns([
             createButton("贡献者指南", CONTRIBUTOR_GUIDE_URL),
             createButton("立即贡献", GOOD_FIRST_ISSUE_URL),
           ]),
@@ -140,7 +146,7 @@ export function buildDeveloperIssuePayload({ issueUrl }) {
             content:
               "只需 3 步💥，选任务 — 认领 —— 提交，即可获得 GitHub README 公开致谢 + 积分奖励 + Github 社区徽章🎉。（详情请阅览群公告）",
           },
-          createActionRow([
+          createButtonColumns([
             createButton("查看 issue", issueUrl, "primary"),
             createButton("领取新手友好 issue", GOOD_FIRST_ISSUE_URL),
             createButton("贡献者指南", CONTRIBUTOR_GUIDE_URL),
@@ -166,6 +172,22 @@ export async function sendWebhook(webhookUrl, payload) {
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`Webhook request failed (${response.status}): ${text}`);
+    }
+
+    const responseBody = await response.json().catch(() => null);
+    if (
+      responseBody &&
+      typeof responseBody === "object" &&
+      "code" in responseBody &&
+      responseBody.code !== 0
+    ) {
+      const message =
+        typeof responseBody.msg === "string"
+          ? responseBody.msg
+          : JSON.stringify(responseBody);
+      throw new Error(
+        `Webhook business error (${responseBody.code}): ${message}`,
+      );
     }
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {

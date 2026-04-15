@@ -37,18 +37,23 @@ describe("developer-notify", () => {
 
     expect(payload.card.header.title.content).toContain("新增 1 位贡献者");
     expect(payload.card.body.elements[2]).toMatchObject({
-      tag: "action",
+      tag: "column_set",
+      flex_mode: "flow",
     });
-    expect(payload.card.body.elements[2].actions).toEqual([
+    expect(payload.card.body.elements[2].columns).toEqual([
       expect.objectContaining({
-        url: "https://github.com/nexu-io/nexu/pull/10",
-        text: expect.objectContaining({ content: "查看贡献 PR" }),
+        elements: [
+          expect.objectContaining({
+            url: "https://github.com/nexu-io/nexu/pull/10",
+            text: expect.objectContaining({ content: "查看贡献 PR" }),
+          }),
+        ],
       }),
     ]);
-    expect(payload.card.body.elements[4]).toMatchObject({ tag: "action" });
+    expect(payload.card.body.elements[4]).toMatchObject({ tag: "column_set" });
     expect(
-      payload.card.body.elements[4].actions.map(
-        (action) => action.text.content,
+      payload.card.body.elements[4].columns.map(
+        (column) => column.elements[0].text.content,
       ),
     ).toEqual(["贡献者指南", "立即贡献"]);
   });
@@ -59,10 +64,10 @@ describe("developer-notify", () => {
     });
 
     expect(payload.card.header.title.content).toContain("新手友好 Issue");
-    expect(payload.card.body.elements[1]).toMatchObject({ tag: "action" });
+    expect(payload.card.body.elements[1]).toMatchObject({ tag: "column_set" });
     expect(
-      payload.card.body.elements[1].actions.map(
-        (action) => action.text.content,
+      payload.card.body.elements[1].columns.map(
+        (column) => column.elements[0].text.content,
       ),
     ).toEqual(["查看 issue", "领取新手友好 issue", "贡献者指南"]);
   });
@@ -106,9 +111,11 @@ describe("developer-notify", () => {
   });
 
   it("sends PR notification without membership lookup", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: true, status: 200, text: async () => "" });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ code: 0, msg: "success" }),
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await runFromEnv({
@@ -124,5 +131,24 @@ describe("developer-notify", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       "https://example.feishu.cn/webhook/test",
     );
+  });
+
+  it("throws when webhook returns a business error", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ code: 11246, msg: "unsupported tag action" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      runFromEnv({
+        WEBHOOK_URL: "https://example.feishu.cn/webhook/test",
+        EVENT_KIND: "pr",
+        AUTHOR: "alice",
+        LABELS_OR_CATEGORY: "none",
+        URL: "https://github.com/nexu-io/nexu/pull/1",
+      }),
+    ).rejects.toThrow("Webhook business error (11246): unsupported tag action");
   });
 });

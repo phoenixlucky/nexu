@@ -36,6 +36,7 @@ Runs on `pull_request_target: [opened]` via `.github/workflows/developer-pr-noti
 
 - 标题：`🎉 又新增 1 位贡献者给 Nexu 提 PR 啦～ 立即派出奖励💰！`
 - 内容包含 author、labels、PR 链接按钮
+- 按钮采用 Feishu V2 `button` + `column_set`（`flex_mode: flow`）组合
 - 额外提供：`贡献者指南`、`立即贡献`
 
 ### Issue card
@@ -43,6 +44,7 @@ Runs on `pull_request_target: [opened]` via `.github/workflows/developer-pr-noti
 - 标题：`一批新手友好 Issue 等你领取，做贡献领积分奖励💰🎉`
 - 内容包含社区引导文案
 - 按钮：`查看 issue`、`领取新手友好 issue`、`贡献者指南`
+- 多按钮区域使用 Feishu V2 `column_set`，不再使用已废弃的 `action`
 
 ## Safety and isolation
 
@@ -50,6 +52,7 @@ Runs on `pull_request_target: [opened]` via `.github/workflows/developer-pr-noti
 - 新链路只复用 GitHub App credentials 做组织成员过滤；Feishu webhook 为独立开发者通知用途。
 - PR 流程保持 metadata-only，仍使用 `pull_request_target`，不执行 PR 代码。
 - 所有跳转链接都限制为 `https://github.com/*` 或固定官方文档链接。
+- webhook 发送除了检查 HTTP 状态，还会校验 Feishu JSON 响应里的 `code/msg`，避免 200 但业务失败被误判为成功。
 
 ## Secrets
 
