@@ -1,0 +1,128 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  buildDeveloperIssuePayload,
+  buildDeveloperPrPayload,
+  checkOrganizationMembership,
+  isInternalEquivalentAuthor,
+  runFromEnv,
+  sanitizeText,
+  validateGithubUrl,
+} from "../../scripts/notify/developer-notify.mjs";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+describe("developer-notify", () => {
+  it("sanitizes markdown-sensitive characters and mentions", () => {
+    expect(sanitizeText("hi\n@team [link]!")).toBe("hi ＠team \\[link\\]\\!");
+  });
+
+  it("validates GitHub URLs", () => {
+    expect(validateGithubUrl("https://github.com/nexu-io/nexu/issues/1")).toBe(
+      "https://github.com/nexu-io/nexu/issues/1",
+    );
+    expect(() => validateGithubUrl("https://example.com/test")).toThrow(
+      "Only https://github.com URLs are allowed",
+    );
+  });
+
+  it("builds the developer PR payload with expected buttons", () => {
+    const payload = buildDeveloperPrPayload({
+      author: "alice",
+      labels: "bug, help wanted",
+      prUrl: "https://github.com/nexu-io/nexu/pull/10",
+    });
+
+    expect(payload.card.header.title.content).toContain("新增 1 位贡献者");
+    expect(payload.card.body.elements[2]).toMatchObject({
+      tag: "action",
+    });
+    expect(payload.card.body.elements[2].actions).toEqual([
+      expect.objectContaining({
+        url: "https://github.com/nexu-io/nexu/pull/10",
+        text: expect.objectContaining({ content: "查看贡献 PR" }),
+      }),
+    ]);
+    expect(payload.card.body.elements[4]).toMatchObject({ tag: "action" });
+    expect(
+      payload.card.body.elements[4].actions.map(
+        (action) => action.text.content,
+      ),
+    ).toEqual(["贡献者指南", "立即贡献"]);
+  });
+
+  it("builds the developer issue payload with three actions", () => {
+    const payload = buildDeveloperIssuePayload({
+      issueUrl: "https://github.com/nexu-io/nexu/issues/99",
+    });
+
+    expect(payload.card.header.title.content).toContain("新手友好 Issue");
+    expect(payload.card.body.elements[1]).toMatchObject({ tag: "action" });
+    expect(
+      payload.card.body.elements[1].actions.map(
+        (action) => action.text.content,
+      ),
+    ).toEqual(["查看 issue", "领取新手友好 issue", "贡献者指南"]);
+  });
+
+  it("treats sentry bot as internal-equivalent", () => {
+    expect(isInternalEquivalentAuthor("sentry[bot]")).toBe(true);
+    expect(isInternalEquivalentAuthor("alice")).toBe(false);
+  });
+
+  it("treats redirect membership responses as non-member", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 302, ok: false });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      checkOrganizationMembership({
+        token: "token",
+        org: "nexu-io",
+        username: "octocat",
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("skips issue notification for internal authors", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 204, ok: true })
+      .mockResolvedValueOnce({ ok: true, status: 200, text: async () => "" });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await runFromEnv({
+      WEBHOOK_URL: "https://example.feishu.cn/webhook/test",
+      EVENT_KIND: "issue",
+      GITHUB_TOKEN: "token",
+      GITHUB_REPOSITORY_OWNER: "nexu-io",
+      AUTHOR: "internal-user",
+      URL: "https://github.com/nexu-io/nexu/issues/1",
+    });
+
+    expect(result).toEqual({ skipped: true, reason: "internal-author" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends PR notification without membership lookup", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 200, text: async () => "" });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await runFromEnv({
+      WEBHOOK_URL: "https://example.feishu.cn/webhook/test",
+      EVENT_KIND: "pr",
+      AUTHOR: "alice",
+      LABELS_OR_CATEGORY: "none",
+      URL: "https://github.com/nexu-io/nexu/pull/1",
+    });
+
+    expect(result).toEqual({ skipped: false, eventKind: "pr" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://example.feishu.cn/webhook/test",
+    );
+  });
+});
