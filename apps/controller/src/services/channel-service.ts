@@ -62,6 +62,7 @@ const LEGACY_WECOM_PLUGIN_ID = "wecom-openclaw-plugin";
 const QQBOT_PLUGIN_ID = "openclaw-qqbot";
 const DISCORD_API_ORIGIN = "https://discord.com";
 const TELEGRAM_API_ORIGIN = "https://api.telegram.org";
+const DINGTALK_API_ORIGIN = "https://oapi.dingtalk.com";
 
 type ActiveWechatLogin = {
   sessionKey: string;
@@ -1678,6 +1679,32 @@ export class ChannelService {
     });
   }
 
+  private toDingtalkConnectError(error: unknown): ChannelConnectError {
+    if (error instanceof ChannelConnectError) {
+      return error;
+    }
+
+    if (error instanceof Error && error.name === "TimeoutError") {
+      return new ChannelConnectError({
+        message: "DingTalk request timed out after 5000ms",
+        code: "timeout",
+        status: 504,
+        retryable: true,
+        phase: "verify_credentials",
+        upstreamHost: DINGTALK_API_ORIGIN,
+      });
+    }
+
+    return new ChannelConnectError({
+      message: "DingTalk network request failed",
+      code: "network_error",
+      status: 502,
+      retryable: true,
+      phase: "verify_credentials",
+      upstreamHost: DINGTALK_API_ORIGIN,
+    });
+  }
+
   private toSyncConnectError(
     error: unknown,
     channel: "discord" | "telegram",
@@ -1796,24 +1823,56 @@ export class ChannelService {
     const clientId = input.clientId.trim();
     const clientSecret = input.clientSecret.trim();
     if (!clientId || !clientSecret) {
-      throw new Error("DingTalk Client ID and Client Secret are required");
+      throw new ChannelConnectError({
+        message: "DingTalk Client ID and Client Secret are required",
+        code: "invalid_credentials",
+        status: 422,
+        retryable: false,
+        phase: "verify_credentials",
+        upstreamHost: DINGTALK_API_ORIGIN,
+      });
     }
 
-    const response = await proxyFetch(
-      `https://oapi.dingtalk.com/gettoken?appkey=${encodeURIComponent(clientId)}&appsecret=${encodeURIComponent(clientSecret)}`,
-      {
-        method: "GET",
-        timeoutMs: 5000,
-      },
-    );
+    let response: Response;
+    try {
+      response = await proxyFetch(
+        `${DINGTALK_API_ORIGIN}/gettoken?appkey=${encodeURIComponent(clientId)}&appsecret=${encodeURIComponent(clientSecret)}`,
+        {
+          method: "GET",
+          timeoutMs: 5000,
+        },
+      );
+    } catch (error) {
+      throw this.toDingtalkConnectError(error);
+    }
     const payload = (await response.json()) as {
       access_token?: string;
       errcode?: number;
       errmsg?: string;
     };
     if (!response.ok || !payload.access_token) {
-      throw new Error(
-        `Invalid DingTalk credentials: ${payload.errmsg ?? `HTTP ${response.status}`}`,
+      throw new ChannelConnectError(
+        response.status === 401 ||
+          payload.errcode === 40014 ||
+          payload.errmsg === "Illegal appKey or appSecret"
+          ? {
+              message: `Invalid DingTalk credentials: ${payload.errmsg ?? `HTTP ${response.status}`}`,
+              code: "invalid_credentials",
+              status: 422,
+              retryable: false,
+              phase: "verify_credentials",
+              upstreamHost: DINGTALK_API_ORIGIN,
+              upstreamStatus: response.status,
+            }
+          : {
+              message: `DingTalk API error: ${payload.errmsg ?? `HTTP ${response.status}`}`,
+              code: "upstream_http_error",
+              status: 502,
+              retryable: response.status >= 500,
+              phase: "verify_credentials",
+              upstreamHost: DINGTALK_API_ORIGIN,
+              upstreamStatus: response.status,
+            },
       );
     }
 
