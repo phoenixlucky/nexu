@@ -37,7 +37,9 @@ describe("developer-notify", () => {
       prUrl: "https://github.com/nexu-io/nexu/pull/10",
     });
 
-    expect(payload.card.header.title.content).toContain("又有新贡献者给 Nexu 提 PR");
+    expect(payload.card.header.title.content).toContain(
+      "又有新贡献者给 Nexu 提 PR",
+    );
     expect(payload.card.body.elements[0]).toMatchObject({
       tag: "markdown",
       content: expect.stringContaining("**Title:** fix: resolve login crash"),
@@ -73,7 +75,9 @@ describe("developer-notify", () => {
     ).toEqual(["Good First Issue", "贡献者指南", "查看全部 Issue"]);
     expect(payload.card.body.elements[2]).toMatchObject({
       tag: "markdown",
-      content: expect.stringContaining("只需 3 步💥：❶ 选任务 ❷ 认领 ❸ 提交 PR"),
+      content: expect.stringContaining(
+        "只需 3 步💥：❶ 选任务 ❷ 认领 ❸ 提交 PR",
+      ),
     });
   });
 
