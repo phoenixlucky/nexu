@@ -149,7 +149,7 @@ export async function prepareSlimclawOwnedRuntimeInstall() {
     timings,
   );
   console.log(
-    `[slimclaw:prepare][timing] precompiled plugin=${hotPluginResult.pluginId} files=${hotPluginResult.transpiledCount}`,
+    `[slimclaw:prepare][timing] precompiled plugin=${hotPluginResult.pluginId} files=${hotPluginResult.transpiledCount}${hotPluginResult.startupExperimentMode ? ` startupExperiment=${hotPluginResult.startupExperimentMode}` : ""}`,
   );
 
   await timedStep(
